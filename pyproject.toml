@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-minimaxh3-easy"
 description = "A streamlined MiniMax H3 workflow for text-to-video, image-to-video, and reference-to-video generation in ComfyUI."
-version = "1.0.0"
+version = "1.0.1"
 license = { file = "LICENSE" }
 dependencies = []
 

@@ -322,6 +322,14 @@ function ensureLinks(node) {
     return node.properties[LINKS_PROP];
 }
 
+function isSameNode(left, right) {
+    if (!left || !right) return false;
+    if (left === right) return true;
+    const leftId = Number(left.id);
+    const rightId = Number(right.id);
+    return Number.isFinite(leftId) && Number.isFinite(rightId) && leftId === rightId;
+}
+
 function resequence(node) {
     const counts = { image: 0, video: 0, audio: 0 };
     ensureLinks(node).forEach((link) => {
@@ -341,6 +349,7 @@ function normalizeLinks(node, removeMissing = true) {
         const sourceSlot = Number(link?.source_slot) || 0;
         const mediaType = String(link?.media_type || "image").toLowerCase();
         if (!Number.isFinite(sourceId) || !["image", "video", "audio"].includes(mediaType)) continue;
+        if (Number.isFinite(Number(node?.id)) && sourceId === Number(node.id)) continue;
         const key = `${sourceId}:${sourceSlot}:${mediaType}`;
         if (seen.has(key)) continue;
         const canResolveSource = typeof app.graph?.getNodeById === "function";
@@ -510,13 +519,16 @@ function clearConnecting(canvas) {
 }
 
 function addVirtualLink(targetNode, sourceNode, sourceSlot, sourceType, mediaType = null) {
+    if (!targetNode || !sourceNode || isSameNode(targetNode, sourceNode)) return false;
+    const sourceId = Number(sourceNode.id);
+    if (!Number.isFinite(sourceId)) return false;
     mediaType ||= getMediaType(sourceType, sourceNode);
     if (!canAccept(targetNode, mediaType)) return false;
     const links = ensureLinks(targetNode);
-    const exists = links.some((link) => String(link.source_id) === String(sourceNode.id) && Number(link.source_slot) === Number(sourceSlot));
+    const exists = links.some((link) => Number(link.source_id) === sourceId && Number(link.source_slot) === Number(sourceSlot));
     if (exists) return false;
     links.push({
-        source_id: Number(sourceNode.id),
+        source_id: sourceId,
         source_slot: Number(sourceSlot) || 0,
         source_type: sourceType || "*",
         media_type: mediaType,
@@ -540,6 +552,73 @@ function removeVirtualLink(node, index) {
     app.graph?.change?.();
     requestMentionPreviewRefresh();
     return true;
+}
+
+function getNativeGraphLink(graph, linkId) {
+    if (!graph || linkId == null) return null;
+    for (const links of [graph.links, graph._links]) {
+        if (!links) continue;
+        if (typeof links.get === "function") {
+            const link = links.get(linkId) ?? links.get(String(linkId));
+            if (link) return link;
+        }
+        const link = links[linkId] ?? links[String(linkId)];
+        if (link) return link;
+    }
+    return null;
+}
+
+function convertNativeMediaConnection(targetNode, inputIndex, linkInfo = null) {
+    if (!isTarget(targetNode) || targetNode.__h3VirtualWireClearing) return false;
+    const input = targetNode.inputs?.[inputIndex];
+    if (!input || String(input.name || "") !== "media") return false;
+
+    const graph = targetNode.graph || app.graph;
+    const linkId = input.link ?? linkInfo?.id ?? linkInfo?.link_id ?? linkInfo?.linkId;
+    const nativeLink = getNativeGraphLink(graph, linkId) || linkInfo;
+    if (!nativeLink) return false;
+
+    const directSourceCandidate = nativeLink.origin_node || nativeLink.originNode
+        || nativeLink.fromNode || nativeLink.sourceNode;
+    const directSource = directSourceCandidate && typeof directSourceCandidate === "object"
+        ? directSourceCandidate
+        : null;
+    const sourceId = nativeLink.origin_id ?? nativeLink.originId
+        ?? nativeLink.from_id ?? nativeLink.fromId
+        ?? (directSourceCandidate && typeof directSourceCandidate !== "object" ? directSourceCandidate : directSource?.id);
+    const sourceNode = directSource || graph?.getNodeById?.(Number(sourceId));
+    if (!sourceNode || isSameNode(targetNode, sourceNode)) return false;
+
+    const rawSourceSlot = nativeLink.origin_slot ?? nativeLink.originSlot
+        ?? nativeLink.from_slot ?? nativeLink.fromSlot ?? nativeLink.from?.slot ?? 0;
+    const parsedSourceSlot = Number(rawSourceSlot);
+    const sourceSlot = Number.isFinite(parsedSourceSlot) ? parsedSourceSlot : 0;
+    const output = sourceNode.outputs?.[sourceSlot] || {};
+    const sourceType = getSlotType(output)
+        || String(nativeLink.type || nativeLink.origin_type || nativeLink.originType || "*").toUpperCase();
+
+    const added = addVirtualLink(targetNode, sourceNode, sourceSlot, sourceType);
+    targetNode.__h3VirtualWireClearing = true;
+    try {
+        if (targetNode.inputs?.[inputIndex]?.link != null && typeof targetNode.disconnectInput === "function") {
+            targetNode.disconnectInput(inputIndex);
+        } else if (linkId != null && typeof graph?.removeLink === "function") {
+            graph.removeLink(linkId);
+        }
+        if (targetNode.inputs?.[inputIndex]) targetNode.inputs[inputIndex].link = null;
+    } finally {
+        targetNode.__h3VirtualWireClearing = false;
+    }
+
+    targetNode.setDirtyCanvas?.(true, true);
+    graph?.setDirtyCanvas?.(true, true);
+    requestMentionPreviewRefresh();
+    return added;
+}
+
+function scheduleNativeMediaConnectionConversion(targetNode, inputIndex, linkInfo = null) {
+    setTimeout(() => convertNativeMediaConnection(targetNode, inputIndex, linkInfo), 0);
+    if (!linkInfo) setTimeout(() => convertNativeMediaConnection(targetNode, inputIndex), 50);
 }
 
 function cubicPoint(start, end, t) {
@@ -915,11 +994,13 @@ function installQuickCreateCapture(canvas) {
                 return dot && Math.hypot(x - dot.x, y - dot.y) <= 18;
             });
             if (!target) return;
+            if (isSameNode(target, pending.sourceNode)) return;
+            const added = addVirtualLink(target, pending.sourceNode, pending.sourceSlot, pending.sourceType);
+            if (!added) return;
             lastCapturedDropAt = performance.now();
             event.preventDefault?.();
             event.stopPropagation?.();
             event.stopImmediatePropagation?.();
-            addVirtualLink(target, pending.sourceNode, pending.sourceSlot, pending.sourceType);
             canvas.linkConnector.reset?.();
             closeNativeNodeSearchSoon();
             return;
@@ -1080,8 +1161,9 @@ function patchCanvas() {
             return dot && Math.hypot(x - dot.x, y - dot.y) <= 18;
         })());
 
-        if (output && target) {
-            addVirtualLink(target, output.sourceNode, output.sourceSlot, output.sourceType);
+        if (output && target && !isSameNode(target, output.sourceNode)) {
+            const added = addVirtualLink(target, output.sourceNode, output.sourceSlot, output.sourceType);
+            if (!added) return originalUp?.apply(this, arguments);
             clearConnecting(this);
             this.graph?.setDirtyCanvas?.(true, true);
             event?.preventDefault?.();
@@ -1131,22 +1213,24 @@ function buildRuntimePrompt(node, runtimeLinks) {
         if (part?.type === "dialogue") return `<d>${String(part.text || "")}</d>`;
         if (part?.type !== "mention") return String(part?.text || "");
         const mediaType = String(part.mediaType || "image").toLowerCase();
+        const partSourceId = part.sourceId != null && Number.isFinite(Number(part.sourceId)) ? Number(part.sourceId) : null;
+        const partOrdinal = Number(part.ordinal);
         let index = -1;
-        if (referenceMentionMode(node) === "index" && Number.isFinite(Number(part.ordinal))) {
+        if ((referenceMentionMode(node) === "index" || partSourceId == null) && Number.isFinite(partOrdinal) && partOrdinal > 0) {
             let ordinal = 0;
             for (let runtimeIndex = 0; runtimeIndex < runtimeLinks.length; runtimeIndex += 1) {
                 const link = runtimeLinks[runtimeIndex];
                 if (String(link.media_type || "image").toLowerCase() !== mediaType) continue;
                 ordinal += 1;
-                if (ordinal === Number(part.ordinal)) {
+                if (ordinal === partOrdinal) {
                     index = runtimeIndex;
                     break;
                 }
             }
         }
-        if (index < 0) {
+        if (index < 0 && partSourceId != null) {
             index = runtimeLinks.findIndex((link) =>
-                Number(link.source_id) === Number(part.sourceId)
+                Number(link.source_id) === partSourceId
                 && Number(link.source_slot) === Number(part.sourceSlot || 0)
                 && String(link.media_type || "image").toLowerCase() === mediaType
             );
@@ -1293,6 +1377,7 @@ function mentionOptions(node) {
         const ordinal = counts[type];
         const tag = type === "image" ? `<Picture ${ordinal}>` : type === "video" ? `<Video ${ordinal}>` : `<Audio ${ordinal}>`;
         const source = app.graph?.getNodeById?.(Number(link.source_id));
+        watchMediaSourceNode(source);
         const filename = sourceFilename(source, type);
         const fullLabel = filename || sourceLabel(source);
         const label = mode === "index" ? `${LABELS[type] || type}${ordinal}` : truncateMentionLabel(fullLabel);
@@ -1318,6 +1403,28 @@ function optimizerSetting(id) {
     } catch {
         return "";
     }
+}
+
+function findMentionOption(options, reference, mode) {
+    const type = String(reference?.mediaType || reference?.type || "image").toLowerCase();
+    const ordinal = Number(reference?.ordinal);
+    const rawSourceId = reference?.sourceId;
+    const sourceId = rawSourceId == null || rawSourceId === "" ? Number.NaN : Number(rawSourceId);
+    const sourceSlot = Number(reference?.sourceSlot) || 0;
+    const findByOrdinal = () => Number.isFinite(ordinal) && ordinal > 0
+        ? options.find((item) => item.type === type && Number(item.ordinal) === ordinal)
+        : null;
+    if (mode === "index") return findByOrdinal();
+    if (Number.isFinite(sourceId)) {
+        return options.find((item) => Number(item.sourceId) === sourceId
+            && Number(item.sourceSlot) === sourceSlot
+            && item.type === type) || null;
+    }
+    // Official tags pasted before their media exists only carry a type and an
+    // ordinal. In filename mode, use that ordinal once to claim the future
+    // source; after resolution updateMentionChip stores sourceId/sourceSlot and
+    // the reference becomes source-bound like any other filename-mode chip.
+    return findByOrdinal();
 }
 
 function isLikelyVideoUrl(url) {
@@ -1370,22 +1477,29 @@ function refreshMentionPreviews() {
         const options = mentionOptions(node);
         const currentMode = referenceMentionMode(node);
         for (const chip of node.__h3Editor?.querySelectorAll?.(".h3-mention-chip") || []) {
-            const option = options.find((item) => currentMode === "index" && chip.dataset.ordinal
-                ? item.type === String(chip.dataset.mediaType || "image") && Number(item.ordinal) === Number(chip.dataset.ordinal)
-                : Number(item.sourceId) === Number(chip.dataset.sourceId)
-                    && Number(item.sourceSlot) === Number(chip.dataset.sourceSlot)
-                    && item.type === String(chip.dataset.mediaType || "image"));
+            const sourceId = chip.dataset.sourceId ? Number(chip.dataset.sourceId) : null;
+            const ordinal = Number(chip.dataset.ordinal) || null;
+            const option = findMentionOption(options, {
+                mediaType: chip.dataset.mediaType || "image",
+                ordinal,
+                sourceId,
+                sourceSlot: Number(chip.dataset.sourceSlot) || 0,
+            }, currentMode);
             updateMentionChip(chip, option || {
                 type: chip.dataset.mediaType || "image",
                 token: chip.dataset.token || "",
                 label: chip.dataset.label || chip.dataset.fullLabel || "",
                 fullLabel: chip.dataset.fullLabel || chip.dataset.label || "",
-                sourceId: chip.dataset.sourceId ? Number(chip.dataset.sourceId) : null,
+                referenceMode: currentMode,
+                ordinal,
+                sourceId,
                 sourceSlot: Number(chip.dataset.sourceSlot) || 0,
                 previewUrl: "",
                 unresolved: true,
+                pending: sourceId == null && ordinal != null,
             });
         }
+        if (node.__h3Editor) syncPromptFromEditor(node, false);
         const menu = node.__h3MentionMenu;
         if (menu) {
             const query = String(menu.mention?.query || "").toLowerCase();
@@ -1404,18 +1518,22 @@ function updateMentionChip(chip, option) {
     const nextLabel = option.label || chip.dataset.label || nextToken;
     const nextFullLabel = option.fullLabel || nextLabel;
     const nextPreviewUrl = option.previewUrl || "";
-    chip.classList.toggle("is-unresolved", Boolean(option.unresolved));
+    chip.classList.toggle("is-pending", Boolean(option.pending));
+    chip.classList.toggle("is-unresolved", Boolean(option.unresolved) && !option.pending);
     chip.dataset.token = nextToken;
     chip.dataset.label = nextLabel;
     chip.dataset.fullLabel = nextFullLabel;
     chip.dataset.mediaType = option.type || chip.dataset.mediaType || "image";
     chip.dataset.referenceMode = option.referenceMode || chip.dataset.referenceMode || "index";
     chip.dataset.ordinal = Number(option.ordinal) || chip.dataset.ordinal || "";
+    chip.dataset.pendingReference = option.pending ? "true" : "";
     if (option.sourceId != null) chip.dataset.sourceId = String(option.sourceId);
     if (option.sourceSlot != null) chip.dataset.sourceSlot = String(Number(option.sourceSlot) || 0);
     chip.dataset.previewUrl = nextPreviewUrl;
-    chip.title = option.unresolved
-        ? (ZH_BROWSER ? "\u5df2\u65ad\u5f00\uff1a\u8bf7\u91cd\u65b0\u8fde\u63a5\u6216\u5220\u9664\u8be5\u5f15\u7528" : "Disconnected: reconnect or remove this reference")
+    chip.title = option.pending
+        ? (ZH_BROWSER ? "\u7b49\u5f85\u8fde\u63a5\u5bf9\u5e94\u5e8f\u53f7\u7684\u5a92\u4f53\u7d20\u6750" : "Waiting for media with the matching index")
+        : option.unresolved
+            ? (ZH_BROWSER ? "\u5df2\u65ad\u5f00\uff1a\u8bf7\u91cd\u65b0\u8fde\u63a5\u6216\u5220\u9664\u8be5\u5f15\u7528" : "Disconnected: reconnect or remove this reference")
         : nextFullLabel;
     const label = chip.querySelector?.(".h3-mention-chip-label");
     if (label) label.textContent = `@${nextLabel}`;
@@ -1440,7 +1558,7 @@ function requestMentionPreviewRefresh() {
 }
 
 function watchMediaSourceNode(node) {
-    if (!node || node.__h3MediaSourceWatchInstalled) return;
+    if (!node) return;
     node.__h3MediaSourceWatchInstalled = true;
     for (const widget of node.widgets || []) {
         if (!widget || widget.__h3MediaSourceWatchInstalled) continue;
@@ -1666,7 +1784,7 @@ function makeMentionThumb(option, menu = false) {
 
 function makeMentionChip(option) {
     const chip = document.createElement("span");
-    chip.className = `h3-mention-chip${option.unresolved ? " is-unresolved" : ""}`;
+    chip.className = `h3-mention-chip${option.pending ? " is-pending" : option.unresolved ? " is-unresolved" : ""}`;
     chip.contentEditable = "false";
     chip.dataset.token = option.token || option.tag || "";
     chip.dataset.label = option.label || "";
@@ -1677,8 +1795,11 @@ function makeMentionChip(option) {
     chip.dataset.sourceId = option.sourceId != null ? String(option.sourceId) : "";
     chip.dataset.sourceSlot = String(option.sourceSlot || 0);
     chip.dataset.previewUrl = option.previewUrl || "";
-    chip.title = option.unresolved
-        ? (ZH_BROWSER ? "\u5df2\u65ad\u5f00\uff1a\u8bf7\u91cd\u65b0\u8fde\u63a5\u6216\u5220\u9664\u8be5\u5f15\u7528" : "Disconnected: reconnect or remove this reference")
+    chip.dataset.pendingReference = option.pending ? "true" : "";
+    chip.title = option.pending
+        ? (ZH_BROWSER ? "\u7b49\u5f85\u8fde\u63a5\u5bf9\u5e94\u5e8f\u53f7\u7684\u5a92\u4f53\u7d20\u6750" : "Waiting for media with the matching index")
+        : option.unresolved
+            ? (ZH_BROWSER ? "\u5df2\u65ad\u5f00\uff1a\u8bf7\u91cd\u65b0\u8fde\u63a5\u6216\u5220\u9664\u8be5\u5f15\u7528" : "Disconnected: reconnect or remove this reference")
         : (option.fullLabel || option.label || "");
     const label = document.createElement("span");
     label.className = "h3-mention-chip-label";
@@ -1824,11 +1945,14 @@ function renderEditorFromNode(node, force = false) {
             continue;
         }
         const currentMode = referenceMentionMode(node);
-        const option = live.find((item) => currentMode === "index" && Number.isFinite(Number(part.ordinal))
-            ? item.type === part.mediaType && Number(item.ordinal) === Number(part.ordinal)
-            : Number(item.sourceId) === Number(part.sourceId)
-                && Number(item.sourceSlot) === Number(part.sourceSlot)
-                && item.type === part.mediaType);
+        const partSourceId = part.sourceId != null && Number.isFinite(Number(part.sourceId)) ? Number(part.sourceId) : null;
+        const partOrdinal = Number(part.ordinal) || null;
+        const option = findMentionOption(live, {
+            mediaType: part.mediaType || "image",
+            ordinal: partOrdinal,
+            sourceId: partSourceId,
+            sourceSlot: Number(part.sourceSlot) || 0,
+        }, currentMode);
         editor.append(makeMentionChip({
             type: part.mediaType || option?.type || "image",
             token: option?.token || part.token || option?.tag || "",
@@ -1841,6 +1965,7 @@ function renderEditorFromNode(node, force = false) {
             sourceSlot: option?.sourceSlot ?? part.sourceSlot ?? 0,
             previewUrl: option?.previewUrl || "",
             unresolved: !option,
+            pending: !option && partSourceId == null && partOrdinal != null,
         }));
     }
 }
@@ -3159,6 +3284,36 @@ function pastedMentionCandidates(node) {
     return candidates.sort((left, right) => right.raw.length - left.raw.length);
 }
 
+function pastedOfficialMediaTagMatch(node, value, cursor) {
+    if (!isReferenceMode(node)) return null;
+    const match = String(value || "").slice(cursor).match(/^<\s*(picture|video|audio)\s*(\d+)\s*>/i);
+    if (!match) return null;
+    const type = match[1].toLowerCase() === "picture" ? "image" : match[1].toLowerCase();
+    const ordinal = Number(match[2]);
+    if (!Number.isFinite(ordinal) || ordinal <= 0) return null;
+    const live = mentionOptions(node);
+    const resolved = live.find((option) => option.type === type && Number(option.ordinal) === ordinal);
+    const tag = type === "image" ? `<Picture ${ordinal}>` : type === "video" ? `<Video ${ordinal}>` : `<Audio ${ordinal}>`;
+    const fallbackLabel = `${LABELS[type] || type}${ordinal}`;
+    return {
+        raw: match[0],
+        option: resolved || {
+            type,
+            tag,
+            token: `@${fallbackLabel}`,
+            label: fallbackLabel,
+            fullLabel: fallbackLabel,
+            ordinal,
+            referenceMode: referenceMentionMode(node),
+            sourceId: null,
+            sourceSlot: 0,
+            previewUrl: "",
+            unresolved: true,
+            pending: true,
+        },
+    };
+}
+
 function appendPastedText(fragment, text) {
     let last = null;
     String(text || "").split("\n").forEach((part, index) => {
@@ -3186,7 +3341,8 @@ function insertTextWithMentionChips(node, editor, text) {
     let plainStart = 0;
     let cursor = 0;
     while (cursor < value.length) {
-        const match = candidates.find((candidate) => value.slice(cursor, cursor + candidate.raw.length).toLocaleLowerCase() === candidate.raw.toLocaleLowerCase());
+        const match = pastedOfficialMediaTagMatch(node, value, cursor)
+            || candidates.find((candidate) => value.slice(cursor, cursor + candidate.raw.length).toLocaleLowerCase() === candidate.raw.toLocaleLowerCase());
         if (!match) {
             cursor += 1;
             continue;
@@ -3634,6 +3790,21 @@ function installNode(nodeType, nodeData) {
         requestMentionPreviewRefresh();
         installPromptEditorSoon(this);
         repairNodeLayout(this);
+        const mediaInputIndex = getMediaInputIndex(this);
+        if (mediaInputIndex >= 0 && this.inputs?.[mediaInputIndex]?.link != null) {
+            scheduleNativeMediaConnectionConversion(this, mediaInputIndex);
+        }
+        return result;
+    };
+
+    const originalConnectionsChange = nodeType.prototype.onConnectionsChange;
+    nodeType.prototype.onConnectionsChange = function onConnectionsChangeH3Easy(type, index, connected, linkInfo) {
+        const result = originalConnectionsChange?.apply(this, arguments);
+        const inputIndex = Number(index);
+        const input = this.inputs?.[Number.isFinite(inputIndex) ? inputIndex : -1];
+        if (connected && !this.__h3VirtualWireClearing && String(input?.name || "") === "media") {
+            scheduleNativeMediaConnectionConversion(this, inputIndex, linkInfo);
+        }
         return result;
     };
 
@@ -3749,7 +3920,7 @@ function install() {
         font-family: Consolas, "Courier New", monospace; font-size: var(--h3-prompt-text-size); font-weight: 400;
         font-style: normal; line-height: var(--h3-native-widget-line-height, normal); letter-spacing: 0;
       }
-      .h3-prompt-editor :not(.h3-mention-chip):not(.h3-mention-chip *) {
+      .h3-prompt-editor :not(.h3-mention-chip):not(.h3-mention-chip *):not(.h3-dialogue-block):not(.h3-dialogue-block *) {
         font-family: Consolas, "Courier New", monospace !important; font-size: var(--h3-prompt-text-size) !important;
         font-weight: 400 !important; font-style: normal !important; line-height: var(--h3-native-widget-line-height, normal) !important; letter-spacing: 0 !important;
       }
@@ -3765,11 +3936,12 @@ function install() {
       .h3-mention-chip.is-unresolved { color: #ff9b9b; text-decoration: underline wavy rgba(255,110,110,.86); text-decoration-thickness: 1px; }
       .h3-mention-chip-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: baseline; }
       .h3-dialogue-block {
-        display: inline; margin: 0 2px; padding: 1px 4px; vertical-align: baseline; border: 1px solid rgba(0,226,187,.16); border-radius: 4px;
+        display: inline; margin: 0 1px; padding: 2px 4px; vertical-align: 1px; border: 0; border-radius: 4px;
         background: rgba(0,226,187,.14); color: rgba(190,255,244,.98); font-family: Consolas, "Courier New", monospace; font-size: var(--h3-prompt-text-size, 12px);
-        font-weight: 400; line-height: inherit; letter-spacing: 0; white-space: pre-wrap; user-select: text; cursor: text; outline: none;
+        box-shadow: inset 0 0 0 1px rgba(0,226,187,.16); font-weight: 400; line-height: calc(1em + 6px); letter-spacing: 0; white-space: pre-wrap;
+        -webkit-box-decoration-break: clone; box-decoration-break: clone; user-select: text; cursor: text; outline: none;
       }
-      .h3-dialogue-block:focus { background: rgba(0,226,187,.19); border-color: rgba(0,226,187,.26); }
+      .h3-dialogue-block:focus { background: rgba(0,226,187,.19); box-shadow: inset 0 0 0 1px rgba(0,226,187,.26); }
       .h3-mention-chip-thumb { display: inline-block; width: 16px; height: 16px; margin-right: 2px; object-fit: cover; border-radius: 3px; vertical-align: -2px; background: rgba(255,255,255,.12); user-select: none; }
       .h3-mention-chip-thumb.is-image, .h3-mention-menu-thumb.is-image { background: #5aa9f0; }
       .h3-mention-chip-thumb.is-video, .h3-mention-menu-thumb.is-video { position: relative; background: linear-gradient(135deg, #1557b8, #49b6ff); }
