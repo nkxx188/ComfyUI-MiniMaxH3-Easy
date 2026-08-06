@@ -17,17 +17,21 @@ import threading
 import wave
 from dataclasses import dataclass
 from functools import lru_cache
+from fractions import Fraction
 from typing import Any
 
+import av
 import torch
 import torchaudio
-from PIL import Image
+from PIL import Image, ImageDraw
 
 import comfy.model_management
 import folder_paths
 import node_helpers
 import nodes
 from comfy_extras import nodes_minimax_h3 as h3
+from comfy.utils import ProgressBar
+from .optimizer_config import get_optimizer_config
 from .prompt_optimizer import optimize_prompt as optimize_h3_prompt
 
 
@@ -41,7 +45,10 @@ REFERENCE_MENTION_FILENAME = "filename"
 REFERENCE_MENTION_INDEX = "index"
 OPTIMIZER_IMAGE_EDGE = 1280
 OPTIMIZER_VIDEO_FRAME_EDGE = 960
-OPTIMIZER_AUDIO_MAX_BYTES = 6 * 1024 * 1024
+OPTIMIZER_AUDIO_MAX_BYTES = 24 * 1024 * 1024
+OPTIMIZER_BINARY_MAX_BYTES = 24 * 1024 * 1024
+OPTIMIZER_VIDEO_EDGE = 720
+MAX_TOKEN_PRESETS = {"short": 1024, "medium": 4096, "long": 8192}
 RESOLUTION_360 = "360P"
 RESOLUTION_416 = "416P"
 RESOLUTION_480 = "480P"
@@ -504,10 +511,103 @@ def _optimizer_audio_data_url(audio: dict) -> str:
     return f"data:audio/wav;base64,{encoded}"
 
 
+def _optimizer_waveform(audio: dict) -> tuple[torch.Tensor, int]:
+    if not isinstance(audio, dict) or not isinstance(audio.get("waveform"), torch.Tensor):
+        raise ValueError("Prompt optimizer received invalid audio")
+    waveform = audio["waveform"].detach().float().cpu()
+    if waveform.ndim == 3:
+        waveform = waveform[0]
+    elif waveform.ndim == 1:
+        waveform = waveform.unsqueeze(0)
+    if waveform.ndim != 2 or not waveform.shape[-1]:
+        raise ValueError("Prompt optimizer received an unsupported audio shape")
+    return waveform[:2].clamp(-1, 1).contiguous(), _audio_sample_rate(audio)
+
+
+def _resize_optimizer_frames(frames: torch.Tensor, max_edge: int) -> torch.Tensor:
+    frames = frames.detach().float().cpu().clamp(0, 1)
+    height, width = int(frames.shape[1]), int(frames.shape[2])
+    scale = min(1.0, float(max_edge) / max(height, width))
+    out_height = max(2, int(round(height * scale)) // 2 * 2)
+    out_width = max(2, int(round(width * scale)) // 2 * 2)
+    if (out_height != height or out_width != width):
+        frames = torch.nn.functional.interpolate(
+            frames[..., :3].movedim(-1, 1), size=(out_height, out_width), mode="bilinear", align_corners=False
+        ).movedim(1, -1)
+    return (frames[..., :3] * 255).round().to(torch.uint8)
+
+
+def _encode_optimizer_mp4(frames: torch.Tensor, fps: float, audio: dict | None = None, repeat_count: int = 1) -> str:
+    """Encode H.264/AAC to an in-memory MP4 data URL."""
+    if not isinstance(frames, torch.Tensor) or frames.ndim != 4 or not frames.shape[0]:
+        raise ValueError("Prompt optimizer received an invalid video")
+    fps = max(1.0, min(240.0, float(fps or 24.0)))
+    repeat_count = max(1, int(repeat_count))
+    pictures = _resize_optimizer_frames(frames, OPTIMIZER_VIDEO_EDGE)
+    output = io.BytesIO()
+    with av.open(output, mode="w", format="mp4") as container:
+        video_stream = container.add_stream("libx264", rate=Fraction(fps).limit_denominator(1001))
+        video_stream.width = int(pictures.shape[2])
+        video_stream.height = int(pictures.shape[1])
+        video_stream.pix_fmt = "yuv420p"
+        video_stream.options = {"crf": "28", "preset": "veryfast", "movflags": "+faststart"}
+        audio_stream = None
+        waveform = None
+        sample_rate = 0
+        layout = "mono"
+        if audio is not None:
+            waveform, sample_rate = _optimizer_waveform(audio)
+            duration_samples = max(1, round(pictures.shape[0] * repeat_count * sample_rate / fps))
+            waveform = waveform[:, :duration_samples]
+            layout = "mono" if waveform.shape[0] == 1 else "stereo"
+            audio_stream = container.add_stream("aac", rate=sample_rate)
+            audio_stream.layout = layout
+        for _ in range(repeat_count):
+            for picture in pictures:
+                frame = av.VideoFrame.from_ndarray(picture.numpy(), format="rgb24")
+                for packet in video_stream.encode(frame):
+                    container.mux(packet)
+        for packet in video_stream.encode():
+            container.mux(packet)
+
+        if audio_stream is not None and waveform is not None:
+            for start in range(0, waveform.shape[1], 1024):
+                chunk = waveform[:, start:start + 1024].numpy()
+                audio_frame = av.AudioFrame.from_ndarray(chunk, format="fltp", layout=layout)
+                audio_frame.sample_rate = sample_rate
+                audio_frame.pts = start
+                audio_frame.time_base = Fraction(1, sample_rate)
+                for packet in audio_stream.encode(audio_frame):
+                    container.mux(packet)
+            for packet in audio_stream.encode():
+                container.mux(packet)
+    payload = output.getvalue()
+    if len(payload) > OPTIMIZER_BINARY_MAX_BYTES:
+        raise ValueError("Prompt optimizer video exceeds the 24 MiB binary limit")
+    return "data:video/mp4;base64," + base64.b64encode(payload).decode("ascii")
+
+
+def _audio_wrapper_data_url(audio: dict) -> str:
+    waveform, sample_rate = _optimizer_waveform(audio)
+    duration = waveform.shape[1] / sample_rate
+    picture = Image.new("RGB", (512, 512), (18, 20, 25))
+    draw = ImageDraw.Draw(picture)
+    center = 256
+    samples = waveform.mean(dim=0)
+    positions = torch.linspace(0, samples.shape[0] - 1, 480).round().long()
+    values = samples[positions].tolist()
+    points = [(16 + index, center - int(value * 190)) for index, value in enumerate(values)]
+    draw.line(points, fill=(0, 226, 187), width=3)
+    array = torch.from_numpy(__import__("numpy").asarray(picture).copy())
+    frame_count = max(1, math.ceil(duration * 12.0))
+    frame = array.unsqueeze(0).float() / 255.0
+    return _encode_optimizer_mp4(frame, 12.0, {"waveform": waveform.unsqueeze(0), "sample_rate": sample_rate}, repeat_count=frame_count)
+
+
 def _optimizer_media_items(
-    items: list[_MediaInput], mode: str, keyframe_role: str
-) -> list[dict[str, str]]:
-    result: list[dict[str, str]] = []
+    items: list[_MediaInput], mode: str, keyframe_role: str, video_mode: str = "auto", audio_mode: str = "auto"
+) -> list[dict[str, Any]]:
+    result: list[dict[str, Any]] = []
     if mode != MODE_REFERENCE:
         images = [item.value for item in items if item.media_type == "image"]
         if len(images) == 2 and keyframe_role == KEYFRAME_LAST:
@@ -531,13 +631,17 @@ def _optimizer_media_items(
             })
             continue
         if item.media_type == "audio":
-            result.append({
+            audio_item: dict[str, Any] = {
                 "type": "audio",
                 "label": token,
                 "data_url": _optimizer_audio_data_url(item.value),
-            })
+                "mode": audio_mode,
+            }
+            if audio_mode in {"auto", "video_wrapper"}:
+                audio_item["fallback_data_url"] = _audio_wrapper_data_url(item.value)
+            result.append(audio_item)
             continue
-        frames, soundtrack, _source_fps = _video_parts(item.value)
+        frames, soundtrack, source_fps = _video_parts(item.value)
         if not isinstance(frames, torch.Tensor) or frames.ndim != 4 or not frames.shape[0]:
             raise ValueError("Prompt optimizer received an invalid video")
         indexes = sorted({round((frames.shape[0] - 1) * ratio) for ratio in (0.12, 0.5, 0.88)})
