@@ -20,6 +20,11 @@ const MAX_SECONDS = 20;
 const PROMPT_HISTORY_LIMIT = 120;
 const PROMPT_UNDO_VERSION = "2026-08-05-editor-undo-shield-v1";
 const CARET_SENTINEL = "\u200B";
+const OPTIMIZER_SETTINGS = {
+    baseUrl: "MiniMaxH3Easy.PromptOptimizer.BaseURL",
+    model: "MiniMaxH3Easy.PromptOptimizer.Model",
+    apiKey: "MiniMaxH3Easy.PromptOptimizer.APIKey",
+};
 const AUDIO_ICON_SVG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='0.5' y='10' width='3' height='4' rx='1.5' fill='%2300e2bb'/%3E%3Crect x='5.5' y='7' width='3' height='10' rx='1.5' fill='%2300e2bb'/%3E%3Crect x='10.5' y='4' width='3' height='16' rx='1.5' fill='%2300e2bb'/%3E%3Crect x='15.5' y='7' width='3' height='10' rx='1.5' fill='%2300e2bb'/%3E%3Crect x='20.5' y='10' width='3' height='4' rx='1.5' fill='%2300e2bb'/%3E%3C/svg%3E";
 const PRIMARY_BROWSER_LANGUAGE = String(globalThis.navigator?.language || globalThis.navigator?.languages?.[0] || "");
 const ZH_BROWSER = /^(zh)(?:[-_]|$)/i.test(PRIMARY_BROWSER_LANGUAGE);
@@ -67,6 +72,10 @@ const TEXT = {
     outputFps: "FPS",
     outputContext: "H3 Context",
     inputMedia: "Media",
+    optimizePrompt: ZH_BROWSER ? "\u4f18\u5316\u63d0\u793a\u8bcd" : "Optimize prompt",
+    optimizerBaseUrl: "Base URL",
+    optimizerModel: ZH_BROWSER ? "\u6a21\u578b" : "Model",
+    optimizerApiKey: "API Key",
 };
 const OPTION_DEFS = {
     mode: {
@@ -242,7 +251,7 @@ function localizeNodeInstance(node) {
     }
     if (!isTarget(node)) return;
     node.title = TEXT.mainTitle;
-    const labels = { mode: TEXT.mode, prompt: TEXT.prompt, resolution: TEXT.resolution, aspect_ratio: TEXT.aspectRatio, width: TEXT.width, height: TEXT.height, seconds: TEXT.seconds, advanced: TEXT.advanced, fps: TEXT.fps, keyframe_role: TEXT.keyframeRole, ref_image_size: TEXT.refImageSize, reference_mention_mode: TEXT.referenceMentionMode };
+    const labels = { mode: TEXT.mode, prompt: TEXT.prompt, resolution: TEXT.resolution, aspect_ratio: TEXT.aspectRatio, width: TEXT.width, height: TEXT.height, seconds: TEXT.seconds, advanced: TEXT.advanced, fps: TEXT.fps, keyframe_role: TEXT.keyframeRole, ref_image_size: TEXT.refImageSize, reference_mention_mode: TEXT.referenceMentionMode, optimize_prompt: TEXT.optimizePrompt };
     for (const widget of node.widgets || []) {
         if (labels[widget.name]) widget.label = labels[widget.name];
         localizeComboWidget(widget);
@@ -1185,6 +1194,17 @@ function patchGraphToPrompt() {
             promptNode.inputs.keyframe_role = canonicalOption("keyframe_role", getWidgetValue(node, "keyframe_role", KEYFRAME_FIRST));
             promptNode.inputs.ref_image_size = canonicalOption("ref_image_size", getWidgetValue(node, "ref_image_size", REF_IMAGE_1K));
             promptNode.inputs.reference_mention_mode = canonicalOption("reference_mention_mode", getWidgetValue(node, "reference_mention_mode", "index"));
+            const optimizePrompt = asBoolean(getWidgetValue(node, "optimize_prompt", false));
+            promptNode.inputs.optimize_prompt = optimizePrompt;
+            if (optimizePrompt) {
+                promptNode.inputs.optimizer_base_url = optimizerSetting(OPTIMIZER_SETTINGS.baseUrl);
+                promptNode.inputs.optimizer_model = optimizerSetting(OPTIMIZER_SETTINGS.model);
+                promptNode.inputs.optimizer_api_key = optimizerSetting(OPTIMIZER_SETTINGS.apiKey);
+            } else {
+                delete promptNode.inputs.optimizer_base_url;
+                delete promptNode.inputs.optimizer_model;
+                delete promptNode.inputs.optimizer_api_key;
+            }
         }
         return promptData;
     };
@@ -1290,6 +1310,14 @@ function mentionOptions(node) {
             previewUrl: sourcePreviewUrl(source, type),
         };
     });
+}
+
+function optimizerSetting(id) {
+    try {
+        return String(app.extensionManager?.setting?.get?.(id) ?? "").trim();
+    } catch {
+        return "";
+    }
 }
 
 function isLikelyVideoUrl(url) {
@@ -3454,7 +3482,9 @@ function pruneTransportInputs(nodeData) {
     const optional = nodeData?.input?.optional;
     if (!optional) return;
     for (const name of Object.keys(optional)) {
-        if (/^media_\d+$/.test(name) || /^media_type_\d+$/.test(name)) delete optional[name];
+        if (/^media_\d+$/.test(name)
+            || /^media_type_\d+$/.test(name)
+            || ["optimizer_base_url", "optimizer_model", "optimizer_api_key"].includes(name)) delete optional[name];
     }
 }
 
@@ -3481,7 +3511,8 @@ function repairConfiguredWidgetValues(node, info) {
         fps: 24,
         keyframe_role: KEYFRAME_FIRST,
         ref_image_size: REF_IMAGE_1K,
-                reference_mention_mode: "index",
+        reference_mention_mode: "index",
+        optimize_prompt: false,
     };
     const names = Object.keys(defaults);
     const values = raw;
@@ -3512,6 +3543,7 @@ function repairConfiguredWidgetValues(node, info) {
             ? canonicalOption("ref_image_size", values[10]) : defaults.ref_image_size,
         reference_mention_mode: Object.prototype.hasOwnProperty.call(OPTION_DEFS.reference_mention_mode, canonicalOption("reference_mention_mode", values[11]))
             ? canonicalOption("reference_mention_mode", values[11]) : defaults.reference_mention_mode,
+        optimize_prompt: asBoolean(values[12], defaults.optimize_prompt),
     };
     for (const name of names) setConfiguredWidgetValue(node, name, normalized[name]);
     info.widgets_values = names.map((name) => normalized[name]);
@@ -3766,6 +3798,33 @@ function install() {
 
 app.registerExtension({
     name: "MiniMaxH3Easy",
+    settings: [
+        {
+            id: OPTIMIZER_SETTINGS.baseUrl,
+            name: TEXT.optimizerBaseUrl,
+            type: "text",
+            defaultValue: "https://api.openai.com/v1",
+            category: ["MiniMaxH3Easy", "PromptOptimizer", TEXT.optimizerBaseUrl],
+            tooltip: ZH_BROWSER ? "OpenAI \u517c\u5bb9 API \u7684\u57fa\u7840\u5730\u5740" : "Base URL of an OpenAI-compatible API",
+        },
+        {
+            id: OPTIMIZER_SETTINGS.model,
+            name: TEXT.optimizerModel,
+            type: "text",
+            defaultValue: "",
+            category: ["MiniMaxH3Easy", "PromptOptimizer", TEXT.optimizerModel],
+            tooltip: ZH_BROWSER ? "\u7528\u4e8e\u4f18\u5316 H3 \u63d0\u793a\u8bcd\u7684\u6a21\u578b ID" : "Model ID used to optimize H3 prompts",
+        },
+        {
+            id: OPTIMIZER_SETTINGS.apiKey,
+            name: TEXT.optimizerApiKey,
+            type: "text",
+            defaultValue: "",
+            category: ["MiniMaxH3Easy", "PromptOptimizer", TEXT.optimizerApiKey],
+            attrs: { type: "password", autocomplete: "off" },
+            tooltip: ZH_BROWSER ? "\u4ec5\u5728\u70b9\u51fb\u4f18\u5316\u65f6\u53d1\u9001\uff0c\u4e0d\u4f1a\u5199\u5165\u5de5\u4f5c\u6d41" : "Sent only when optimizing; never stored in workflow JSON",
+        },
+    ],
     setup() {
         install();
     },

@@ -7,23 +7,28 @@ chain. The browser extension supplies the ordered virtual media inputs.
 
 from __future__ import annotations
 
+import base64
+import io
 import math
 import os
 import re
 import sys
 import threading
+import wave
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
 
 import torch
 import torchaudio
+from PIL import Image
 
 import comfy.model_management
 import folder_paths
 import node_helpers
 import nodes
 from comfy_extras import nodes_minimax_h3 as h3
+from .prompt_optimizer import optimize_prompt as optimize_h3_prompt
 
 
 MODE_IMAGE = "image"
@@ -34,6 +39,9 @@ REF_IMAGE_1K = "1k"
 REF_IMAGE_2K = "2k"
 REFERENCE_MENTION_FILENAME = "filename"
 REFERENCE_MENTION_INDEX = "index"
+OPTIMIZER_IMAGE_EDGE = 1280
+OPTIMIZER_VIDEO_FRAME_EDGE = 960
+OPTIMIZER_AUDIO_MAX_BYTES = 6 * 1024 * 1024
 RESOLUTION_360 = "360P"
 RESOLUTION_416 = "416P"
 RESOLUTION_480 = "480P"
@@ -452,6 +460,102 @@ def _video_parts(value: Any) -> tuple[torch.Tensor, dict | None, float]:
     raise ValueError("Unsupported reference video payload")
 
 
+def _optimizer_image_data_url(image: torch.Tensor, max_edge: int) -> str:
+    if not isinstance(image, torch.Tensor) or image.ndim not in {3, 4}:
+        raise ValueError("Prompt optimizer received an invalid image")
+    frame = image[0] if image.ndim == 4 else image
+    frame = frame.detach().float().cpu().clamp(0, 1)
+    if frame.shape[-1] == 1:
+        frame = frame.repeat(1, 1, 3)
+    if frame.shape[-1] < 3:
+        raise ValueError("Prompt optimizer received an unsupported image format")
+    array = (frame[..., :3] * 255.0).round().to(torch.uint8).numpy()
+    picture = Image.fromarray(array, mode="RGB")
+    if max(picture.size) > max_edge:
+        picture.thumbnail((max_edge, max_edge), Image.Resampling.LANCZOS)
+    output = io.BytesIO()
+    picture.save(output, format="JPEG", quality=86, optimize=True)
+    encoded = base64.b64encode(output.getvalue()).decode("ascii")
+    return f"data:image/jpeg;base64,{encoded}"
+
+
+def _optimizer_audio_data_url(audio: dict) -> str:
+    if not isinstance(audio, dict) or not isinstance(audio.get("waveform"), torch.Tensor):
+        raise ValueError("Prompt optimizer received invalid audio")
+    waveform = audio["waveform"].detach().float().cpu()
+    if waveform.ndim == 3:
+        waveform = waveform[0]
+    elif waveform.ndim == 1:
+        waveform = waveform.unsqueeze(0)
+    if waveform.ndim != 2:
+        raise ValueError("Prompt optimizer received an unsupported audio shape")
+    waveform = waveform[:2]
+    sample_rate = _audio_sample_rate(audio)
+    max_samples = max(1, (OPTIMIZER_AUDIO_MAX_BYTES - 44) // (2 * waveform.shape[0]))
+    waveform = waveform[:, :max_samples].clamp(-1, 1)
+    pcm = (waveform.transpose(0, 1).contiguous() * 32767.0).round().to(torch.int16)
+    output = io.BytesIO()
+    with wave.open(output, "wb") as wav_file:
+        wav_file.setnchannels(waveform.shape[0])
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(sample_rate)
+        wav_file.writeframes(pcm.numpy().tobytes())
+    encoded = base64.b64encode(output.getvalue()).decode("ascii")
+    return f"data:audio/wav;base64,{encoded}"
+
+
+def _optimizer_media_items(
+    items: list[_MediaInput], mode: str, keyframe_role: str
+) -> list[dict[str, str]]:
+    result: list[dict[str, str]] = []
+    if mode != MODE_REFERENCE:
+        images = [item.value for item in items if item.media_type == "image"]
+        if len(images) == 2 and keyframe_role == KEYFRAME_LAST:
+            images = [images[1], images[0]]
+        for index, image in enumerate(images, start=1):
+            role = "first frame" if index == 1 and (len(images) > 1 or keyframe_role != KEYFRAME_LAST) else "last frame"
+            result.append({
+                "type": "image",
+                "label": f"Picture {index} ({role})",
+                "data_url": _optimizer_image_data_url(image, OPTIMIZER_IMAGE_EDGE),
+            })
+        return result
+
+    for item in items:
+        token = f"__MINIMAX_H3_REF_{item.input_index}__"
+        if item.media_type == "image":
+            result.append({
+                "type": "image",
+                "label": token,
+                "data_url": _optimizer_image_data_url(item.value, OPTIMIZER_IMAGE_EDGE),
+            })
+            continue
+        if item.media_type == "audio":
+            result.append({
+                "type": "audio",
+                "label": token,
+                "data_url": _optimizer_audio_data_url(item.value),
+            })
+            continue
+        frames, soundtrack, _source_fps = _video_parts(item.value)
+        if not isinstance(frames, torch.Tensor) or frames.ndim != 4 or not frames.shape[0]:
+            raise ValueError("Prompt optimizer received an invalid video")
+        indexes = sorted({round((frames.shape[0] - 1) * ratio) for ratio in (0.12, 0.5, 0.88)})
+        for sample_index, frame_index in enumerate(indexes, start=1):
+            result.append({
+                "type": "image",
+                "label": f"{token} sampled video frame {sample_index}/{len(indexes)}",
+                "data_url": _optimizer_image_data_url(frames[frame_index], OPTIMIZER_VIDEO_FRAME_EDGE),
+            })
+        if soundtrack is not None:
+            result.append({
+                "type": "audio",
+                "label": f"audio track from {token}",
+                "data_url": _optimizer_audio_data_url(soundtrack),
+            })
+    return result[:32]
+
+
 def _resample_video_frames(frames: torch.Tensor, source_fps: float) -> torch.Tensor:
     if not source_fps or abs(source_fps - h3.FPS) < 0.01:
         return frames
@@ -642,7 +746,12 @@ class MiniMaxH3Easy:
 
     @classmethod
     def INPUT_TYPES(cls):
-        optional = {"media": ("*",)}
+        optional = {
+            "media": ("*",),
+            "optimizer_base_url": ("STRING", {"default": ""}),
+            "optimizer_model": ("STRING", {"default": ""}),
+            "optimizer_api_key": ("STRING", {"default": ""}),
+        }
         for index in range(1, MAX_MEDIA + 1):
             optional[f"media_{index}"] = ("*",)
             optional[f"media_type_{index}"] = ("STRING", {"default": ""})
@@ -661,6 +770,7 @@ class MiniMaxH3Easy:
                 "keyframe_role": ([KEYFRAME_FIRST, KEYFRAME_LAST], {"default": KEYFRAME_FIRST}),
                 "ref_image_size": ([REF_IMAGE_1K, REF_IMAGE_2K], {"default": REF_IMAGE_1K}),
                 "reference_mention_mode": ([REFERENCE_MENTION_FILENAME, REFERENCE_MENTION_INDEX], {"default": REFERENCE_MENTION_INDEX}),
+                "optimize_prompt": ("BOOLEAN", {"default": False}),
             },
             "optional": optional,
         }
@@ -702,7 +812,7 @@ class MiniMaxH3Easy:
         return images[0], images[1]
 
     @classmethod
-    def generate(cls, h3_bundle, mode, prompt, resolution, aspect_ratio, width, height, seconds, advanced, fps, keyframe_role, ref_image_size, reference_mention_mode, **kwargs):
+    def generate(cls, h3_bundle, mode, prompt, resolution, aspect_ratio, width, height, seconds, advanced, fps, keyframe_role, ref_image_size, reference_mention_mode, optimize_prompt, **kwargs):
         if not isinstance(h3_bundle, MiniMaxH3Bundle):
             raise ValueError("Connect a MiniMax H3 Easy Loader bundle")
         mode = str(mode)
@@ -723,10 +833,30 @@ class MiniMaxH3Easy:
                 raise ValueError("Reference mode media limits are 9 images, 3 videos and 3 audio clips")
             if counts["image"] == 0 and counts["video"] == 0:
                 raise ValueError("Reference mode needs an image or video in addition to audio")
+            if bool(optimize_prompt):
+                prompt = optimize_h3_prompt(
+                    prompt=prompt,
+                    mode=MODE_REFERENCE,
+                    base_url=kwargs.get("optimizer_base_url", ""),
+                    model=kwargs.get("optimizer_model", ""),
+                    api_key=kwargs.get("optimizer_api_key", ""),
+                    media_items=_optimizer_media_items(items, MODE_REFERENCE, keyframe_role),
+                    duration=seconds,
+                )
             model = h3_bundle.model_for("ref2va")
             conditioning, latent = _reference_conditioning(h3_bundle, prompt, width, height, length, ref_image_size, items)
         else:
             first_frame, last_frame = cls._keyframes(items, keyframe_role)
+            if bool(optimize_prompt):
+                prompt = optimize_h3_prompt(
+                    prompt=prompt,
+                    mode=MODE_IMAGE,
+                    base_url=kwargs.get("optimizer_base_url", ""),
+                    model=kwargs.get("optimizer_model", ""),
+                    api_key=kwargs.get("optimizer_api_key", ""),
+                    media_items=_optimizer_media_items(items, MODE_IMAGE, keyframe_role),
+                    duration=seconds,
+                )
             model = h3_bundle.model_for("fl2va")
             conditioning, latent = _empty_image_conditioning(h3_bundle, prompt, width, height, length, first_frame, last_frame)
         context = MiniMaxH3Context(

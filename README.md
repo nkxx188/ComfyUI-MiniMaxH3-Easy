@@ -76,6 +76,35 @@ The block is automatically converted to MiniMax's recommended dialogue format
 prompt text, so users can describe the scene naturally without learning the
 underlying markup.
 
+### H3 prompt optimization
+
+The main node includes an **Optimize prompt** switch. It can use any
+OpenAI-compatible `chat/completions` API to expand a short idea into a
+MiniMax H3 audiovisual prompt. The switch is a native BOOLEAN node input. When
+enabled, the Python node optimizes the prompt inside `generate()` before creating
+H3 conditioning. It selects one of two hard-coded system prompts
+from the node's top-level mode: `IMAGE_SYSTEM_PROMPT` for `image`, and
+`REFERENCE_SYSTEM_PROMPT` for `reference`, while preserving every `@` reference
+in Reference Video mode. Both constants live in `prompt_optimizer.py` and are
+intentionally empty placeholders for complete prompts.
+
+Before first use, configure these values under
+**MiniMaxH3Easy → PromptOptimizer** in the ComfyUI settings panel:
+
+- `Base URL`, for example `https://api.openai.com/v1`;
+- `Model`, using the model ID supplied by the provider;
+- `API Key`, which may be empty for an unauthenticated local compatible API.
+
+The ComfyUI settings system stores the API key. When enabled, its value is injected
+only into the current execution data and is never added to workflow JSON. The
+optimized result is used only for that node execution and does not rewrite the
+frontend prompt editor.
+
+The request reads the node's actual multimodal inputs in Python. Images are resized
+before attachment, videos contribute three sampled frames, and audio is encoded as
+a WAV `input_audio` excerpt capped at about 6 MB. The selected prompt model must
+support the relevant OpenAI-compatible multimodal message parts.
+
 ## Nodes and connections
 
 ### MiniMax H3 Easy Loader

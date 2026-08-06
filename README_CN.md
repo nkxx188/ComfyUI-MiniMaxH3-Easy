@@ -65,6 +65,30 @@
 
 台词块在执行时会自动转换成 MiniMax 官方推荐的 `<d>...</d>` 台词格式。台词块之外仍然是普通提示词文本，用户可以自然地描述画面，不需要理解底层标签。
 
+### H3 提示词优化
+
+主节点提供**优化提示词**开关，可通过任意 OpenAI 兼容的
+`chat/completions` API，将简短创意扩写为符合 MiniMax H3 结构的视听提示词。
+该开关是节点的原生 BOOLEAN 输入；启用后，由 Python 节点在执行 `generate()` 时
+优化提示词，再使用优化结果创建 H3 conditioning。
+优化器会直接根据主节点的顶层模式选择两套硬编码系统提示词之一：`image`
+使用 `IMAGE_SYSTEM_PROMPT`，`reference` 使用 `REFERENCE_SYSTEM_PROMPT`，并保留
+参考模式中的所有 `@` 素材引用。这两个提示词常量位于 `prompt_optimizer.py`，默认
+留空，便于直接粘贴完整提示词。
+
+首次使用前，在 ComfyUI 设置面板的 **MiniMaxH3Easy → PromptOptimizer** 中填写：
+
+- `Base URL`：例如 `https://api.openai.com/v1`；
+- `Model`：服务商提供的模型 ID；
+- `API Key`：可留空以支持不需要鉴权的本地兼容服务。
+
+`API Key` 由 ComfyUI 设置系统保存，仅在开关启用时注入本次执行数据，不写入工作流
+JSON。优化结果仅供当次节点执行使用，不会改写前端提示词编辑器。
+
+优化请求会直接读取当前节点收到的多模态数据：图片会缩放后附加，视频会抽取三个代表
+帧，音频会编码为最长约 6 MB 的 WAV `input_audio`。所选提示词模型必须支持对应的
+OpenAI 兼容多模态消息。
+
 ## 节点和连接方式
 
 ### MiniMax H3 Easy Loader
