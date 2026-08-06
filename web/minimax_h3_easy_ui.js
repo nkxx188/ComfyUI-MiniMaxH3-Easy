@@ -1,4 +1,5 @@
 import { app } from "../../scripts/app.js";
+import { api } from "../../scripts/api.js";
 
 const NODE_CLASS = "MiniMaxH3Easy";
 const LOADER_CLASS = "MiniMaxH3EasyLoader";
@@ -24,6 +25,10 @@ const OPTIMIZER_SETTINGS = {
     baseUrl: "MiniMaxH3Easy.PromptOptimizer.BaseURL",
     model: "MiniMaxH3Easy.PromptOptimizer.Model",
     apiKey: "MiniMaxH3Easy.PromptOptimizer.APIKey",
+    apiKeyConfigured: "MiniMaxH3Easy.PromptOptimizer.APIKeyConfigured",
+    clearApiKey: "MiniMaxH3Easy.PromptOptimizer.ClearAPIKey",
+    videoMode: "MiniMaxH3Easy.PromptOptimizer.VideoMode",
+    audioMode: "MiniMaxH3Easy.PromptOptimizer.AudioMode",
 };
 const AUDIO_ICON_SVG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='0.5' y='10' width='3' height='4' rx='1.5' fill='%2300e2bb'/%3E%3Crect x='5.5' y='7' width='3' height='10' rx='1.5' fill='%2300e2bb'/%3E%3Crect x='10.5' y='4' width='3' height='16' rx='1.5' fill='%2300e2bb'/%3E%3Crect x='15.5' y='7' width='3' height='10' rx='1.5' fill='%2300e2bb'/%3E%3Crect x='20.5' y='10' width='3' height='4' rx='1.5' fill='%2300e2bb'/%3E%3C/svg%3E";
 const PRIMARY_BROWSER_LANGUAGE = String(globalThis.navigator?.language || globalThis.navigator?.languages?.[0] || "");
@@ -76,6 +81,14 @@ const TEXT = {
     optimizerBaseUrl: "Base URL",
     optimizerModel: ZH_BROWSER ? "\u6a21\u578b" : "Model",
     optimizerApiKey: "API Key",
+    optimizerApiKeyConfigured: ZH_BROWSER ? "API Key 已配置" : "API Key configured",
+    optimizerClearApiKey: ZH_BROWSER ? "清除 API Key" : "Clear API Key",
+    optimizerVideoMode: ZH_BROWSER ? "视频传输" : "Video transport",
+    optimizerAudioMode: ZH_BROWSER ? "音频传输" : "Audio transport",
+    maxTokensPreset: ZH_BROWSER ? "最大输出 Tokens" : "Maximum output tokens",
+    maxTokensCustom: ZH_BROWSER ? "自定义 Tokens" : "Custom tokens",
+    optimizedPrompt: ZH_BROWSER ? "优化后提示词" : "Optimized prompt",
+    reasoningContent: ZH_BROWSER ? "推理内容" : "Reasoning content",
 };
 const OPTION_DEFS = {
     mode: {
@@ -93,6 +106,12 @@ const OPTION_DEFS = {
     reference_mention_mode: {
         filename: ZH_BROWSER ? "\u6309\u6587\u4ef6\u540d" : "By filename",
         index: ZH_BROWSER ? "\u6309\u5e8f\u53f7" : "By index",
+    },
+    max_tokens_preset: {
+        short: ZH_BROWSER ? "短 (1024)" : "Short (1024)",
+        medium: ZH_BROWSER ? "中 (4096)" : "Medium (4096)",
+        long: ZH_BROWSER ? "长 (8192)" : "Long (8192)",
+        custom: ZH_BROWSER ? "自定义" : "Custom",
     },
     resolution: {
         "360P": "360P",
@@ -251,7 +270,7 @@ function localizeNodeInstance(node) {
     }
     if (!isTarget(node)) return;
     node.title = TEXT.mainTitle;
-    const labels = { mode: TEXT.mode, prompt: TEXT.prompt, resolution: TEXT.resolution, aspect_ratio: TEXT.aspectRatio, width: TEXT.width, height: TEXT.height, seconds: TEXT.seconds, advanced: TEXT.advanced, fps: TEXT.fps, keyframe_role: TEXT.keyframeRole, ref_image_size: TEXT.refImageSize, reference_mention_mode: TEXT.referenceMentionMode, optimize_prompt: TEXT.optimizePrompt };
+    const labels = { mode: TEXT.mode, prompt: TEXT.prompt, resolution: TEXT.resolution, aspect_ratio: TEXT.aspectRatio, width: TEXT.width, height: TEXT.height, seconds: TEXT.seconds, advanced: TEXT.advanced, fps: TEXT.fps, keyframe_role: TEXT.keyframeRole, ref_image_size: TEXT.refImageSize, reference_mention_mode: TEXT.referenceMentionMode, optimize_prompt: TEXT.optimizePrompt, max_tokens_preset: TEXT.maxTokensPreset, max_tokens_custom: TEXT.maxTokensCustom };
     for (const widget of node.widgets || []) {
         if (labels[widget.name]) widget.label = labels[widget.name];
         localizeComboWidget(widget);
@@ -260,7 +279,7 @@ function localizeNodeInstance(node) {
         if (input.name === "h3_bundle") setLocalizedSlotLabel(input, TEXT.bundle);
         if (input.name === "media") setLocalizedSlotLabel(input, TEXT.inputMedia);
     }
-    const outputLabels = { model: TEXT.outputModel, h3_context: TEXT.outputContext };
+    const outputLabels = { model: TEXT.outputModel, h3_context: TEXT.outputContext, optimized_prompt: TEXT.optimizedPrompt, reasoning_content: TEXT.reasoningContent };
     for (const output of node.outputs || []) {
         const key = String(output.name || "").toLowerCase();
         if (outputLabels[key]) setLocalizedSlotLabel(output, outputLabels[key]);
@@ -1280,15 +1299,11 @@ function patchGraphToPrompt() {
             promptNode.inputs.reference_mention_mode = canonicalOption("reference_mention_mode", getWidgetValue(node, "reference_mention_mode", "index"));
             const optimizePrompt = asBoolean(getWidgetValue(node, "optimize_prompt", false));
             promptNode.inputs.optimize_prompt = optimizePrompt;
-            if (optimizePrompt) {
-                promptNode.inputs.optimizer_base_url = optimizerSetting(OPTIMIZER_SETTINGS.baseUrl);
-                promptNode.inputs.optimizer_model = optimizerSetting(OPTIMIZER_SETTINGS.model);
-                promptNode.inputs.optimizer_api_key = optimizerSetting(OPTIMIZER_SETTINGS.apiKey);
-            } else {
-                delete promptNode.inputs.optimizer_base_url;
-                delete promptNode.inputs.optimizer_model;
-                delete promptNode.inputs.optimizer_api_key;
-            }
+            promptNode.inputs.max_tokens_preset = String(getWidgetValue(node, "max_tokens_preset", "medium") || "medium");
+            promptNode.inputs.max_tokens_custom = Number(getWidgetValue(node, "max_tokens_custom", 4096)) || 4096;
+            delete promptNode.inputs.optimizer_base_url;
+            delete promptNode.inputs.optimizer_model;
+            delete promptNode.inputs.optimizer_api_key;
         }
         return promptData;
     };
@@ -1395,14 +1410,6 @@ function mentionOptions(node) {
             previewUrl: sourcePreviewUrl(source, type),
         };
     });
-}
-
-function optimizerSetting(id) {
-    try {
-        return String(app.extensionManager?.setting?.get?.(id) ?? "").trim();
-    } catch {
-        return "";
-    }
 }
 
 function findMentionOption(options, reference, mode) {
@@ -2825,6 +2832,7 @@ function syncModeWidgets(node) {
         setConditionalWidgetVisible(node, getWidget(node, "aspect_ratio"), !isCustomResolution(node)),
         setConditionalWidgetVisible(node, getWidget(node, "width"), isCustomResolution(node)),
         setConditionalWidgetVisible(node, getWidget(node, "height"), isCustomResolution(node)),
+        setConditionalWidgetVisible(node, getWidget(node, "max_tokens_custom"), String(getWidgetValue(node, "max_tokens_preset", "medium")) === "custom"),
     ].some(Boolean);
     if (changed) {
         refreshVueNodeWidgets(node);
@@ -3669,6 +3677,8 @@ function repairConfiguredWidgetValues(node, info) {
         ref_image_size: REF_IMAGE_1K,
         reference_mention_mode: "index",
         optimize_prompt: false,
+        max_tokens_preset: "medium",
+        max_tokens_custom: 4096,
     };
     const names = Object.keys(defaults);
     const values = raw;
@@ -3700,6 +3710,9 @@ function repairConfiguredWidgetValues(node, info) {
         reference_mention_mode: Object.prototype.hasOwnProperty.call(OPTION_DEFS.reference_mention_mode, canonicalOption("reference_mention_mode", values[11]))
             ? canonicalOption("reference_mention_mode", values[11]) : defaults.reference_mention_mode,
         optimize_prompt: asBoolean(values[12], defaults.optimize_prompt),
+        max_tokens_preset: Object.prototype.hasOwnProperty.call(OPTION_DEFS.max_tokens_preset, String(values[13] || ""))
+            ? String(values[13]) : defaults.max_tokens_preset,
+        max_tokens_custom: Number.isFinite(Number(values[14])) ? Math.min(32768, Math.max(256, Number(values[14]))) : defaults.max_tokens_custom,
     };
     for (const name of names) setConfiguredWidgetValue(node, name, normalized[name]);
     info.widgets_values = names.map((name) => normalized[name]);
@@ -3766,6 +3779,17 @@ function installNode(nodeType, nodeData) {
                 syncModeWidgets(this);
                 renderEditorFromNode(this);
                 requestMentionPreviewRefresh();
+                repairNodeLayout(this);
+                this.setDirtyCanvas?.(true, true);
+            };
+        }
+        const maxTokensWidget = getWidget(this, "max_tokens_preset");
+        if (maxTokensWidget && !maxTokensWidget.__h3ConditionalCallbackBound) {
+            maxTokensWidget.__h3ConditionalCallbackBound = true;
+            const originalCallback = maxTokensWidget.callback;
+            maxTokensWidget.callback = (value) => {
+                originalCallback?.call(maxTokensWidget, value);
+                syncModeWidgets(this);
                 repairNodeLayout(this);
                 this.setDirtyCanvas?.(true, true);
             };
@@ -3968,6 +3992,60 @@ function install() {
     document.head.append(style);
 }
 
+let optimizerSettingsSyncing = false;
+
+async function saveOptimizerBackend(values) {
+    const response = await api.fetchApi("/minimax_h3_easy/prompt_optimizer/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+    });
+    if (!response.ok) {
+        const detail = await response.json().catch(() => ({}));
+        throw new Error(detail.error || `HTTP ${response.status}`);
+    }
+    return response.json();
+}
+
+function setOptimizerSetting(id, value) {
+    try {
+        app.extensionManager?.setting?.set?.(id, value);
+    } catch { /* Older frontends do not expose a programmatic setter. */ }
+}
+
+async function loadOptimizerBackendSettings() {
+    try {
+        const response = await api.fetchApi("/minimax_h3_easy/prompt_optimizer/config");
+        if (!response.ok) return;
+        const config = await response.json();
+        optimizerSettingsSyncing = true;
+        setOptimizerSetting(OPTIMIZER_SETTINGS.baseUrl, config.base_url || "");
+        setOptimizerSetting(OPTIMIZER_SETTINGS.model, config.model || "");
+        setOptimizerSetting(OPTIMIZER_SETTINGS.apiKey, "");
+        setOptimizerSetting(OPTIMIZER_SETTINGS.apiKeyConfigured, Boolean(config.api_key_configured));
+        setOptimizerSetting(OPTIMIZER_SETTINGS.videoMode, config.video_mode || "auto");
+        setOptimizerSetting(OPTIMIZER_SETTINGS.audioMode, config.audio_mode || "auto");
+    } finally {
+        optimizerSettingsSyncing = false;
+    }
+}
+
+async function updateOptimizerBackend(values) {
+    if (optimizerSettingsSyncing) return;
+    try {
+        const config = await saveOptimizerBackend(values);
+        optimizerSettingsSyncing = true;
+        setOptimizerSetting(OPTIMIZER_SETTINGS.apiKey, "");
+        setOptimizerSetting(OPTIMIZER_SETTINGS.apiKeyConfigured, Boolean(config.api_key_configured));
+        setOptimizerSetting(OPTIMIZER_SETTINGS.clearApiKey, false);
+    } catch (error) {
+        console.error("MiniMax H3 optimizer configuration failed", error);
+    } finally {
+        setOptimizerSetting(OPTIMIZER_SETTINGS.apiKey, "");
+        optimizerSettingsSyncing = false;
+    }
+}
+
 app.registerExtension({
     name: "MiniMaxH3Easy",
     settings: [
@@ -3978,6 +4056,7 @@ app.registerExtension({
             defaultValue: "https://api.openai.com/v1",
             category: ["MiniMaxH3Easy", "PromptOptimizer", TEXT.optimizerBaseUrl],
             tooltip: ZH_BROWSER ? "OpenAI \u517c\u5bb9 API \u7684\u57fa\u7840\u5730\u5740" : "Base URL of an OpenAI-compatible API",
+            onChange: (value) => updateOptimizerBackend({ base_url: String(value || "").trim() }),
         },
         {
             id: OPTIMIZER_SETTINGS.model,
@@ -3986,6 +4065,7 @@ app.registerExtension({
             defaultValue: "",
             category: ["MiniMaxH3Easy", "PromptOptimizer", TEXT.optimizerModel],
             tooltip: ZH_BROWSER ? "\u7528\u4e8e\u4f18\u5316 H3 \u63d0\u793a\u8bcd\u7684\u6a21\u578b ID" : "Model ID used to optimize H3 prompts",
+            onChange: (value) => updateOptimizerBackend({ model: String(value || "").trim() }),
         },
         {
             id: OPTIMIZER_SETTINGS.apiKey,
@@ -3994,11 +4074,50 @@ app.registerExtension({
             defaultValue: "",
             category: ["MiniMaxH3Easy", "PromptOptimizer", TEXT.optimizerApiKey],
             attrs: { type: "password", autocomplete: "off" },
-            tooltip: ZH_BROWSER ? "\u4ec5\u5728\u70b9\u51fb\u4f18\u5316\u65f6\u53d1\u9001\uff0c\u4e0d\u4f1a\u5199\u5165\u5de5\u4f5c\u6d41" : "Sent only when optimizing; never stored in workflow JSON",
+            tooltip: ZH_BROWSER ? "\u4fdd\u5b58\u540e\u7acb\u5373\u6e05\u7a7a\u663e\u793a\uff0c\u5bc6\u94a5\u53ea\u4fdd\u5b58\u5728\u540e\u7aef" : "Cleared from the field after saving; stored only by the backend",
+            onChange: (value) => {
+                const key = String(value || "").trim();
+                if (key) updateOptimizerBackend({ api_key: key });
+            },
+        },
+        {
+            id: OPTIMIZER_SETTINGS.apiKeyConfigured,
+            name: TEXT.optimizerApiKeyConfigured,
+            type: "boolean",
+            defaultValue: false,
+            category: ["MiniMaxH3Easy", "PromptOptimizer", TEXT.optimizerApiKeyConfigured],
+            attrs: { disabled: true },
+        },
+        {
+            id: OPTIMIZER_SETTINGS.clearApiKey,
+            name: TEXT.optimizerClearApiKey,
+            type: "boolean",
+            defaultValue: false,
+            category: ["MiniMaxH3Easy", "PromptOptimizer", TEXT.optimizerClearApiKey],
+            onChange: (value) => { if (value) updateOptimizerBackend({ clear_api_key: true }); },
+        },
+        {
+            id: OPTIMIZER_SETTINGS.videoMode,
+            name: TEXT.optimizerVideoMode,
+            type: "combo",
+            defaultValue: "auto",
+            options: ["auto", "native", "sampled_frames"],
+            category: ["MiniMaxH3Easy", "PromptOptimizer", TEXT.optimizerVideoMode],
+            onChange: (value) => updateOptimizerBackend({ video_mode: value }),
+        },
+        {
+            id: OPTIMIZER_SETTINGS.audioMode,
+            name: TEXT.optimizerAudioMode,
+            type: "combo",
+            defaultValue: "auto",
+            options: ["auto", "input_audio", "video_wrapper"],
+            category: ["MiniMaxH3Easy", "PromptOptimizer", TEXT.optimizerAudioMode],
+            onChange: (value) => updateOptimizerBackend({ audio_mode: value }),
         },
     ],
     setup() {
         install();
+        loadOptimizerBackendSettings();
     },
     beforeRegisterNodeDef(nodeType, nodeData) {
         localizeNodeDefinition(nodeData);

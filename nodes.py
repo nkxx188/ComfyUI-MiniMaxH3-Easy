@@ -852,23 +852,23 @@ def _reference_conditioning(bundle, prompt, width, height, length, ref_image_siz
     tokens = bundle.clip.tokenize(resolved_prompt, minimax_ref_items=ref_items)
     conditioning = bundle.clip.encode_from_tokens_scheduled(tokens)
     conditioning = node_helpers.conditioning_set_values(conditioning, {"minimax_refs": ref_blocks})
-    return conditioning, latent
+    return conditioning, latent, resolved_prompt
 
 
 class MiniMaxH3Easy:
     CATEGORY = "MiniMax H3 Easy"
     FUNCTION = "generate"
-    RETURN_TYPES = ("MODEL", "MINIMAX_H3_CONTEXT")
-    RETURN_NAMES = ("model", "h3_context")
+    RETURN_TYPES = ("MODEL", "MINIMAX_H3_CONTEXT", "STRING", "STRING")
+    RETURN_NAMES = ("model", "h3_context", "optimized_prompt", "reasoning_content")
     DESCRIPTION = "One MiniMax H3 node for text, image and reference video workflows."
 
     @classmethod
     def INPUT_TYPES(cls):
         optional = {
+            "optimize_prompt": ("BOOLEAN", {"default": False}),
+            "max_tokens_preset": (["short", "medium", "long", "custom"], {"default": "medium"}),
+            "max_tokens_custom": ("INT", {"default": 4096, "min": 256, "max": 32768, "step": 256}),
             "media": ("*",),
-            "optimizer_base_url": ("STRING", {"default": ""}),
-            "optimizer_model": ("STRING", {"default": ""}),
-            "optimizer_api_key": ("STRING", {"default": ""}),
         }
         for index in range(1, MAX_MEDIA + 1):
             optional[f"media_{index}"] = ("*",)
@@ -888,7 +888,6 @@ class MiniMaxH3Easy:
                 "keyframe_role": ([KEYFRAME_FIRST, KEYFRAME_LAST], {"default": KEYFRAME_FIRST}),
                 "ref_image_size": ([REF_IMAGE_1K, REF_IMAGE_2K], {"default": REF_IMAGE_1K}),
                 "reference_mention_mode": ([REFERENCE_MENTION_FILENAME, REFERENCE_MENTION_INDEX], {"default": REFERENCE_MENTION_INDEX}),
-                "optimize_prompt": ("BOOLEAN", {"default": False}),
             },
             "optional": optional,
         }
@@ -930,10 +929,25 @@ class MiniMaxH3Easy:
         return images[0], images[1]
 
     @classmethod
-    def generate(cls, h3_bundle, mode, prompt, resolution, aspect_ratio, width, height, seconds, advanced, fps, keyframe_role, ref_image_size, reference_mention_mode, optimize_prompt, **kwargs):
+    def generate(cls, h3_bundle, mode, prompt, resolution, aspect_ratio, width, height, seconds, advanced, fps, keyframe_role, ref_image_size, reference_mention_mode, optimize_prompt=False, max_tokens_preset="medium", max_tokens_custom=4096, **kwargs):
         if not isinstance(h3_bundle, MiniMaxH3Bundle):
             raise ValueError("Connect a MiniMax H3 Easy Loader bundle")
         mode = str(mode)
+        original_prompt = str(prompt or "")
+        optimized_prompt = original_prompt
+        reasoning_content = ""
+        optimizer_config = None
+        preset = str(max_tokens_preset or "medium").strip().lower()
+        if preset == "custom":
+            try:
+                custom_tokens = int(max_tokens_custom)
+            except (TypeError, ValueError):
+                custom_tokens = 4096
+            max_tokens = custom_tokens if 256 <= custom_tokens <= 32768 else 4096
+        else:
+            max_tokens = MAX_TOKEN_PRESETS.get(preset, 4096)
+        if bool(optimize_prompt):
+            optimizer_config = get_optimizer_config()
         keyframe_role = KEYFRAME_LAST if str(keyframe_role) == KEYFRAME_LAST else KEYFRAME_FIRST
         width, height = _canvas_dimensions(resolution, aspect_ratio, width, height)
         seconds = min(MAX_SECONDS, max(MIN_SECONDS, float(seconds)))
@@ -952,29 +966,40 @@ class MiniMaxH3Easy:
             if counts["image"] == 0 and counts["video"] == 0:
                 raise ValueError("Reference mode needs an image or video in addition to audio")
             if bool(optimize_prompt):
-                prompt = optimize_h3_prompt(
+                optimized_prompt, reasoning_content = optimize_h3_prompt(
                     prompt=prompt,
                     mode=MODE_REFERENCE,
-                    base_url=kwargs.get("optimizer_base_url", ""),
-                    model=kwargs.get("optimizer_model", ""),
-                    api_key=kwargs.get("optimizer_api_key", ""),
-                    media_items=_optimizer_media_items(items, MODE_REFERENCE, keyframe_role),
+                    base_url=optimizer_config["base_url"],
+                    model=optimizer_config["model"],
+                    api_key=optimizer_config["api_key"],
+                    media_items=_optimizer_media_items(items, MODE_REFERENCE, keyframe_role, optimizer_config["video_mode"], optimizer_config["audio_mode"]),
                     duration=seconds,
+                    max_tokens=max_tokens,
+                    video_mode=optimizer_config["video_mode"],
+                    audio_mode=optimizer_config["audio_mode"],
+                    progress=ProgressBar(100),
                 )
+                prompt = optimized_prompt
             model = h3_bundle.model_for("ref2va")
-            conditioning, latent = _reference_conditioning(h3_bundle, prompt, width, height, length, ref_image_size, items)
+            conditioning, latent, resolved_prompt = _reference_conditioning(h3_bundle, prompt, width, height, length, ref_image_size, items)
+            optimized_prompt = resolved_prompt
         else:
             first_frame, last_frame = cls._keyframes(items, keyframe_role)
             if bool(optimize_prompt):
-                prompt = optimize_h3_prompt(
+                optimized_prompt, reasoning_content = optimize_h3_prompt(
                     prompt=prompt,
                     mode=MODE_IMAGE,
-                    base_url=kwargs.get("optimizer_base_url", ""),
-                    model=kwargs.get("optimizer_model", ""),
-                    api_key=kwargs.get("optimizer_api_key", ""),
-                    media_items=_optimizer_media_items(items, MODE_IMAGE, keyframe_role),
+                    base_url=optimizer_config["base_url"],
+                    model=optimizer_config["model"],
+                    api_key=optimizer_config["api_key"],
+                    media_items=_optimizer_media_items(items, MODE_IMAGE, keyframe_role, optimizer_config["video_mode"], optimizer_config["audio_mode"]),
                     duration=seconds,
+                    max_tokens=max_tokens,
+                    video_mode=optimizer_config["video_mode"],
+                    audio_mode=optimizer_config["audio_mode"],
+                    progress=ProgressBar(100),
                 )
+                prompt = optimized_prompt
             model = h3_bundle.model_for("fl2va")
             conditioning, latent = _empty_image_conditioning(h3_bundle, prompt, width, height, length, first_frame, last_frame)
         context = MiniMaxH3Context(
@@ -984,7 +1009,7 @@ class MiniMaxH3Easy:
             audio_vae=h3_bundle.audio_vae,
             fps=float(fps),
         )
-        return model, context
+        return model, context, optimized_prompt, reasoning_content
 
 
 class MiniMaxH3EasyOutput:
