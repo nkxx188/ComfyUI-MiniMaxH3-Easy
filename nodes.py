@@ -645,18 +645,32 @@ def _optimizer_media_items(
         if not isinstance(frames, torch.Tensor) or frames.ndim != 4 or not frames.shape[0]:
             raise ValueError("Prompt optimizer received an invalid video")
         indexes = sorted({round((frames.shape[0] - 1) * ratio) for ratio in (0.12, 0.5, 0.88)})
+        sampled_frames = []
         for sample_index, frame_index in enumerate(indexes, start=1):
-            result.append({
-                "type": "image",
+            sampled_frames.append({
                 "label": f"{token} sampled video frame {sample_index}/{len(indexes)}",
                 "data_url": _optimizer_image_data_url(frames[frame_index], OPTIMIZER_VIDEO_FRAME_EDGE),
             })
+        video_item: dict[str, Any] = {
+            "type": "video",
+            "label": token,
+            "mode": video_mode,
+            "sampled_frames": sampled_frames,
+            "data_url": "data:video/mp4;base64,",
+        }
+        if video_mode in {"auto", "native"}:
+            video_item["data_url"] = _encode_optimizer_mp4(frames, source_fps, soundtrack)
         if soundtrack is not None:
-            result.append({
+            sampled_audio: dict[str, Any] = {
                 "type": "audio",
                 "label": f"audio track from {token}",
                 "data_url": _optimizer_audio_data_url(soundtrack),
-            })
+                "mode": audio_mode,
+            }
+            if audio_mode in {"auto", "video_wrapper"}:
+                sampled_audio["fallback_data_url"] = _audio_wrapper_data_url(soundtrack)
+            video_item["sampled_audio"] = sampled_audio
+        result.append(video_item)
     return result[:32]
 
 
