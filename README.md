@@ -85,25 +85,42 @@ enabled, the Python node optimizes the prompt inside `generate()` before creatin
 H3 conditioning. It selects one of two hard-coded system prompts
 from the node's top-level mode: `IMAGE_SYSTEM_PROMPT` for `image`, and
 `REFERENCE_SYSTEM_PROMPT` for `reference`, while preserving every `@` reference
-in Reference Video mode. Both constants live in `prompt_optimizer.py` and are
-intentionally empty placeholders for complete prompts.
+in Reference Video mode. Both complete prompt constants live in
+`prompt_optimizer.py`.
 
-Before first use, configure these values under
+Before first use, configure these instance-wide values under
 **MiniMaxH3Easy → PromptOptimizer** in the ComfyUI settings panel:
 
 - `Base URL`, for example `https://api.openai.com/v1`;
 - `Model`, using the model ID supplied by the provider;
-- `API Key`, which may be empty for an unauthenticated local compatible API.
+- `API Key`, which may be empty for an unauthenticated local compatible API;
+- video transport: `Auto`, `Native`, or `Sampled frames`;
+- audio transport: `Auto`, `input_audio`, or `Video wrapper`.
 
-The ComfyUI settings system stores the API key. When enabled, its value is injected
-only into the current execution data and is never added to workflow JSON. The
-optimized result is used only for that node execution and does not rewrite the
-frontend prompt editor.
+The backend stores these values in `user/__minimax_h3_easy/`. The API key field is
+always shown blank; the settings page reports whether a key is configured and
+provides a clear action. `GET` responses never contain the key. Base URL, model,
+and key can instead be supplied with `MINIMAX_H3_OPTIMIZER_BASE_URL`,
+`MINIMAX_H3_OPTIMIZER_MODEL`, and `MINIMAX_H3_OPTIMIZER_API_KEY`; environment
+variables take priority. Optimizer configuration is never placed in `/prompt` or
+queue history. This is instance-wide configuration shared by every workflow and
+user of the same ComfyUI server, so only trusted administrators should manage it.
 
-The request reads the node's actual multimodal inputs in Python. Images are resized
-before attachment, videos contribute three sampled frames, and audio is encoded as
-a WAV `input_audio` excerpt capped at about 6 MB. The selected prompt model must
-support the relevant OpenAI-compatible multimodal message parts.
+The request reads the node's actual multimodal inputs in Python. Native video is an
+in-memory H.264/AAC MP4 with its frame rate and synchronized soundtrack preserved,
+scaled to a 720-pixel longest edge. Sampled mode attaches three representative
+frames. Audio can use `input_audio` or an in-memory 512×512 waveform MP4 wrapper.
+`Auto` starts with native video and `input_audio`; only a 400/415/422 response that
+explicitly says `video_url` or `input_audio` is unsupported triggers one fallback
+request. Explicit modes and ambiguous errors never retry.
+
+Each binary attachment is limited to 24 MiB and the total Base64 payload to 40
+million characters. Responses use SSE streaming when supported and also accept a
+non-streaming JSON response. The node progress is an estimate based on accumulated
+UTF-8 bytes divided by four and the selected maximum-output-token limit; it reaches
+at most 95% while reading and 100% on clean completion. `Short`, `Medium`, and
+`Long` send 1024, 4096, and 8192 `max_tokens`; Custom accepts 256–32768 and falls
+back to 4096 when invalid.
 
 ## Nodes and connections
 
@@ -122,11 +139,19 @@ BF16, FP8, INT8, INT4, NVFP4, NF4, and GGUF releases.
 
 ### MiniMax H3 Easy
 
-This is the main generation node. It outputs:
+This is the main generation node. Its existing first two output slots are unchanged,
+with two text outputs appended:
 
 - `Model` — connect this to a model-only LoRA, Sage Attention patch, or directly
   to the sampler;
 - `H3 Context` — connect this to **MiniMax H3 Easy Output**.
+- `Optimized prompt` — the actual optimized text, or the original prompt when
+  optimization is disabled;
+- `Reasoning content` — reasoning returned through `reasoning_content`, `reasoning`,
+  or `reasoning_details`, otherwise empty.
+
+Optimization failures are execution errors and never return a partial prompt.
+Older API workflows that omit `optimize_prompt` continue to execute with it disabled.
 
 ### MiniMax H3 Easy Output
 

@@ -7,8 +7,11 @@ inputs into multimodal message parts before H3 text conditioning is created.
 
 from __future__ import annotations
 
+import codecs
 import json
+import queue
 import re
+import threading
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit, urlunsplit
@@ -17,6 +20,7 @@ from urllib.request import Request, urlopen
 MAX_PROMPT_LENGTH = 50_000
 MAX_MEDIA_ITEMS = 32
 MAX_MEDIA_PAYLOAD_CHARS = 40_000_000
+MAX_MEDIA_BINARY_BYTES = 24 * 1024 * 1024
 REQUEST_TIMEOUT_SECONDS = 300
 
 
@@ -180,32 +184,11 @@ def _system_prompt(mode: str) -> str:
     return SYSTEM_PROMPTS[mode]
 
 
-def _post_json(endpoint: str, headers: dict[str, str], body: dict[str, Any]) -> Any:
-    """Send a JSON request with the standard library from a worker thread."""
-    request = Request(
-        endpoint,
-        data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
-        headers=headers,
-        method="POST",
-    )
-    try:
-        with urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
-            raw_text = response.read().decode("utf-8", errors="replace")
-    except HTTPError as error:
-        detail = error.read().decode("utf-8", errors="replace").strip()[:1_000]
-        raise _UpstreamHTTPError(error.code, detail or str(error.reason)) from error
-    except (URLError, OSError, TimeoutError) as error:
-        reason = getattr(error, "reason", error)
-        raise _UpstreamConnectionError(str(reason)) from error
-
-    try:
-        return json.loads(raw_text)
-    except (json.JSONDecodeError, TypeError) as error:
-        raise _UpstreamJSONError from error
-
-
 def _media_content(
-    prompt: str, media_items: list[dict[str, str]]
+    prompt: str,
+    media_items: list[dict[str, Any]],
+    fallback_video: bool = False,
+    fallback_audio: bool = False,
 ) -> str | list[dict[str, Any]]:
     """Build OpenAI-compatible multimodal chat content."""
     if not media_items:
@@ -214,11 +197,25 @@ def _media_content(
     for item in media_items:
         kind = item["type"]
         label = item["label"]
-        data_url = item["data_url"]
         content.append({"type": "text", "text": f"Attached {kind}: {label}"})
         if kind == "image":
-            content.append({"type": "image_url", "image_url": {"url": data_url}})
+            content.append({"type": "image_url", "image_url": {"url": item["data_url"]}})
             continue
+        if kind == "video":
+            if fallback_video or item.get("mode") == "sampled_frames":
+                for frame in item.get("sampled_frames", []):
+                    content.append({"type": "text", "text": frame["label"]})
+                    content.append({"type": "image_url", "image_url": {"url": frame["data_url"]}})
+                soundtrack = item.get("sampled_audio")
+                if soundtrack:
+                    content.extend(_media_content("", [soundtrack], fallback_audio=fallback_audio)[1:])
+            else:
+                content.append({"type": "video_url", "video_url": {"url": item["data_url"]}})
+            continue
+        if fallback_audio or item.get("mode") == "video_wrapper":
+            content.append({"type": "video_url", "video_url": {"url": item["fallback_data_url"]}})
+            continue
+        data_url = item["data_url"]
         header, encoded = data_url.split(",", 1)
         mime_type = header[5:].split(";", 1)[0].lower()
         audio_format = {
@@ -238,6 +235,188 @@ def _media_content(
             }
         )
     return content
+
+
+def _reasoning_text(value: Any) -> str:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        return "".join(_reasoning_text(item) for item in value)
+    if isinstance(value, dict):
+        for key in ("text", "content", "reasoning_content", "reasoning"):
+            if key in value:
+                return _reasoning_text(value[key])
+    return ""
+
+
+def _response_parts(payload: Any, streaming: bool) -> tuple[str, str]:
+    if not isinstance(payload, dict):
+        return "", ""
+    choices = payload.get("choices")
+    if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+        return "", ""
+    source = choices[0].get("delta" if streaming else "message")
+    if not isinstance(source, dict):
+        return "", ""
+    content = _message_text(source.get("content"))
+    reasoning = ""
+    for key in ("reasoning_content", "reasoning", "reasoning_details"):
+        reasoning += _reasoning_text(source.get(key))
+    return content, reasoning
+
+
+def _set_progress(progress: Any, value: int) -> None:
+    if progress is None:
+        return
+    try:
+        progress.update_absolute(max(0, min(100, int(value))), 100)
+    except TypeError:
+        progress.update_absolute(max(0, min(100, int(value))))
+
+
+def _check_interrupted() -> None:
+    try:
+        import comfy.model_management
+
+        comfy.model_management.throw_exception_if_processing_interrupted()
+    except ImportError:
+        return
+
+
+def _stream_completion(
+    endpoint: str,
+    headers: dict[str, str],
+    body: dict[str, Any],
+    max_tokens: int,
+    progress: Any,
+) -> tuple[str, str, Any]:
+    """Read a streaming completion in a worker so cancellation stays responsive."""
+    events: queue.Queue[tuple[str, Any]] = queue.Queue()
+    response_holder: dict[str, Any] = {}
+
+    def worker() -> None:
+        request = Request(
+            endpoint,
+            data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+            headers=headers,
+            method="POST",
+        )
+        try:
+            response = urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS)
+            response_holder["response"] = response
+            try:
+                while True:
+                    chunk = response.read(4096)
+                    if not chunk:
+                        break
+                    events.put(("chunk", chunk))
+            finally:
+                response.close()
+            events.put(("done", None))
+        except HTTPError as error:
+            detail = error.read().decode("utf-8", errors="replace").strip()
+            events.put(("error", _UpstreamHTTPError(error.code, detail or str(error.reason))))
+        except (URLError, OSError, TimeoutError) as error:
+            events.put(("error", _UpstreamConnectionError(str(getattr(error, "reason", error)))))
+        except BaseException as error:  # propagate unexpected worker failures
+            events.put(("error", error))
+
+    content_parts: list[str] = []
+    reasoning_parts: list[str] = []
+    event_data: list[str] = []
+    raw_text_parts: list[str] = []
+    saw_sse = False
+    stream_finished = False
+    usage = None
+
+    def consume_event() -> None:
+        nonlocal usage, saw_sse, stream_finished
+        if not event_data:
+            return
+        saw_sse = True
+        data = "\n".join(event_data).strip()
+        event_data.clear()
+        if not data:
+            return
+        if data == "[DONE]":
+            stream_finished = True
+            return
+        try:
+            payload = json.loads(data)
+        except json.JSONDecodeError as error:
+            raise _UpstreamJSONError(f"invalid SSE JSON: {error}") from error
+        part, thought = _response_parts(payload, streaming=True)
+        content_parts.append(part)
+        reasoning_parts.append(thought)
+        usage = payload.get("usage", usage) if isinstance(payload, dict) else usage
+        choices = payload.get("choices") if isinstance(payload, dict) else None
+        if isinstance(choices, list) and any(isinstance(choice, dict) and choice.get("finish_reason") is not None for choice in choices):
+            stream_finished = True
+        byte_count = len("".join(content_parts).encode("utf-8")) + len("".join(reasoning_parts).encode("utf-8"))
+        _set_progress(progress, min(95, int((byte_count / 4) * 100 / max(1, max_tokens))))
+
+    def consume_line(line: str) -> None:
+        if not line.strip():
+            consume_event()
+        elif line.startswith(":"):
+            return
+        elif line.startswith("data:"):
+            event_data.append(line[5:].lstrip())
+
+    thread = threading.Thread(target=worker, name="MiniMaxH3PromptOptimizer", daemon=True)
+    thread.start()
+    decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+    line_buffer = ""
+    finished = False
+    try:
+        while not finished:
+            _check_interrupted()
+            try:
+                kind, value = events.get(timeout=0.1)
+            except queue.Empty:
+                continue
+            if kind == "chunk":
+                decoded = decoder.decode(value)
+                raw_text_parts.append(decoded)
+                line_buffer += decoded
+                while "\n" in line_buffer:
+                    line, line_buffer = line_buffer.split("\n", 1)
+                    consume_line(line.rstrip("\r"))
+            elif kind == "error":
+                raise value
+            else:
+                finished = True
+    except BaseException:
+        response = response_holder.get("response")
+        if response is not None:
+            try:
+                response.close()
+            except Exception:
+                pass
+        raise
+    finally:
+        thread.join(timeout=1.0)
+    tail = decoder.decode(b"", final=True)
+    if tail:
+        raw_text_parts.append(tail)
+        line_buffer += tail
+    if line_buffer:
+        consume_line(line_buffer.rstrip("\r"))
+    consume_event()
+    if not saw_sse:
+        text = "".join(raw_text_parts)
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError as error:
+            raise _UpstreamJSONError(str(error)) from error
+        part, thought = _response_parts(payload, streaming=False)
+        content_parts.append(part)
+        reasoning_parts.append(thought)
+        usage = payload.get("usage") if isinstance(payload, dict) else None
+    elif not stream_finished:
+        raise _UpstreamConnectionError("stream ended before a completion marker")
+    _set_progress(progress, 100)
+    return "".join(content_parts), "".join(reasoning_parts), usage
 
 
 def _message_text(message: Any) -> str:
@@ -262,15 +441,41 @@ def _strip_markdown_fence(value: str) -> str:
     return text
 
 
+def _payload_data_url_chars(value: Any) -> int:
+    if isinstance(value, str):
+        return len(value) if value.startswith("data:") and ";base64," in value[:256] else 0
+    if isinstance(value, list):
+        return sum(_payload_data_url_chars(item) for item in value)
+    if isinstance(value, dict):
+        return sum(_payload_data_url_chars(item) for item in value.values())
+    return 0
+
+
+def _iter_data_urls(value: Any):
+    if isinstance(value, str):
+        if value.startswith("data:") and ";base64," in value[:256]:
+            yield value
+    elif isinstance(value, list):
+        for item in value:
+            yield from _iter_data_urls(item)
+    elif isinstance(value, dict):
+        for item in value.values():
+            yield from _iter_data_urls(item)
+
+
 def optimize_prompt(
     prompt: str,
     mode: str,
     base_url: str,
     model: str,
     api_key: str = "",
-    media_items: list[dict[str, str]] | None = None,
+    media_items: list[dict[str, Any]] | None = None,
     duration: float | None = None,
-) -> str:
+    max_tokens: int = 4096,
+    video_mode: str = "auto",
+    audio_mode: str = "auto",
+    progress: Any = None,
+) -> tuple[str, str]:
     """Optimize a prompt synchronously during execution of the ComfyUI node."""
     prompt = str(prompt or "").strip()
     mode = str(mode or "image").strip().lower()
@@ -278,6 +483,13 @@ def optimize_prompt(
     model = str(model or "").strip()
     api_key = str(api_key or "").strip()
     media_items = list(media_items or [])
+    max_tokens = max(256, min(32_768, int(max_tokens or 4096)))
+    video_mode = str(video_mode or "auto").strip().lower()
+    audio_mode = str(audio_mode or "auto").strip().lower()
+    if video_mode not in {"auto", "native", "sampled_frames"}:
+        raise ValueError("Invalid prompt optimizer video mode")
+    if audio_mode not in {"auto", "input_audio", "video_wrapper"}:
+        raise ValueError("Invalid prompt optimizer audio mode")
 
     if not model:
         raise ValueError("Prompt Optimizer Model is not configured")
@@ -292,20 +504,28 @@ def optimize_prompt(
     if len(media_items) > MAX_MEDIA_ITEMS:
         raise ValueError(f"Too many multimodal items (maximum {MAX_MEDIA_ITEMS})")
 
-    media_payload_size = 0
     for item in media_items:
         kind = str(item.get("type") or "").strip().lower()
         data_url = str(item.get("data_url") or "")
-        expected_prefix = "data:image/" if kind == "image" else "data:audio/"
+        expected_prefix = {"image": "data:image/", "audio": "data:audio/", "video": "data:video/"}.get(kind, "")
         if (
-            kind not in {"image", "audio"}
+            kind not in {"image", "audio", "video"}
             or not data_url.startswith(expected_prefix)
             or ";base64," not in data_url[:256]
         ):
             raise ValueError("Invalid multimodal media item")
-        media_payload_size += len(data_url)
-    if media_payload_size > MAX_MEDIA_PAYLOAD_CHARS:
-        raise ValueError("Multimodal payload is too large")
+        fallback_url = str(item.get("fallback_data_url") or "")
+        if fallback_url:
+            if not fallback_url.startswith("data:video/"):
+                raise ValueError("Invalid multimodal fallback item")
+        for frame in item.get("sampled_frames", []):
+            frame_url = str(frame.get("data_url") or "")
+            if not frame_url.startswith("data:image/"):
+                raise ValueError("Invalid sampled video frame")
+        for media_url in _iter_data_urls(item):
+            encoded = media_url.split(",", 1)[1]
+            if (len(encoded) * 3) // 4 > MAX_MEDIA_BINARY_BYTES + 2:
+                raise ValueError("Multimodal item exceeds the 24 MiB binary limit")
 
     endpoint = _completion_url(base_url)
     headers = {"Content-Type": "application/json"}
@@ -323,38 +543,44 @@ def optimize_prompt(
             "the optimized prompt wherever that asset is used; do not rename or omit it:\n"
             + "\n".join(references)
         )
-    request_body = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": _system_prompt(mode)},
-            {
-                "role": "user",
-                "content": _media_content(user_text, media_items),
-            },
-        ],
-        "stream": False,
-    }
+    fallback_video = video_mode == "sampled_frames"
+    fallback_audio = audio_mode == "video_wrapper"
+    retried = False
+    while True:
+        user_content = _media_content(user_text, media_items, fallback_video, fallback_audio)
+        if _payload_data_url_chars(user_content) > MAX_MEDIA_PAYLOAD_CHARS:
+            raise ValueError("Multimodal payload is too large (maximum 40 million Base64 characters)")
+        request_body = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": _system_prompt(mode)},
+                {"role": "user", "content": user_content},
+            ],
+            "max_tokens": max_tokens,
+            "stream": True,
+        }
+        try:
+            content, reasoning, _usage = _stream_completion(endpoint, headers, request_body, max_tokens, progress)
+            break
+        except _UpstreamHTTPError as error:
+            detail = error.detail.lower()
+            eligible = error.status in {400, 415, 422} and not retried
+            unsupported_words = ("unsupported", "not support", "invalid content type", "unknown content type")
+            reject_video = eligible and video_mode == "auto" and "video_url" in detail and any(word in detail for word in unsupported_words)
+            reject_audio = eligible and audio_mode == "auto" and "input_audio" in detail and any(word in detail for word in unsupported_words)
+            if reject_video or reject_audio:
+                fallback_video = fallback_video or reject_video
+                fallback_audio = fallback_audio or reject_audio
+                retried = True
+                _set_progress(progress, 0)
+                continue
+            raise RuntimeError(f"Prompt optimizer API returned HTTP {error.status}: {error.detail}") from error
+        except _UpstreamJSONError as error:
+            raise RuntimeError(f"Prompt optimizer API returned invalid JSON: {error}") from error
+        except _UpstreamConnectionError as error:
+            raise RuntimeError(f"Could not reach the prompt optimizer API: {error}") from error
 
-    try:
-        result = _post_json(endpoint, headers, request_body)
-    except _UpstreamHTTPError as error:
-        raise RuntimeError(
-            f"Prompt optimizer API returned HTTP {error.status}: {error.detail}"
-        ) from error
-    except _UpstreamJSONError as error:
-        raise RuntimeError("Prompt optimizer API returned invalid JSON") from error
-    except _UpstreamConnectionError as error:
-        raise RuntimeError(
-            f"Could not reach the prompt optimizer API: {error}"
-        ) from error
-
-    choices = result.get("choices") if isinstance(result, dict) else None
-    message = None
-    if isinstance(choices, list) and choices and isinstance(choices[0], dict):
-        response_message = choices[0].get("message")
-        if isinstance(response_message, dict):
-            message = response_message.get("content")
-    optimized = _strip_markdown_fence(_message_text(message))
+    optimized = _strip_markdown_fence(content)
     if not optimized:
         raise RuntimeError("Prompt optimizer API returned an empty response")
 
@@ -363,4 +589,4 @@ def optimize_prompt(
         raise RuntimeError(
             "The optimized prompt omitted reference tokens: " + ", ".join(missing)
         )
-    return optimized
+    return optimized, reasoning.strip()

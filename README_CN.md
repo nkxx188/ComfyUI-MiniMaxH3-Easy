@@ -73,21 +73,31 @@
 优化提示词，再使用优化结果创建 H3 conditioning。
 优化器会直接根据主节点的顶层模式选择两套硬编码系统提示词之一：`image`
 使用 `IMAGE_SYSTEM_PROMPT`，`reference` 使用 `REFERENCE_SYSTEM_PROMPT`，并保留
-参考模式中的所有 `@` 素材引用。这两个提示词常量位于 `prompt_optimizer.py`，默认
-留空，便于直接粘贴完整提示词。
+参考模式中的所有 `@` 素材引用。这两个完整的提示词常量位于 `prompt_optimizer.py`。
 
-首次使用前，在 ComfyUI 设置面板的 **MiniMaxH3Easy → PromptOptimizer** 中填写：
+首次使用前，在 ComfyUI 设置面板的 **MiniMaxH3Easy → PromptOptimizer** 中配置实例级参数：
 
 - `Base URL`：例如 `https://api.openai.com/v1`；
 - `Model`：服务商提供的模型 ID；
-- `API Key`：可留空以支持不需要鉴权的本地兼容服务。
+- `API Key`：可留空以支持不需要鉴权的本地兼容服务；
+- 视频传输：`Auto` / `Native` / `Sampled frames`；
+- 音频传输：`Auto` / `input_audio` / `Video wrapper`。
 
-`API Key` 由 ComfyUI 设置系统保存，仅在开关启用时注入本次执行数据，不写入工作流
-JSON。优化结果仅供当次节点执行使用，不会改写前端提示词编辑器。
+后端将配置保存到 `user/__minimax_h3_easy/`。API Key 输入框始终空白，设置页只显示
+“已配置”状态并提供清除操作，GET 路由绝不返回密钥。也可使用
+`MINIMAX_H3_OPTIMIZER_BASE_URL`、`MINIMAX_H3_OPTIMIZER_MODEL` 和
+`MINIMAX_H3_OPTIMIZER_API_KEY` 环境变量，且环境变量优先。这些配置不会进入
+`/prompt` 或队列历史。配置由同一 ComfyUI 实例的所有工作流和用户共享，应仅由可信管理员管理。
 
-优化请求会直接读取当前节点收到的多模态数据：图片会缩放后附加，视频会抽取三个代表
-帧，音频会编码为最长约 6 MB 的 WAV `input_audio`。所选提示词模型必须支持对应的
-OpenAI 兼容多模态消息。
+原生视频会在内存中编码为 H.264/AAC MP4，保留帧率和同步音轨，最长边缩放到 720；
+抽帧模式附加三帧。音频可使用 `input_audio`，也可封装成带 512×512 静态波形画面的 MP4。
+`Auto` 首次使用原生视频和 `input_audio`；仅当 400/415/422 明确说明 `video_url` 或
+`input_audio` 不受支持时回退一次，显式模式和模糊错误不重试。
+
+单项二进制限制为 24 MiB，Base64 总负载限制为 4000 万字符。响应优先使用 SSE 流，也兼容
+非流式 JSON。进度由累计 UTF-8 字节数÷4 与最大输出 Tokens 估算，读取时最高 95%，
+正常结束后 100%。短/中/长分别发送 1024/4096/8192 `max_tokens`，自定义范围为
+256–32768，非法值回退到 4096。
 
 ## 节点和连接方式
 
@@ -105,10 +115,14 @@ OpenAI 兼容多模态消息。
 
 ### MiniMax H3 Easy
 
-这是整套节点的主要操作入口，输出两个端口：
+这是整套节点的主要操作入口。原有前两个输出索引保持不变，末尾追加两个文本输出：
 
 - `Model`：可以直接连接采样器，也可以先连接模型专用 LoRA、Sage Attention 或其他模型补丁；
 - `H3 Context`：连接到 **MiniMax H3 Easy Output**。
+- `Optimized prompt`：实际优化结果；关闭优化时输出原提示词；
+- `Reasoning content`：聚合 `reasoning_content`、`reasoning` 或 `reasoning_details`，没有时为空。
+
+优化失败会直接报错，不返回半成品。旧 API 工作流缺少 `optimize_prompt` 时仍可执行，默认为关闭。
 
 ### MiniMax H3 Easy Output
 
