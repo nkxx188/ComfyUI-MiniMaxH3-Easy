@@ -69,6 +69,7 @@ const TEXT = {
     textEncoder: ZH_BROWSER ? "\u6587\u672c\u7f16\u7801\u5668" : "Text encoder",
     videoVae: ZH_BROWSER ? "\u89c6\u9891 VAE" : "Video VAE",
     audioVae: ZH_BROWSER ? "\u97f3\u9891 VAE" : "Audio VAE",
+    noneModel: ZH_BROWSER ? "\u65e0" : "None",
     outputModel: "Model",
     outputConditioning: "Conditioning",
     outputLatent: "Latent",
@@ -196,7 +197,8 @@ let quickCreateCaptureCanvas = null;
 let quickCreateCaptureCleanup = null;
 let activePromptNode = null;
 let lastCapturedDropAt = 0;
-let nativeDropGuardActive = false;
+let deferredCreateMenuPending = false;
+let deferredCreateMenuToken = 0;
 const videoThumbnailCache = new Map();
 let mentionPreviewRefreshTimer = null;
 let suppressNativeDropUntil = 0;
@@ -241,6 +243,19 @@ function localizeComboWidget(widget) {
     widget.value = definition[current] ?? widget.value;
 }
 
+function isNoneModelValue(value) {
+    const normalized = String(value ?? "").trim().toLowerCase();
+    return normalized === "none" || normalized === "\u65e0";
+}
+
+function localizeOptionalModelWidget(widget) {
+    if (!widget) return;
+    widget.options ||= {};
+    const values = Array.isArray(widget.options.values) ? widget.options.values : [];
+    widget.options.values = [...new Set(values.map((value) => isNoneModelValue(value) ? TEXT.noneModel : value))];
+    if (isNoneModelValue(widget.value)) widget.value = TEXT.noneModel;
+}
+
 function setLocalizedSlotLabel(slot, label) {
     if (!slot || !label) return;
     slot.label = label;
@@ -252,7 +267,10 @@ function localizeNodeInstance(node) {
     if (isLoader(node)) {
         node.title = TEXT.loaderTitle;
         const labels = { fl2va_model: TEXT.fl2vaModel, ref2va_model: TEXT.ref2vaModel, text_encoder: TEXT.textEncoder, video_vae: TEXT.videoVae, audio_vae: TEXT.audioVae };
-        for (const widget of node.widgets || []) if (labels[widget.name]) widget.label = labels[widget.name];
+        for (const widget of node.widgets || []) {
+            if (labels[widget.name]) widget.label = labels[widget.name];
+            if (widget.name === "fl2va_model" || widget.name === "ref2va_model") localizeOptionalModelWidget(widget);
+        }
         for (const input of node.inputs || []) if (labels[input.name]) setLocalizedSlotLabel(input, labels[input.name]);
         return;
     }
@@ -742,7 +760,6 @@ function openCreateMenu(canvas, targetNode, event, allowedTypes) {
     if (!targetNode) return;
     closeContextMenuCompat(createMenu);
     createMenu = null;
-    nativeDropGuardActive = false;
     releaseCreateMenuLinkHold?.();
     releaseCreateMenuLinkHold = null;
     const [x, y] = Number.isFinite(event?.canvasX) && Number.isFinite(event?.canvasY)
@@ -758,7 +775,7 @@ function openCreateMenu(canvas, targetNode, event, allowedTypes) {
         if (createMenu === menuInstance) createMenu = null;
         releaseCreateMenuLinkHold?.();
         releaseCreateMenuLinkHold = null;
-        nativeDropGuardActive = false;
+        deferredCreateMenuPending = false;
         setNativeSearchVisualSuppression(false);
         clearTemporaryRenderLink(canvas);
     };
@@ -770,7 +787,7 @@ function openCreateMenu(canvas, targetNode, event, allowedTypes) {
         },
     }));
     if (!globalThis.LiteGraph?.ContextMenu || !items.length) {
-        nativeDropGuardActive = false;
+        deferredCreateMenuPending = false;
         setNativeSearchVisualSuppression(false);
         clearTemporaryRenderLink(canvas);
         return;
@@ -783,7 +800,7 @@ function openCreateMenu(canvas, targetNode, event, allowedTypes) {
         if (createMenu === menuInstance) createMenu = null;
         releaseCreateMenuLinkHold?.();
         releaseCreateMenuLinkHold = null;
-        nativeDropGuardActive = false;
+        deferredCreateMenuPending = false;
         setNativeSearchVisualSuppression(false);
         clearTemporaryRenderLink(canvas);
     }, { once: true });
@@ -952,7 +969,7 @@ function clearTemporaryRenderLink(canvas) {
 
 function shouldSuppressNativeDrop(type) {
     return type === "dropped-on-canvas"
-        && (nativeDropGuardActive || Boolean(createMenu))
+        && (Boolean(createMenu) || deferredCreateMenuPending)
         && performance.now() < suppressNativeDropUntil;
 }
 
@@ -960,26 +977,132 @@ function suppressNativeDrop(event) {
     event?.preventDefault?.();
     event?.stopPropagation?.();
     event?.stopImmediatePropagation?.();
-    if (!createMenu) nativeDropGuardActive = false;
     closeNativeNodeSearchSoon();
 }
 
-function scheduleInputCreateMenu(canvas, event, pending, allowed) {
+function primeInputDropSuppression(canvas) {
+    const pending = getPendingConnectorLink(canvas);
+    if (pending?.direction !== "from_input") return false;
+    deferredCreateMenuPending = true;
+    suppressNativeDropUntil = performance.now() + 1000;
+    setNativeSearchVisualSuppression(true);
+    closeNativeNodeSearchSoon();
+    return true;
+}
+
+function getTargetInputLinkId(pending) {
+    if (!pending?.targetNode) return null;
+    const inputIndex = getSlotIndex(pending.targetNode.inputs, pending.targetSlot);
+    return inputIndex >= 0 ? pending.targetNode.inputs?.[inputIndex]?.link ?? null : null;
+}
+
+function getVirtualLinkCount(node) {
+    return isTarget(node) ? ensureLinks(node).length : 0;
+}
+
+function hasDeferredInputDropConnected(canvas, pending, before, nativeLinkCreated = false) {
+    if (nativeLinkCreated) return true;
+    const inputLinkId = getTargetInputLinkId(pending);
+    if (inputLinkId != null && inputLinkId !== before.inputLinkId) return true;
+    if (getVirtualLinkCount(pending?.targetNode) > before.virtualLinkCount) return true;
+    const graphVersion = Number((canvas?.graph || app.graph)?._version) || 0;
+    return graphVersion > before.graphVersion;
+}
+
+function buildInputDropDetail(canvas, event) {
     const [canvasX, canvasY] = pointerGraphPosition(canvas, event);
-    const detail = {
+    return {
         clientX: event?.clientX,
         clientY: event?.clientY,
         canvasX,
         canvasY,
+        shiftKey: Boolean(event?.shiftKey),
+        ctrlKey: Boolean(event?.ctrlKey),
+        metaKey: Boolean(event?.metaKey),
+        altKey: Boolean(event?.altKey),
+        pointerType: event?.pointerType,
         originalEvent: event,
+        target: event?.target,
     };
-    nativeDropGuardActive = true;
+}
+
+function scheduleDeferredInputCreateMenu(canvas, event, pending, allowed) {
+    if (pending?.direction !== "from_input") return false;
+    const token = ++deferredCreateMenuToken;
+    const detail = buildInputDropDetail(canvas, event);
+    const linkSnapshot = { ...pending };
+    const before = {
+        inputLinkId: getTargetInputLinkId(linkSnapshot),
+        virtualLinkCount: getVirtualLinkCount(linkSnapshot.targetNode),
+        graphVersion: Number((canvas?.graph || app.graph)?._version) || 0,
+    };
+
+    deferredCreateMenuPending = true;
     suppressNativeDropUntil = performance.now() + 1000;
     setNativeSearchVisualSuppression(true);
     closeNativeNodeSearchSoon();
-    openCreateMenu(canvas, pending.targetNode, detail, allowed);
-    suppressNativeDropUntil = performance.now() + 800;
-    closeNativeNodeSearchSoon();
+    const releaseDeferredHold = holdDroppedLinkForMenu(canvas, detail);
+    const events = canvas?.linkConnector?.events;
+    let settled = false;
+    let nativeLinkCreated = false;
+
+    const cleanupNativeListeners = () => {
+        events?.removeEventListener?.("link-created", onNativeLinkCreated);
+        events?.removeEventListener?.("after-drop-links", onAfterDropLinks);
+    };
+    const releaseHold = () => releaseDeferredHold?.();
+    const finishConnected = () => {
+        if (settled || token !== deferredCreateMenuToken) return false;
+        if (!hasDeferredInputDropConnected(canvas, linkSnapshot, before, nativeLinkCreated)) return false;
+        settled = true;
+        deferredCreateMenuPending = false;
+        cleanupNativeListeners();
+        releaseHold();
+        setNativeSearchVisualSuppression(false);
+        clearTemporaryRenderLink(canvas);
+        return true;
+    };
+    const onNativeLinkCreated = () => {
+        nativeLinkCreated = true;
+        setTimeout(() => finishConnected(), 0);
+    };
+    const onAfterDropLinks = () => setTimeout(() => finishConnected(), 0);
+    const checkConnectedSoon = () => {
+        if (settled || token !== deferredCreateMenuToken || finishConnected()) return;
+        if (typeof requestAnimationFrame === "function") requestAnimationFrame(() => finishConnected());
+    };
+
+    events?.addEventListener?.("link-created", onNativeLinkCreated);
+    events?.addEventListener?.("after-drop-links", onAfterDropLinks);
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(checkConnectedSoon);
+    setTimeout(checkConnectedSoon, 16);
+    setTimeout(checkConnectedSoon, 32);
+
+    setTimeout(() => {
+        if (settled) return;
+        if (token !== deferredCreateMenuToken) {
+            settled = true;
+            cleanupNativeListeners();
+            releaseHold();
+            setNativeSearchVisualSuppression(false);
+            return;
+        }
+        deferredCreateMenuPending = false;
+        if (createMenu) {
+            settled = true;
+            cleanupNativeListeners();
+            releaseHold();
+            return;
+        }
+        if (finishConnected()) return;
+
+        settled = true;
+        cleanupNativeListeners();
+        releaseHold();
+        suppressNativeDropUntil = performance.now() + 800;
+        openCreateMenu(canvas, linkSnapshot.targetNode, detail, allowed);
+        closeNativeNodeSearchSoon();
+    }, 70);
     return true;
 }
 
@@ -1001,7 +1124,7 @@ function installQuickCreateCapture(canvas) {
         // this guard, the first menu click is mistaken for another canvas drop:
         // the temporary line is reset and the menu is reopened before its item
         // callback can create the resource node.
-        if (createMenu || event?.target?.closest?.(".litecontextmenu")) return;
+        if (createMenu || deferredCreateMenuPending || event?.target?.closest?.(".litecontextmenu")) return;
         if (event?.button > 0 || performance.now() - lastCapturedDropAt < 80) return;
         const pending = getPendingConnectorLink(canvas);
         if (!pending) return;
@@ -1024,13 +1147,10 @@ function installQuickCreateCapture(canvas) {
             closeNativeNodeSearchSoon();
             return;
         }
-        if (nodeAtGraphPoint(canvas, x, y, pending.targetNode)) return;
-        lastCapturedDropAt = performance.now();
-        event.preventDefault?.();
-        event.stopPropagation?.();
-        event.stopImmediatePropagation?.();
         const allowed = isReferenceMode(pending.targetNode) ? ["image", "video", "audio"] : ["image"];
-        scheduleInputCreateMenu(canvas, event, pending, allowed);
+        if (scheduleDeferredInputCreateMenu(canvas, event, pending, allowed)) {
+            lastCapturedDropAt = performance.now();
+        }
     };
     const pointerTargets = [window, document, canvas.canvas];
     for (const target of pointerTargets) {
@@ -1045,15 +1165,7 @@ function installQuickCreateCapture(canvas) {
     let wrappedDispatchEvent = null;
     if (originalDispatch) {
         wrappedDispatch = function dispatchWithMediaDropGuard(type, detail) {
-            if (type === "before-drop-links") {
-                const pending = getPendingConnectorLink(canvas);
-                if (pending?.direction === "from_input") {
-                    nativeDropGuardActive = true;
-                    suppressNativeDropUntil = performance.now() + 1000;
-                    setNativeSearchVisualSuppression(true);
-                    closeNativeNodeSearchSoon();
-                }
-            }
+            if (type === "before-drop-links") primeInputDropSuppression(canvas);
             if (shouldSuppressNativeDrop(type)) {
                 closeNativeNodeSearchSoon();
                 return false;
@@ -1063,15 +1175,7 @@ function installQuickCreateCapture(canvas) {
         events.dispatch = wrappedDispatch;
     }
     wrappedDispatchEvent = function dispatchEventWithMediaDropGuard(event) {
-        if (event?.type === "before-drop-links") {
-            const pending = getPendingConnectorLink(canvas);
-            if (pending?.direction === "from_input") {
-                nativeDropGuardActive = true;
-                suppressNativeDropUntil = performance.now() + 1000;
-                setNativeSearchVisualSuppression(true);
-                closeNativeNodeSearchSoon();
-            }
-        }
+        if (event?.type === "before-drop-links") primeInputDropSuppression(canvas);
         if (shouldSuppressNativeDrop(event?.type)) {
             suppressNativeDrop(event);
             return false;
@@ -1079,9 +1183,11 @@ function installQuickCreateCapture(canvas) {
         return originalDispatchEvent.call(events, event);
     };
     events.dispatchEvent = wrappedDispatchEvent;
+    const beforeDropLinksHandler = () => primeInputDropSuppression(canvas);
     const droppedOnCanvasHandler = (event) => {
         if (shouldSuppressNativeDrop(event?.type)) suppressNativeDrop(event);
     };
+    events.addEventListener("before-drop-links", beforeDropLinksHandler, { capture: true });
     events.addEventListener("dropped-on-canvas", droppedOnCanvasHandler, { capture: true });
 
     quickCreateCaptureCleanup = () => {
@@ -1089,6 +1195,7 @@ function installQuickCreateCapture(canvas) {
             target.removeEventListener?.("pointerup", handler, true);
             target.removeEventListener?.("mouseup", handler, true);
         }
+        events.removeEventListener?.("before-drop-links", beforeDropLinksHandler, { capture: true });
         events.removeEventListener?.("dropped-on-canvas", droppedOnCanvasHandler, { capture: true });
         if (wrappedDispatch && events.dispatch === wrappedDispatch) events.dispatch = originalDispatch;
         if (events.dispatchEvent === wrappedDispatchEvent) events.dispatchEvent = originalDispatchEvent;
@@ -1101,12 +1208,16 @@ function installQuickCreateCapture(canvas) {
 function drawLinks(canvas, ctx) {
     const graph = canvas?.graph || app.graph;
     if (!graph?._nodes || canvas.links_render_mode === globalThis.LiteGraph?.HIDDEN_LINK) return;
+    let missingLinkFound = false;
     for (const targetNode of graph._nodes) {
         if (!isTarget(targetNode)) continue;
         const links = ensureLinks(targetNode);
         for (const link of links) {
             const geometry = linkGeometry(targetNode, link);
-            if (!geometry) continue;
+            if (!geometry) {
+                missingLinkFound = true;
+                continue;
+            }
             const highlighted = linkHighlighted(canvas, targetNode, geometry.sourceNode);
             const color = linkColor(canvas, targetNode, geometry.sourceNode, link);
             const width = canvas.connections_width || 3;
@@ -1126,18 +1237,21 @@ function drawLinks(canvas, ctx) {
             ctx.lineWidth = width;
             ctx.strokeStyle = color;
             ctx.stroke();
-            ctx.beginPath();
-            ctx.arc(geometry.mid[0], geometry.mid[1], 5, 0, Math.PI * 2);
-            ctx.fillStyle = color;
-            ctx.fill();
-            ctx.fillStyle = highlighted ? "#222" : "#fff";
-            ctx.font = "bold 7px sans-serif";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillText(String(link.order || 1), geometry.mid[0], geometry.mid[1] + 0.3);
+            if (canvas.linkMarkerShape !== 0 && (canvas.ds?.scale ?? 1) >= 0.6 && canvas.highquality_render !== false) {
+                ctx.beginPath();
+                ctx.arc(geometry.mid[0], geometry.mid[1], 5, 0, Math.PI * 2);
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.fillStyle = highlighted ? "#222" : "#fff";
+                ctx.font = "bold 7px sans-serif";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(String(link.order || 1), geometry.mid[0], geometry.mid[1] + 0.3);
+            }
             ctx.restore();
         }
     }
+    if (missingLinkFound) requestMentionPreviewRefresh();
 }
 
 function patchCanvas() {
@@ -1168,36 +1282,6 @@ function patchCanvas() {
         }
         const result = originalDown?.apply(this, arguments);
         return result;
-    };
-
-    const originalUp = canvas.processMouseUp;
-    canvas.processMouseUp = function processMouseUpWithH3Links(event) {
-        const output = connectingOutput(this);
-        const input = connectingInput(this);
-        const [x, y] = pointerGraphPosition(this, event);
-        const target = (this.graph || app.graph)?._nodes?.find((node) => isTarget(node) && (() => {
-            const dot = getMediaDot(node);
-            return dot && Math.hypot(x - dot.x, y - dot.y) <= 18;
-        })());
-
-        if (output && target && !isSameNode(target, output.sourceNode)) {
-            const added = addVirtualLink(target, output.sourceNode, output.sourceSlot, output.sourceType);
-            if (!added) return originalUp?.apply(this, arguments);
-            clearConnecting(this);
-            this.graph?.setDirtyCanvas?.(true, true);
-            event?.preventDefault?.();
-            event?.stopImmediatePropagation?.();
-            return true;
-        }
-
-        if (input && !target) {
-            openCreateMenu(this, input.targetNode, event, isReferenceMode(input.targetNode) ? ["image", "video", "audio"] : ["image"]);
-            clearConnecting(this);
-            event?.preventDefault?.();
-            event?.stopImmediatePropagation?.();
-            return true;
-        }
-        return originalUp?.apply(this, arguments);
     };
 
     const linkPointerHandler = (event) => {
@@ -2184,6 +2268,7 @@ function patchLiteGraphPromptProcessKey() {
 
 function preparePromptEditorForUndo(editor) {
     if (!editor) return;
+    if (editor.__h3UndoPrepared && editor.dataset?.h3UndoVersion === PROMPT_UNDO_VERSION) return;
     editor.setAttribute("data-h3-undo-version", PROMPT_UNDO_VERSION);
     try {
         Object.defineProperty(editor, "type", {
@@ -2193,6 +2278,7 @@ function preparePromptEditorForUndo(editor) {
     } catch {
         editor.type = "textarea";
     }
+    editor.__h3UndoPrepared = true;
 }
 
 function getMentionRange(editor) {
@@ -2576,6 +2662,9 @@ function applyNativeEditorTheme(element) {
     const widgetText = LiteGraph.WIDGET_TEXT_COLOR || "#ddd";
     const outline = LiteGraph.WIDGET_OUTLINE_COLOR || "rgba(255, 255, 255, 0.18)";
     const menuBg = LiteGraph.NODE_DEFAULT_BGCOLOR || "#1f1f1f";
+    const signature = `${modern ? 1 : 0}|${widgetBg}|${widgetText}|${outline}|${menuBg}`;
+    if (element.__h3NativeThemeSignature === signature) return;
+    element.__h3NativeThemeSignature = signature;
     element.classList?.toggle("h3-native-vue-nodes", modern);
     element.classList?.toggle("h3-native-legacy-nodes", !modern);
     if (modern) {
@@ -3615,17 +3704,26 @@ function ensurePromptEditor(node) {
 }
 
 function installPromptEditorSoon(node) {
-    if (!node || node.__h3PromptInstallPending || node.__h3Editor) return;
+    if (!node || node.__h3PromptInstallPending || node.__h3PromptInstallRetry || node.__h3Editor) return;
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+    if (now < (Number(node.__h3PromptInstallNextAt) || 0)) return;
     node.__h3PromptInstallPending = true;
     const run = () => {
         node.__h3PromptInstallPending = false;
         ensurePromptEditor(node);
-        if (!node.__h3Editor && !node.__h3PromptInstallRetry) {
-            node.__h3PromptInstallRetry = setTimeout(() => {
-                node.__h3PromptInstallRetry = null;
-                ensurePromptEditor(node);
-            }, 120);
+        if (node.__h3Editor) {
+            node.__h3PromptInstallAttempts = 0;
+            node.__h3PromptInstallNextAt = 0;
+            return;
         }
+        const attempts = Math.min(8, (Number(node.__h3PromptInstallAttempts) || 0) + 1);
+        const delay = Math.min(2000, 120 * (2 ** Math.min(attempts - 1, 4)));
+        node.__h3PromptInstallAttempts = attempts;
+        node.__h3PromptInstallNextAt = (typeof performance !== "undefined" ? performance.now() : Date.now()) + delay;
+        node.__h3PromptInstallRetry = setTimeout(() => {
+            node.__h3PromptInstallRetry = null;
+            installPromptEditorSoon(node);
+        }, delay);
     };
     if (typeof requestAnimationFrame === "function") requestAnimationFrame(run);
     else setTimeout(run, 0);
@@ -3846,9 +3944,7 @@ function installNode(nodeType, nodeData) {
     const originalDraw = nodeType.prototype.onDrawForeground;
     nodeType.prototype.onDrawForeground = function onDrawForegroundH3Easy(ctx) {
         const result = originalDraw?.apply(this, arguments);
-        normalizeLinks(this);
-        syncModeWidgets(this);
-        updatePromptEditor(this);
+        if (!this.__h3Editor && !this.__h3PromptInstallPending && !this.__h3PromptInstallRetry) installPromptEditorSoon(this);
         return result;
     };
 
@@ -3858,6 +3954,8 @@ function installNode(nodeType, nodeData) {
         if (this.__h3PromptInstallRetry) clearTimeout(this.__h3PromptInstallRetry);
         this.__h3PromptInstallRetry = null;
         this.__h3PromptInstallPending = false;
+        this.__h3PromptInstallAttempts = 0;
+        this.__h3PromptInstallNextAt = 0;
         this.__h3EditorWrap?.remove?.();
         this.__h3Editor = null;
         this.__h3EditorWrap = null;
@@ -3920,14 +4018,6 @@ function install() {
             closeMentionMenu(node);
         }
     }, true);
-    const refreshForMediaWidget = (event) => {
-        const target = event?.target;
-        if (!target || target.closest?.(".h3-prompt-editor")) return;
-        if (!target.matches?.("input, select, textarea, video, audio")) return;
-        requestMentionPreviewRefresh();
-    };
-    document.addEventListener("change", refreshForMediaWidget, true);
-    document.addEventListener("input", refreshForMediaWidget, true);
     const style = document.createElement("style");
     style.textContent = `
       .h3-prompt-editor-wrap {

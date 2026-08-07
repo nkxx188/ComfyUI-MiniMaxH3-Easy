@@ -1,8 +1,8 @@
 {
   "id": "594552d6-9e64-44e3-b347-f225aa52dab3",
   "revision": 0,
-  "last_node_id": 17,
-  "last_link_id": 22,
+  "last_node_id": 18,
+  "last_link_id": 25,
   "nodes": [
     {
       "id": 13,
@@ -69,6 +69,8 @@
         }
       ],
       "properties": {
+        "cnr_id": "comfyui-minimaxh3-easy",
+        "ver": "1658798be6a8ac004aa3a3973b29a41d3e036abc",
         "Node name for S&R": "MiniMaxH3EasyOutput"
       },
       "widgets_values": []
@@ -91,7 +93,7 @@
         {
           "name": "model",
           "type": "MODEL",
-          "link": 21
+          "link": 24
         },
         {
           "name": "conditioning",
@@ -133,7 +135,7 @@
         {
           "name": "model",
           "type": "MODEL",
-          "link": 22
+          "link": 25
         }
       ],
       "outputs": [
@@ -496,6 +498,8 @@
         }
       ],
       "properties": {
+        "cnr_id": "comfyui-minimaxh3-easy",
+        "ver": "1658798be6a8ac004aa3a3973b29a41d3e036abc",
         "Node name for S&R": "MiniMaxH3EasyLoader"
       },
       "widgets_values": [
@@ -504,130 +508,6 @@
         "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
         "minimax_h3_video_vae_fp16.safetensors",
         "minimax_h3_audio_vae_fp32.safetensors"
-      ]
-    },
-    {
-      "id": 3,
-      "type": "PathchSageAttentionKJ",
-      "pos": [
-        565.6129125398658,
-        -463.29077114554883
-      ],
-      "size": [
-        230.6310979765624,
-        82
-      ],
-      "flags": {},
-      "order": 5,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "model",
-          "type": "MODEL",
-          "link": 2
-        }
-      ],
-      "outputs": [
-        {
-          "name": "MODEL",
-          "type": "MODEL",
-          "links": [
-            21,
-            22
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "PathchSageAttentionKJ"
-      },
-      "widgets_values": [
-        "auto",
-        false
-      ]
-    },
-    {
-      "id": 2,
-      "type": "MiniMaxH3Easy",
-      "pos": [
-        134.45405336846267,
-        -200.34665633477084
-      ],
-      "size": [
-        403.4355384927826,
-        290.6681801829715
-      ],
-      "flags": {},
-      "order": 4,
-      "mode": 0,
-      "inputs": [
-        {
-          "label": "H3 模型组合",
-          "name": "h3_bundle",
-          "type": "MINIMAX_H3_BUNDLE",
-          "link": 1
-        },
-        {
-          "label": "Media",
-          "name": "media",
-          "shape": 7,
-          "type": "*",
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "label": "Model",
-          "name": "model",
-          "type": "MODEL",
-          "links": [
-            2
-          ]
-        },
-        {
-          "label": "H3 Context",
-          "name": "h3_context",
-          "type": "MINIMAX_H3_CONTEXT",
-          "links": [
-            19
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "MiniMaxH3Easy",
-        "minimax_h3_virtual_media_links": [
-          {
-            "source_id": 15,
-            "source_slot": 0,
-            "source_type": "IMAGE",
-            "media_type": "image",
-            "order": 1
-          }
-        ],
-        "minimax_h3_prompt_reference_doc": {
-          "version": 1,
-          "text": "一只小猫在跳舞",
-          "parts": [
-            {
-              "type": "text",
-              "text": "一只小猫在跳舞"
-            }
-          ]
-        }
-      },
-      "widgets_values": [
-        "图生或首尾帧",
-        "一只小猫在跳舞",
-        null,
-        "360P",
-        "16:9",
-        1344,
-        768,
-        5,
-        false,
-        24,
-        "首帧优先",
-        "短边最大1K像素",
-        "按文件名"
       ]
     },
     {
@@ -676,7 +556,7 @@
       ],
       "size": [
         300,
-        271.6842105263158
+        106
       ],
       "flags": {},
       "order": 13,
@@ -705,6 +585,128 @@
         "auto",
         "auto"
       ]
+    },
+    {
+      "id": 2,
+      "type": "MiniMaxH3Easy",
+      "pos": [
+        134.45405336846267,
+        -200.34665633477084
+      ],
+      "size": [
+        403.4355384927826,
+        290.6681801829715
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "H3 模型组合",
+          "name": "h3_bundle",
+          "type": "MINIMAX_H3_BUNDLE",
+          "link": 1
+        },
+        {
+          "label": "Media",
+          "name": "media",
+          "shape": 7,
+          "type": "*",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "label": "Model",
+          "name": "model",
+          "type": "MODEL",
+          "links": [
+            23
+          ]
+        },
+        {
+          "label": "H3 Context",
+          "name": "h3_context",
+          "type": "MINIMAX_H3_CONTEXT",
+          "links": [
+            19
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-minimaxh3-easy",
+        "ver": "1658798be6a8ac004aa3a3973b29a41d3e036abc",
+        "Node name for S&R": "MiniMaxH3Easy",
+        "minimax_h3_virtual_media_links": [
+          {
+            "source_id": 15,
+            "source_slot": 0,
+            "source_type": "IMAGE",
+            "media_type": "image",
+            "order": 1
+          }
+        ],
+        "minimax_h3_prompt_reference_doc": {
+          "version": 1,
+          "text": "一只小猫在跳舞",
+          "parts": [
+            {
+              "type": "text",
+              "text": "一只小猫在跳舞"
+            }
+          ]
+        }
+      },
+      "widgets_values": [
+        "图生或首尾帧",
+        "一只小猫在跳舞",
+        null,
+        "360P",
+        "16:9",
+        1344,
+        768,
+        5,
+        false,
+        24,
+        "首帧优先",
+        "短边最大1K像素",
+        "按文件名"
+      ]
+    },
+    {
+      "id": 18,
+      "type": "MiniMaxH3MemoryEfficientSageAttentionPatch",
+      "pos": [
+        618.5656689454477,
+        -430.1064340992534
+      ],
+      "size": [
+        320.323828125,
+        26
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 23
+        }
+      ],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "links": [
+            24,
+            25
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MiniMaxH3MemoryEfficientSageAttentionPatch"
+      }
     }
   ],
   "links": [
@@ -715,14 +717,6 @@
       2,
       0,
       "MINIMAX_H3_BUNDLE"
-    ],
-    [
-      2,
-      2,
-      0,
-      3,
-      0,
-      "MODEL"
     ],
     [
       5,
@@ -845,16 +839,24 @@
       "MINIMAX_H3_CONTEXT"
     ],
     [
-      21,
-      3,
+      23,
+      2,
+      0,
+      18,
+      0,
+      "MODEL"
+    ],
+    [
+      24,
+      18,
       0,
       4,
       0,
       "MODEL"
     ],
     [
-      22,
-      3,
+      25,
+      18,
       0,
       5,
       0,
@@ -913,15 +915,18 @@
   ],
   "config": {},
   "extra": {
-    "frontendVersion": "1.47.12",
+    "frontendVersion": "1.48.6",
     "VHS_latentpreview": false,
     "ds": {
-      "scale": 0.9090909090909095,
+      "scale": 0.7513148009015781,
       "offset": [
-        314.5735130003526,
-        965.9395301075541
+        368.3525720823838,
+        937.0535301075541
       ]
-    }
+    },
+    "VHS_latentpreviewrate": 0,
+    "VHS_MetadataImage": true,
+    "VHS_KeepIntermediate": true
   },
   "version": 0.4
 }
