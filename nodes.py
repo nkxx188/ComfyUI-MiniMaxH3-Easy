@@ -16,7 +16,6 @@ import base64
 import asyncio
 import json
 import mimetypes
-import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -109,15 +108,6 @@ PROMPT_GUIDES_DIR = os.path.join(os.path.dirname(__file__), "prompt_guides")
 PROMPT_GUIDE_MANIFEST = os.path.join(PROMPT_GUIDES_DIR, "manifest.json")
 PROMPT_OPTIMIZER_TIMEOUT_SECONDS = 600
 PROMPT_OPTIMIZER_MAX_OUTPUT_TOKENS = 50000
-PROMPT_OPTIMIZER_CONFIG_VERSION = 1
-PROMPT_OPTIMIZER_CONFIG_DEFAULTS = {
-    "version": PROMPT_OPTIMIZER_CONFIG_VERSION,
-    "api_format": "openai",
-    "api_url": "",
-    "api_key": "",
-    "model": "",
-    "read_media": False,
-}
 
 
 def _reference_aligned_size(image_w: int, image_h: int, scale: float) -> tuple[int, int]:
@@ -164,7 +154,6 @@ def _original_reference_size(image_w: int, image_h: int) -> tuple[int, int]:
     return _reference_aligned_size(image_w, image_h, scale)
 
 
-_PROMPT_OPTIMIZER_CONFIG_LOCK = threading.RLock()
 REFERENCE_PLACEHOLDER_RE = re.compile(r"__MINIMAX_H3_REF_(\d+)__")
 UNRESOLVED_REFERENCE_RE = re.compile(r"__MINIMAX_H3_UNRESOLVED_REF_[^_]+__")
 MODEL_FILE_EXTENSIONS = {".safetensors", ".gguf"}
@@ -382,67 +371,6 @@ def _prompt_guide_bundle(scene_guide: str, mode: str, seconds: float, media_coun
                             blocks.append(f"=== SELECTED SCENE REFERENCE: {relative} ===\n" + _read_prompt_guide_text(relative))
                 break
     return "\n\n".join(blocks)
-
-
-def _prompt_optimizer_config_path() -> str:
-    return os.path.join(os.path.dirname(os.path.realpath(__file__)), "prompt_optimizer.json")
-
-
-def _normalize_prompt_optimizer_config(value: Mapping[str, Any] | None) -> dict[str, Any]:
-    source = value if isinstance(value, Mapping) else {}
-    api_format = str(source.get("api_format") or "openai").strip().lower()
-    if api_format not in {"openai", "responses", "gemini"}:
-        api_format = "openai"
-    read_media = source.get("read_media", False)
-    if isinstance(read_media, str):
-        read_media = read_media.strip().lower() in {"1", "true", "yes", "on"}
-    return {
-        "version": PROMPT_OPTIMIZER_CONFIG_VERSION,
-        "api_format": api_format,
-        "api_url": str(source.get("api_url") or "").strip(),
-        "api_key": str(source.get("api_key") or ""),
-        "model": str(source.get("model") or "").strip(),
-        "read_media": bool(read_media),
-    }
-
-
-def _read_prompt_optimizer_config() -> dict[str, Any]:
-    path = _prompt_optimizer_config_path()
-    with _PROMPT_OPTIMIZER_CONFIG_LOCK:
-        try:
-            with open(path, "r", encoding="utf-8") as handle:
-                payload = json.load(handle)
-        except (FileNotFoundError, json.JSONDecodeError, OSError, TypeError, ValueError):
-            return dict(PROMPT_OPTIMIZER_CONFIG_DEFAULTS)
-    return _normalize_prompt_optimizer_config(payload)
-
-
-def _write_prompt_optimizer_config(value: Mapping[str, Any] | None) -> dict[str, Any]:
-    normalized = _normalize_prompt_optimizer_config(value)
-    path = _prompt_optimizer_config_path()
-    directory = os.path.dirname(path)
-    temporary_path = ""
-    with _PROMPT_OPTIMIZER_CONFIG_LOCK:
-        try:
-            with tempfile.NamedTemporaryFile(
-                mode="w",
-                encoding="utf-8",
-                dir=directory,
-                prefix=".prompt_optimizer.",
-                suffix=".tmp",
-                delete=False,
-            ) as handle:
-                temporary_path = handle.name
-                json.dump(normalized, handle, ensure_ascii=False, indent=2)
-                handle.write("\n")
-            os.replace(temporary_path, path)
-        finally:
-            if temporary_path and os.path.exists(temporary_path):
-                try:
-                    os.remove(temporary_path)
-                except OSError:
-                    pass
-    return normalized
 
 
 _OPTIMIZER_KNOWN_ENDPOINT_SUFFIXES = (
@@ -810,40 +738,26 @@ def _register_prompt_optimizer_route() -> bool:
     if routes is None or getattr(_register_prompt_optimizer_route, "_registered", False):
         return bool(getattr(_register_prompt_optimizer_route, "_registered", False))
 
-    @routes.get("/minimax_h3_easy/prompt_optimizer_settings")
-    async def _prompt_optimizer_settings_get(request):
-        return web.json_response({"ok": True, "settings": _read_prompt_optimizer_config()})
-
-    @routes.post("/minimax_h3_easy/prompt_optimizer_settings")
-    async def _prompt_optimizer_settings_post(request):
-        try:
-            payload = await request.json()
-            settings = _write_prompt_optimizer_config(payload if isinstance(payload, dict) else {})
-            return web.json_response({"ok": True, "settings": settings})
-        except Exception as exc:
-            return web.json_response({"ok": False, "error": str(exc)}, status=500)
-
     @routes.post("/minimax_h3_easy/prompt_optimize")
     async def _prompt_optimize(request):
         try:
             payload = await request.json()
             prompt = str(payload.get("prompt") or "")
-            settings = _read_prompt_optimizer_config()
-            api_key = str(settings.get("api_key") or "")
-            api_url = str(settings.get("api_url") or "")
-            model = str(settings.get("model") or "")
-            api_format = str(settings.get("api_format") or "openai").lower()
+            api_key = str(payload.get("api_key") or "")
+            api_url = str(payload.get("api_url") or "")
+            model = str(payload.get("model") or "")
+            api_format = str(payload.get("api_format") or "openai").lower()
             mode = str(payload.get("mode") or MODE_IMAGE)
             scene_guide = str(payload.get("scene_guide") or "none")
             seconds = min(MAX_SECONDS, max(MIN_SECONDS, float(payload.get("seconds") or 5.0)))
             if api_format not in {"openai", "responses", "gemini"}:
                 return web.json_response({"ok": False, "error": "Unsupported API format"}, status=400)
             if not prompt.strip() or not api_key.strip() or not api_url.strip() or not model.strip():
-                return web.json_response({"ok": False, "error": "Prompt optimization settings are incomplete"}, status=400)
+                return web.json_response({"ok": False, "error": "Prompt, API URL, API key, and model are required"}, status=400)
             raw_counts = payload.get("media_counts") if isinstance(payload.get("media_counts"), dict) else {}
             counts = {kind: max(0, min(MAX_MEDIA, int(raw_counts.get(kind, 0) or 0))) for kind in ("image", "video", "audio")}
             resources = payload.get("resources") if isinstance(payload.get("resources"), list) else []
-            media_parts = _optimizer_media_parts(resources, api_format) if bool(settings.get("read_media")) else []
+            media_parts = _optimizer_media_parts(resources, api_format) if bool(payload.get("read_media")) else []
             system = _optimizer_system_prompt(scene_guide, mode, seconds, counts, len(media_parts))
             result = await asyncio.to_thread(_optimizer_http_json, api_url, api_key, model, api_format, system, prompt, media_parts)
             return web.json_response({"ok": True, "prompt": result})
@@ -1407,11 +1321,16 @@ class MiniMaxH3Easy:
                 "keyframe_role": ([KEYFRAME_FIRST, KEYFRAME_LAST], {"default": KEYFRAME_FIRST}),
                 "ref_image_size": ([REF_IMAGE_MATCH, REF_IMAGE_1K, REF_IMAGE_15K, REF_IMAGE_2K, REF_IMAGE_ORIGINAL], {"default": REF_IMAGE_1K}),
                 "reference_mention_mode": ([REFERENCE_MENTION_FILENAME, REFERENCE_MENTION_INDEX], {"default": REFERENCE_MENTION_INDEX}),
-                "prompt_optimizer_settings": ("BOOLEAN", {"default": False}),
+                "prompt_optimizer": ("BOOLEAN", {"default": False}),
+                "prompt_optimizer_api_format": (["openai", "responses", "gemini"], {"default": "openai"}),
+                "prompt_optimizer_api_url": ("STRING", {"default": ""}),
+                "prompt_optimizer_api_key": ("STRING", {"default": "", "multiline": False, "password": True}),
+                "prompt_optimizer_model": ("STRING", {"default": ""}),
                 "prompt_optimizer_scene_guide": (
                     [str(item.get("id")) for item in (_prompt_guide_manifest().get("scene_guides") or []) if isinstance(item, dict) and item.get("id")] or ["none"],
                     {"default": "none"},
                 ),
+                "prompt_optimizer_read_media": ("BOOLEAN", {"default": False}),
             },
             "optional": optional,
         }

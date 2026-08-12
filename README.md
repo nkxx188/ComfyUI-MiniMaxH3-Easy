@@ -122,13 +122,10 @@ The actual output limit is still controlled by the selected model and API
 provider. Providers with a lower limit may truncate the response or reject the
 requested value.
 
-### API settings popup
+### Workflow API settings
 
-Enable **Advanced options**, then set **Optimizer settings** to `true`. This
-temporarily opens the settings popup and automatically returns to `false` when
-the popup closes.
-
-The popup contains:
+Enable **Advanced options**, then enable **Prompt optimizer** to show its
+workflow parameters:
 
 - API format: OpenAI Compatible, OpenAI Responses, or Gemini Native;
 - API URL;
@@ -136,19 +133,10 @@ The popup contains:
 - model name;
 - Read connected media.
 
-These settings are stored in:
-
-```text
-ComfyUI/custom_nodes/ComfyUI-MiniMaxH3-Easy/prompt_optimizer.json
-```
-
-The file is shared by every MiniMax H3 Easy main node in that ComfyUI
-installation and is excluded by `.gitignore`. The API Key input is visually
-masked, but the JSON file itself contains the key in plain text. Do not publish
-or package that file.
-
-The selected **Prompt Guide** remains an ordinary per-node parameter and is
-saved with the workflow.
+All of these settings, including the selected **Prompt Guide**, are stored as
+ordinary node parameters in the workflow. The API Key is visually masked in the
+node, but remains plain text in the workflow JSON. Keep workflow files private
+when they contain credentials.
 
 ### Prompt Guide selection
 
