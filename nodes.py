@@ -1230,7 +1230,7 @@ def _empty_image_conditioning(bundle, prompt, width, height, length, first_frame
     images = []
     keyframes = []
     if first_frame is not None:
-        image = h3._resize(first_frame[:1], width, height, "disabled")
+        image = h3._resize(first_frame[:1], width, height, "center")
         images.append(image)
         keyframes.append({"resolved_frame_index": 0, "image": image})
     if last_frame is not None:
