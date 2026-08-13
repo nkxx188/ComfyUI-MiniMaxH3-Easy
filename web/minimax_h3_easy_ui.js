@@ -1470,6 +1470,23 @@ function buildRuntimePrompt(node, runtimeLinks) {
     }).join("");
 }
 
+function preserveLinkedPromptInput(promptNode, node, name, fallbackValue) {
+    const input = node?.inputs?.find((slot) => String(slot?.name || "") === name);
+    if (input?.link != null) {
+        const link = getNativeGraphLink(node.graph || app.graph, input.link);
+        const originId = link?.origin_id ?? link?.originId;
+        const originSlot = link?.origin_slot ?? link?.originSlot ?? 0;
+        if (originId != null) {
+            promptNode.inputs[name] = [String(originId), Number(originSlot) || 0];
+            return;
+        }
+    }
+
+    const existing = promptNode?.inputs?.[name];
+    if (Array.isArray(existing) && existing.length >= 2) return;
+    promptNode.inputs[name] = fallbackValue;
+}
+
 function patchGraphToPrompt() {
     if (patchedPrompt || typeof app.graphToPrompt !== "function") return;
     patchedPrompt = true;
@@ -1513,8 +1530,8 @@ function patchGraphToPrompt() {
             promptNode.inputs.mode = canonicalOption("mode", getWidgetValue(node, "mode", MODE_IMAGE));
             promptNode.inputs.resolution = canonicalOption("resolution", getWidgetValue(node, "resolution", "480P"));
             promptNode.inputs.aspect_ratio = canonicalOption("aspect_ratio", getWidgetValue(node, "aspect_ratio", "16:9"));
-            promptNode.inputs.width = Number(getWidgetValue(node, "width", 1344));
-            promptNode.inputs.height = Number(getWidgetValue(node, "height", 768));
+            preserveLinkedPromptInput(promptNode, node, "width", Number(getWidgetValue(node, "width", 1344)));
+            preserveLinkedPromptInput(promptNode, node, "height", Number(getWidgetValue(node, "height", 768)));
             promptNode.inputs.seconds = Math.min(MAX_SECONDS, Math.max(MIN_SECONDS, Number(getWidgetValue(node, "seconds", 5)) || 5));
             promptNode.inputs.advanced = asBoolean(getWidgetValue(node, "advanced", false));
             promptNode.inputs.prompt_optimizer = asBoolean(getWidgetValue(node, "prompt_optimizer", false));
@@ -3155,7 +3172,7 @@ function hideConditionalWidget(widget) {
     const originalType = widget.type;
     const originalComputeSize = widget.computeSize;
     const originalHidden = widget.hidden;
-    if (widget.type !== "hidden" && widget.type !== "converted-widget") widget.__h3ConditionalOrigType = widget.type;
+    if (widget.type !== "hidden") widget.__h3ConditionalOrigType = widget.type;
     if (!Object.prototype.hasOwnProperty.call(widget, "__h3ConditionalOrigComputeSize")) {
         widget.__h3ConditionalOrigComputeSize = originalComputeSize;
         widget.__h3ConditionalHadComputeSize = Object.prototype.hasOwnProperty.call(widget, "computeSize");

@@ -232,8 +232,14 @@ def _filesystem_weight_names(categories: tuple[str, ...]) -> list[str]:
     return names
 
 
-@lru_cache(maxsize=16)
 def _collect_weight_names(categories: tuple[str, ...]) -> list[str]:
+    """Collect the current model filenames advertised by ComfyUI.
+
+    Model folders can be refreshed while ComfyUI is running. Keeping this
+    result cached made the Easy Loader retain the first snapshot for the
+    lifetime of the process, so newly downloaded models did not appear even
+    after ComfyUI refreshed its own filename lists.
+    """
     names: list[str] = []
     seen: set[str] = set()
     for category in categories:
