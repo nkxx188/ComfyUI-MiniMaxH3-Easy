@@ -15,7 +15,7 @@ Document top matter (header block at the top of the document):
 - Project title, approved video model, approved resolution, storyboard mode, and self-check status (e.g. `shot-table self-check: passed at <timestamp>`).
 - A short table-of-contents listing every shot, its hook, and its section anchor (`S01`, `S02`, …) so the user can jump.
 
-Per-shot section structure (one `##` heading per shot, in shot order). Every section is mandatory to contain these fields, in this order — direct adaptation of the half-narrated-drama storyboard:
+Per-shot section structure (one `##` heading per shot, in shot order). Every section must contain these fields, in this order — direct adaptation of the half-narrated-drama storyboard:
 
 1. **Shot title & duration** — short human-readable title for the shot, plus `S<N> / <duration>s` (e.g. `S03 / 6s`).
 2. **Hook type** — one of the controlled vocabulary: `setup` / `visual-joke` / `reversal` / `reveal` / `callback` / `suspense` / `tender` / `chase` / `expression-beat` / `climax`. Used by the per-episode hook distribution self-check.
