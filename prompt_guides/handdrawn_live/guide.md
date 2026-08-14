@@ -5,7 +5,7 @@ description: |
 trigger-words: [手绘发光动画实拍融合, 15秒变形追逐视频提示词, Seedance视频prompt, H3生成视频, 视频prompt, 手绘动画接触真实物体, 蜡笔粉笔质感, 多语言视频提示词]
 ---
 
-# Handdrawn Live-Action Fusion Video Generator
+# Hand-Drawn Live-Action Fusion Video Generator
 
 Use this Prompt Guide when the user wants a **finished 15-second, 16:9 live-action-and-hand-drawn fusion video**. The output must preserve the structure: a flat hand-drawn luminous animation appears in a real space, clearly contacts live-action hands or objects in the first 0-3 seconds, continuously morphs as one single entity, escapes, and a handheld phone camera follows slightly late.
 
