@@ -62,7 +62,7 @@ Create a story outline.
 
 Include:
 
-- Protagonist Want / Need / flaw
+- Protagonist Want / Need / Flaw
 - Core world rule
 - 8-beat causal story spine
 - Emotional anchor and payoff
