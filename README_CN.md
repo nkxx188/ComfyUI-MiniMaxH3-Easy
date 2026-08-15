@@ -100,6 +100,7 @@
 - 自定义 API URL、API Key 和模型名；
 - 按节点模式选择 MiniMax H3 Prompt Guide；
 - 可选读取已连接媒体；
+- 可选在工作流运行时自动优化；
 - 600 秒请求超时；
 - 请求最大输出 50,000 tokens。
 
@@ -114,10 +115,19 @@
 - API 地址；
 - API Key；
 - 模型名；
-- 是否读取已连接媒体。
+- 是否读取已连接媒体；
+- 是否在工作流运行时自动优化。
+
+对于无需鉴权的 OpenAI 兼容或 Responses 接口（例如本地 LM Studio），API Key
+可以留空。
 
 上述设置以及**提示词方案**都作为普通节点参数保存到工作流中。API Key 在节点内使用
 密码样式显示，但工作流 JSON 中仍是明文；包含凭据的工作流不要随意公开或分享。
+
+**运行工作流时自动优化**默认关闭。开启后，节点会先优化提示词，再构建 H3
+conditioning。API 配置不完整或请求报错时会继续使用原提示词，不会中断工作流。优化
+成功后结果会写回提示词输入框；只要提示词、所选方案、API 上下文和连接素材没有变化，
+再次运行时就不会重复优化。手动点击 `✦` 仍会单独执行一次优化。
 
 ### Prompt Guide 选择
 
@@ -199,6 +209,50 @@
 - Video VAE；
 - Audio VAE；
 - FPS。
+
+### MiniMax H3 Easy Aspect Ratio
+
+该工具节点从 `H3 Context` 读取 Easy 主节点最终使用的宽高比，并输出
+`ResolutionSelector` 能直接识别的标签，例如 `16:9 (Widescreen)`。它只同步
+宽高比，不会复制一采的具体宽度和高度；下游的百万像素、对齐倍数和最终尺寸仍然
+独立设置。这样 Pass 2 可以保持一采构图比例，同时使用更高或更低的像素预算。
+
+### MiniMax H3 Easy Second Pass Conditioning
+
+该节点专门为改变分辨率的 Pass 2 重建 Conditioning。连接方式：
+
+- `h3_context` 连接 **MiniMax H3 Easy** 主节点；
+- `second_pass_video_latent` 连接 Pass 2 `VAEEncode` 生成的 24 通道纯视频
+  latent，位置应在音视频 latent 合并之前；
+- `second_pass_positive` 连接第二阶段 `BasicGuider`。
+
+文生视频和纯参考生视频会复制原 Conditioning，不删除对应模式的元数据。图生视频
+和首尾帧模式会将 Easy 主节点保存的原始关键帧缩放到 Pass 2 的实际 latent 画布，
+再用 H3 Video VAE 重新编码。`minimax_refs` 参考块、文本条件、token 标签、关键帧
+位置以及其他元数据都会保留。这样可以避免把一采低分辨率关键帧 latent 直接用于
+二采高分辨率网格时出现的行数不匹配报错。
+
+## Pass 2 工作流
+
+[`MiniMax_H3_Easy_Pass2.json`](workflow/MiniMax_H3_Easy_Pass2.json) 是随项目
+提供的双阶段细化工作流。一采模型负责建立动作、时序、构图和音频，Pass 2 使用
+体积更小的剪枝 W4A8 H3 模型，在较低降噪值下细化放大后的视频。
+
+工作流执行过程：
+
+1. 使用 Easy Loader、Turbo LoRA 和所选 H3 模式完成一采；
+2. 拆分一采 AV latent，保留原始音频 latent；
+3. 只解码和缩放视频，再按照独立的 Pass 2 百万像素目标重新编码；
+4. 重建与分辨率绑定的图生/首尾帧条件，同时保留参考媒体 Conditioning；
+5. 将新的高分辨率视频 latent 与一采音频 latent 重新合并，再进行第二次采样。
+
+工作流预设为一采 8 步、完整降噪，Pass 2 为 3 步、`0.25` 降噪。这些只是建议
+起点，并非固定要求。宽高比会从 **MiniMax H3 Easy** 自动同步，Pass 2 的百万像素
+目标仍可独立调整。
+
+该工作流兼容文生、图生、首尾帧和参考 Conditioning，但二采模型本身也必须支持
+当前使用的条件模式。所需插件、模型文件名、安装目录和 Hugging Face 下载地址见
+[`workflow/README_WORKFLOWS.md`](workflow/README_WORKFLOWS.md)。
 
 ## 模式与媒体限制
 

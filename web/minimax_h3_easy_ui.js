@@ -9,6 +9,7 @@ const LINKS_PROP = "minimax_h3_virtual_media_links";
 const PROMPT_DOC_PROP = "minimax_h3_prompt_reference_doc";
 const PROMPT_VIEW_PROP = "minimax_h3_prompt_view_mode";
 const PROMPT_OPTIMIZER_PROP = "minimax_h3_prompt_optimizer";
+const PROMPT_AUTO_MARKER_PROP = "minimax_h3_auto_prompt_marker";
 const RUNTIME_REF_PREFIX = "__MINIMAX_H3_REF_";
 const UNRESOLVED_REF_PREFIX = "__MINIMAX_H3_UNRESOLVED_REF_";
 const DIALOGUE_CLASS = "h3-dialogue-block";
@@ -57,7 +58,7 @@ const TEXT = {
     showStructuredPrompt: ZH_BROWSER ? "\u8fd4\u56de\u7ed3\u6784\u5316\u7f16\u8f91" : "Back to structured editor",
     optimizePrompt: ZH_BROWSER ? "\u63d0\u793a\u8bcd\u4f18\u5316" : "Prompt optimization",
     regeneratePrompt: ZH_BROWSER ? "\u91cd\u65b0\u751f\u6210" : "Regenerate",
-    optimizerMissing: ZH_BROWSER ? "\u8bf7\u5148\u5728\u9ad8\u7ea7\u9009\u9879\u4e2d\u586b\u5199 API \u5730\u5740\u3001API Key \u548c\u6a21\u578b\u540d\u3002" : "Set the API URL, API key, and model in Advanced options first.",
+    optimizerMissing: ZH_BROWSER ? "\u8bf7\u5148\u5728\u9ad8\u7ea7\u9009\u9879\u4e2d\u586b\u5199 API \u5730\u5740\u548c\u6a21\u578b\u540d\uff1bGemini \u539f\u751f\u8fd8\u9700\u8981 API Key\u3002" : "Set the API URL and model in Advanced options; Gemini Native also requires an API key.",
     optimizerFailed: ZH_BROWSER ? "\u63d0\u793a\u8bcd\u4f18\u5316\u5931\u8d25" : "Prompt optimization failed",
     optimizerRunning: ZH_BROWSER ? "\u6b63\u5728\u4f18\u5316" : "Optimizing",
     optimizerCancel: ZH_BROWSER ? "\u4e2d\u65ad\u4f18\u5316" : "Stop optimization",
@@ -87,6 +88,7 @@ const TEXT = {
     promptOptimizerModel: ZH_BROWSER ? "\u6a21\u578b\u540d" : "Model",
     promptOptimizerSceneGuide: ZH_BROWSER ? "\u63d0\u793a\u8bcd\u65b9\u6848" : "Prompt Guide",
     promptOptimizerReadMedia: ZH_BROWSER ? "\u8bfb\u53d6\u5df2\u8fde\u63a5\u5a92\u4f53" : "Read connected media",
+    promptOptimizerOptimizeOnRun: ZH_BROWSER ? "\u8fd0\u884c\u5de5\u4f5c\u6d41\u65f6\u81ea\u52a8\u4f18\u5316" : "Optimize when workflow runs",
     fps: ZH_BROWSER ? "\u5e27\u7387 (FPS)" : "Frame rate (FPS)",
     keyframeRole: ZH_BROWSER ? "\u9996\u5c3e\u5e27\u8bbe\u7f6e" : "First/last frame setup",
     refImageSize: ZH_BROWSER ? "\u53c2\u8003\u56fe\u5c3a\u5bf8" : "Reference size",
@@ -403,7 +405,7 @@ function localizeNodeInstance(node) {
     }
     if (!isTarget(node)) return;
     node.title = TEXT.mainTitle;
-    const labels = { mode: TEXT.mode, prompt: TEXT.prompt, resolution: TEXT.resolution, aspect_ratio: TEXT.aspectRatio, width: TEXT.width, height: TEXT.height, seconds: TEXT.seconds, advanced: TEXT.advanced, prompt_optimizer: TEXT.promptOptimizer, prompt_optimizer_api_format: TEXT.promptOptimizerApiFormat, prompt_optimizer_api_url: TEXT.promptOptimizerApiUrl, prompt_optimizer_api_key: TEXT.promptOptimizerApiKey, prompt_optimizer_model: TEXT.promptOptimizerModel, prompt_optimizer_scene_guide: TEXT.promptOptimizerSceneGuide, prompt_optimizer_read_media: TEXT.promptOptimizerReadMedia, fps: TEXT.fps, keyframe_role: TEXT.keyframeRole, ref_image_size: TEXT.refImageSize, reference_mention_mode: TEXT.referenceMentionMode };
+    const labels = { mode: TEXT.mode, prompt: TEXT.prompt, resolution: TEXT.resolution, aspect_ratio: TEXT.aspectRatio, width: TEXT.width, height: TEXT.height, seconds: TEXT.seconds, advanced: TEXT.advanced, prompt_optimizer: TEXT.promptOptimizer, prompt_optimizer_api_format: TEXT.promptOptimizerApiFormat, prompt_optimizer_api_url: TEXT.promptOptimizerApiUrl, prompt_optimizer_api_key: TEXT.promptOptimizerApiKey, prompt_optimizer_model: TEXT.promptOptimizerModel, prompt_optimizer_scene_guide: TEXT.promptOptimizerSceneGuide, prompt_optimizer_read_media: TEXT.promptOptimizerReadMedia, prompt_optimizer_optimize_on_run: TEXT.promptOptimizerOptimizeOnRun, fps: TEXT.fps, keyframe_role: TEXT.keyframeRole, ref_image_size: TEXT.refImageSize, reference_mention_mode: TEXT.referenceMentionMode };
     for (const widget of node.widgets || []) {
         if (labels[widget.name]) widget.label = labels[widget.name];
         localizeComboWidget(widget);
@@ -1545,6 +1547,10 @@ function patchGraphToPrompt() {
             promptNode.inputs.keyframe_role = canonicalOption("keyframe_role", getWidgetValue(node, "keyframe_role", KEYFRAME_FIRST));
             promptNode.inputs.ref_image_size = canonicalOption("ref_image_size", getWidgetValue(node, "ref_image_size", REF_IMAGE_1K));
             promptNode.inputs.reference_mention_mode = canonicalOption("reference_mention_mode", getWidgetValue(node, "reference_mention_mode", "index"));
+            promptNode.inputs.prompt_optimizer_optimize_on_run = asBoolean(getWidgetValue(node, "prompt_optimizer_optimize_on_run", false));
+            promptNode.inputs.prompt_optimizer_resources = JSON.stringify(promptOptimizerResources(node));
+            promptNode.inputs.prompt_optimizer_marker = JSON.stringify(node.properties?.[PROMPT_AUTO_MARKER_PROP] || {});
+            promptNode.inputs.prompt_optimizer_prompt_connected = hasPromptConnection;
         }
         return promptData;
     };
@@ -3275,6 +3281,7 @@ function syncModeWidgets(node, { adjustHeight = true } = {}) {
         setConditionalWidgetVisible(node, getWidget(node, "prompt_optimizer_model"), advanced && asBoolean(getWidgetValue(node, "prompt_optimizer", false)), { adjustHeight }),
         setConditionalWidgetVisible(node, getWidget(node, "prompt_optimizer_scene_guide"), advanced && asBoolean(getWidgetValue(node, "prompt_optimizer", false)), { adjustHeight }),
         setConditionalWidgetVisible(node, getWidget(node, "prompt_optimizer_read_media"), advanced && asBoolean(getWidgetValue(node, "prompt_optimizer", false)), { adjustHeight }),
+        setConditionalWidgetVisible(node, getWidget(node, "prompt_optimizer_optimize_on_run"), advanced && asBoolean(getWidgetValue(node, "prompt_optimizer", false)), { adjustHeight }),
     ].some(Boolean);
     if (changed) {
         refreshVueNodeWidgets(node);
@@ -3342,6 +3349,7 @@ function promptOptimizerState(node) {
         model: String(widgetValue("prompt_optimizer_model", state.model || "") || ""),
         scene_guide: canonicalPromptGuide(widgetValue("prompt_optimizer_scene_guide", state.scene_guide || "none")),
         read_media: asBoolean(widgetValue("prompt_optimizer_read_media", state.read_media), false),
+        optimize_on_run: asBoolean(widgetValue("prompt_optimizer_optimize_on_run", state.optimize_on_run), false),
     };
     node.properties[PROMPT_OPTIMIZER_PROP] = {
         enabled: normalized.enabled,
@@ -3350,8 +3358,21 @@ function promptOptimizerState(node) {
         model: normalized.model,
         scene_guide: normalized.scene_guide,
         read_media: normalized.read_media,
+        optimize_on_run: normalized.optimize_on_run,
     };
     return normalized;
+}
+
+function promptOptimizerApiKeyRequired(apiFormat) {
+    return String(apiFormat || "openai").trim().toLowerCase() === "gemini";
+}
+
+function promptOptimizerConfigured(state) {
+    return Boolean(
+        state?.api_url?.trim()
+        && state?.model?.trim()
+        && (state?.api_key?.trim() || !promptOptimizerApiKeyRequired(state?.api_format))
+    );
 }
 
 function notifyPromptOptimizer(message, severity = "error") {
@@ -3430,7 +3451,7 @@ function syncPromptOptimizerButton(node) {
     const button = node?.__h3PromptOptimizeButton;
     if (!button) return;
     const state = promptOptimizerState(node);
-    const configured = Boolean(state.api_url.trim() && state.model.trim() && state.api_key.trim());
+    const configured = promptOptimizerConfigured(state);
     const external = promptInputIsConnected(node);
     const pending = Boolean(node.__h3OptimizerPending);
     const locked = external || pending;
@@ -3495,11 +3516,18 @@ function promptOptimizerResources(node) {
     });
 }
 
-function setPromptFromOptimizedText(node, value) {
+function clearAutomaticPromptMarker(node) {
+    if (!node?.properties || !Object.prototype.hasOwnProperty.call(node.properties, PROMPT_AUTO_MARKER_PROP)) return false;
+    delete node.properties[PROMPT_AUTO_MARKER_PROP];
+    return true;
+}
+
+function setPromptFromOptimizedText(node, value, { preserveAutoMarker = false, notifyGraphChange = true } = {}) {
     const text = String(value || "").replace(/^```(?:text)?\s*/i, "").replace(/\s*```$/, "").trim();
     const doc = { version: 1, text, parts: promptPartsFromText(node, text) };
     const widget = getWidget(node, "prompt");
     node.properties ||= {};
+    if (!preserveAutoMarker) clearAutomaticPromptMarker(node);
     node.properties[PROMPT_DOC_PROP] = doc;
     if (widget) {
         widget.value = text;
@@ -3510,7 +3538,43 @@ function setPromptFromOptimizedText(node, value) {
     syncPromptFromEditor(node, false);
     pushPromptHistory(node);
     node.setDirtyCanvas?.(true, true);
-    app.graph?.change?.();
+    app.graph?.setDirtyCanvas?.(true, true);
+    if (notifyGraphChange) app.graph?.change?.();
+}
+
+function promptOptimizerUiValue(message, name) {
+    const output = message?.output && typeof message.output === "object" ? message.output : message;
+    const value = output?.[name];
+    return Array.isArray(value) ? value[0] : value;
+}
+
+function applyRuntimePromptOptimization(node, message) {
+    if (!node || promptInputIsConnected(node)) return;
+    const prompt = String(promptOptimizerUiValue(message, "auto_optimized_prompt") || "").trim();
+    const markerValue = promptOptimizerUiValue(message, "auto_optimization_marker");
+    if (!prompt || markerValue == null) return;
+
+    let marker;
+    try {
+        marker = typeof markerValue === "string" ? JSON.parse(markerValue) : markerValue;
+    } catch {
+        return;
+    }
+    if (!marker || typeof marker !== "object") return;
+
+    const currentPrompt = String(getWidget(node, "prompt")?.value || "");
+    const currentMarker = node.properties?.[PROMPT_AUTO_MARKER_PROP];
+    if (currentPrompt === prompt && JSON.stringify(currentMarker || {}) === JSON.stringify(marker)) return;
+
+    if (node.__h3Editor) syncPromptFromEditor(node, false);
+    pushPromptHistory(node);
+    setPromptFromOptimizedText(node, prompt, { preserveAutoMarker: true, notifyGraphChange: false });
+    node.properties ||= {};
+    node.properties[PROMPT_AUTO_MARKER_PROP] = marker;
+    node.__h3OptimizerSourcePrompt = null;
+    node.__h3OptimizerLastResult = null;
+    node.setDirtyCanvas?.(true, true);
+    app.graph?.setDirtyCanvas?.(true, true);
 }
 
 async function optimizePromptFromEditor(node) {
@@ -3518,7 +3582,7 @@ async function optimizePromptFromEditor(node) {
     syncPromptFromEditor(node, false);
     pushPromptHistory(node);
     const state = promptOptimizerState(node);
-    if (!state.api_url.trim() || !state.model.trim() || !state.api_key.trim()) {
+    if (!promptOptimizerConfigured(state)) {
         notifyPromptOptimizer(TEXT.optimizerMissing);
         return;
     }
@@ -4496,7 +4560,12 @@ function updatePromptEditor(node) {
 }
 
 function isTransportInputName(name) {
-    return /^media_[0-9]+$/i.test(String(name || "")) || /^media_type_[0-9]+$/i.test(String(name || ""));
+    const value = String(name || "");
+    return /^media_[0-9]+$/i.test(value)
+        || /^media_type_[0-9]+$/i.test(value)
+        || value === "prompt_optimizer_resources"
+        || value === "prompt_optimizer_marker"
+        || value === "prompt_optimizer_prompt_connected";
 }
 
 function removeInputSlot(node, index) {
@@ -4595,6 +4664,7 @@ function bindPromptOptimizerWidgetCallbacks(node) {
         "prompt_optimizer_model",
         "prompt_optimizer_scene_guide",
         "prompt_optimizer_read_media",
+        "prompt_optimizer_optimize_on_run",
     ];
     for (const name of names) {
         const widget = getWidget(node, name);
@@ -4639,8 +4709,10 @@ function repairConfiguredWidgetValues(node, info) {
         prompt_optimizer_model: "",
         prompt_optimizer_scene_guide: "none",
         prompt_optimizer_read_media: false,
+        prompt_optimizer_optimize_on_run: false,
     };
     const names = Object.keys(defaults);
+    const legacyNamesLength = names.length - 1;
     const values = raw;
     // Some ComfyUI workflow versions serialize an extra null placeholder
     // after the prompt widget. Remove it before restoring the named rows so
@@ -4659,12 +4731,13 @@ function repairConfiguredWidgetValues(node, info) {
         defaults.prompt_optimizer_model,
         defaults.prompt_optimizer_scene_guide,
         defaults.prompt_optimizer_read_media,
+        defaults.prompt_optimizer_optimize_on_run,
     ];
     // A short-lived development layout serialized the optimizer toggle once
     // before FPS and then serialized the complete optimizer block again at
     // the bottom. Remove the duplicate leading toggle before restoring rows.
     const duplicatedApiFormat = canonicalOption("prompt_optimizer_api_format", values[14]);
-    const hasDuplicatedLeadingOptimizerToggle = values.length >= names.length + 1
+    const hasDuplicatedLeadingOptimizerToggle = values.length >= legacyNamesLength + 1
         && (typeof values[8] === "boolean" || Number(values[8]) === 0 || Number(values[8]) === 1)
         && Number.isFinite(Number(values[9]))
         && Object.prototype.hasOwnProperty.call(OPTION_DEFS.keyframe_role, canonicalOption("keyframe_role", values[10]))
@@ -4681,10 +4754,10 @@ function repairConfiguredWidgetValues(node, info) {
         && (typeof values[12] === "boolean" || String(values[12]).toLowerCase() === "true" || String(values[12]).toLowerCase() === "false");
     if (looksLikePopupLayout) {
         const sceneGuide = canonicalPromptGuide(values[13] || defaults.prompt_optimizer_scene_guide);
-        values.splice(12, 2, false, "openai", "", "", "", sceneGuide, false);
+        values.splice(12, 2, false, "openai", "", "", "", sceneGuide, false, false);
     } else {
         const interimApiFormat = canonicalOption("prompt_optimizer_api_format", values[9]);
-        const hasInterimOptimizerLayout = values.length >= names.length
+        const hasInterimOptimizerLayout = values.length >= legacyNamesLength
             && (typeof values[8] === "boolean" || String(values[8]).toLowerCase() === "true" || String(values[8]).toLowerCase() === "false")
             && ["openai", "responses", "gemini"].includes(interimApiFormat);
         if (hasInterimOptimizerLayout) {
@@ -4723,6 +4796,7 @@ function repairConfiguredWidgetValues(node, info) {
         prompt_optimizer_model: String(values[16] ?? defaults.prompt_optimizer_model),
         prompt_optimizer_scene_guide: canonicalPromptGuide(values[17] || defaults.prompt_optimizer_scene_guide),
         prompt_optimizer_read_media: asBoolean(values[18], defaults.prompt_optimizer_read_media),
+        prompt_optimizer_optimize_on_run: asBoolean(values[19], defaults.prompt_optimizer_optimize_on_run),
     };
     for (const name of names) setConfiguredWidgetValue(node, name, normalized[name]);
     info.widgets_values = names.map((name) => normalized[name]);
@@ -4806,6 +4880,13 @@ function installNode(nodeType, nodeData) {
         return result;
     };
 
+    const originalExecuted = nodeType.prototype.onExecuted;
+    nodeType.prototype.onExecuted = function onExecutedH3Easy(message) {
+        const result = originalExecuted?.apply(this, arguments);
+        applyRuntimePromptOptimization(this, message);
+        return result;
+    };
+
     const originalAdded = nodeType.prototype.onAdded;
     nodeType.prototype.onAdded = function onAddedH3Easy(graph) {
         const result = originalAdded?.apply(this, arguments);
@@ -4845,6 +4926,10 @@ function installNode(nodeType, nodeData) {
             this.properties ||= {};
             this.properties[PROMPT_VIEW_PROP] = info.properties[PROMPT_VIEW_PROP];
         }
+        if (info?.properties?.[PROMPT_AUTO_MARKER_PROP]) {
+            this.properties ||= {};
+            this.properties[PROMPT_AUTO_MARKER_PROP] = info.properties[PROMPT_AUTO_MARKER_PROP];
+        }
         if (info?.properties?.[PROMPT_OPTIMIZER_PROP]) {
             this.properties ||= {};
             const savedOptimizer = info.properties[PROMPT_OPTIMIZER_PROP];
@@ -4855,6 +4940,7 @@ function installNode(nodeType, nodeData) {
                 model: savedOptimizer.model,
                 scene_guide: savedOptimizer.scene_guide,
                 read_media: savedOptimizer.read_media,
+                optimize_on_run: savedOptimizer.optimize_on_run,
             };
         }
         repairConfiguredWidgetValues(this, info);
@@ -4909,6 +4995,10 @@ function installNode(nodeType, nodeData) {
         if (info && this.properties?.[PROMPT_OPTIMIZER_PROP]) {
             info.properties ||= {};
             info.properties[PROMPT_OPTIMIZER_PROP] = this.properties[PROMPT_OPTIMIZER_PROP];
+        }
+        if (info && this.properties?.[PROMPT_AUTO_MARKER_PROP]) {
+            info.properties ||= {};
+            info.properties[PROMPT_AUTO_MARKER_PROP] = this.properties[PROMPT_AUTO_MARKER_PROP];
         }
         return result;
     };

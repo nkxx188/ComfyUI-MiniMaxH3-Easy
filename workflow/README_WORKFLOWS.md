@@ -10,6 +10,7 @@
 - [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes)
 - [Comfyui-Memory_Cleanup](https://github.com/LAOGOU-666/Comfyui-Memory_Cleanup)
 - [ComfyUI-VideoHelperSuite](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite)
+- [ComfyUI-Easy-Use](https://github.com/yolain/ComfyUI-Easy-Use)
 
 也可以在 ComfyUI Manager 中搜索插件名称安装。安装或更新后请重启 ComfyUI。
 
@@ -20,6 +21,7 @@
 <https://pan.quark.cn/s/8be70c7581e6?pwd=6LmC>
 
 - [LightX2V MiniMax H3 Turbo（正式版 8-step LoRA）](https://huggingface.co/lightx2v/Minimax-h3-Turbo)
+- [MiniMax H3 FL2VA 剪枝 W4A8（minimax_h3_fl2va_pruned_w4a8_mixed.safetensors）](https://huggingface.co/Kijai/MiniMax-H3-experimental)
 
 不同工作流需要的模型可能不同，请按照工作流中的加载器选择对应文件。如果列表中找不到模型，请检查模型是否放入了正确的 `ComfyUI/models` 子目录，然后刷新或重启 ComfyUI。
 
@@ -39,6 +41,7 @@ Before using any workflow in this folder, install the required custom nodes and 
 - [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes)
 - [Comfyui-Memory_Cleanup](https://github.com/LAOGOU-666/Comfyui-Memory_Cleanup)
 - [ComfyUI-VideoHelperSuite](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite)
+- [ComfyUI-Easy-Use](https://github.com/yolain/ComfyUI-Easy-Use)
 
 You can also install them by searching for their names in ComfyUI Manager. Restart ComfyUI after installing or updating custom nodes.
 
@@ -49,6 +52,7 @@ The plugins, models, and related assets used by the workflows are available here
 <https://pan.quark.cn/s/8be70c7581e6?pwd=6LmC>
 
 - [LightX2V MiniMax H3 Turbo (official 8-step LoRA)](https://huggingface.co/lightx2v/Minimax-h3-Turbo)
+- [MiniMax H3 FL2VA pruned W4A8 (minimax_h3_fl2va_pruned_w4a8_mixed.safetensors)](https://huggingface.co/Kijai/MiniMax-H3-experimental)
 
 Model requirements may differ between workflows. Select the matching files in each workflow's loader node. If a model is not listed, place it in the correct `ComfyUI/models` subdirectory, then refresh or restart ComfyUI.
 

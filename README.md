@@ -115,6 +115,7 @@ The optimizer supports:
 - configurable API URL, API key, and model name;
 - mode-aware MiniMax H3 Prompt Guides;
 - optional reading of connected media;
+- optional optimization when the workflow runs;
 - a 600-second request timeout;
 - a requested maximum output of 50,000 tokens.
 
@@ -131,12 +132,23 @@ workflow parameters:
 - API URL;
 - API Key;
 - model name;
-- Read connected media.
+- Read connected media;
+- Optimize when workflow runs.
+
+The API key may be left empty for OpenAI-compatible and Responses endpoints
+that do not require authentication, such as a local LM Studio server.
 
 All of these settings, including the selected **Prompt Guide**, are stored as
 ordinary node parameters in the workflow. The API Key is visually masked in the
 node, but remains plain text in the workflow JSON. Keep workflow files private
 when they contain credentials.
+
+**Optimize when workflow runs** is disabled by default. When enabled, the node
+optimizes the prompt before building the H3 conditioning. Missing settings or
+API errors fall back to the original prompt so the workflow can continue. A
+successful result is written back to the prompt editor and is not optimized
+again while the prompt, selected guide, API context, and connected media remain
+unchanged. Clicking the `✦` button still performs a manual optimization.
 
 ### Prompt Guide selection
 
@@ -230,6 +242,62 @@ This node expands `H3 Context` into standard workflow outputs:
 - Video VAE;
 - Audio VAE;
 - FPS.
+
+### MiniMax H3 Easy Aspect Ratio
+
+This utility reads the resolved aspect ratio from `H3 Context` and exposes the
+matching `ResolutionSelector` label, such as `16:9 (Widescreen)`. It synchronizes
+only the ratio: downstream megapixels, multiples, and exact width/height remain
+independent. This is useful for Pass 2 workflows where the second pass must keep
+the first pass composition ratio while rendering at a different pixel budget.
+
+### MiniMax H3 Easy Second Pass Conditioning
+
+This node prepares conditioning for a resolution-changing second pass. Connect:
+
+- `h3_context` to the main **MiniMax H3 Easy** node;
+- `second_pass_video_latent` to the 24-channel video-only latent produced by the
+  second-pass `VAEEncode`, before it is joined with audio;
+- `second_pass_positive` to the second pass `BasicGuider`.
+
+For text-to-video and pure reference generation, the node copies the existing
+conditioning without removing mode-specific metadata. For I2V and first/last
+frame generation, it resizes the original keyframe images to the actual
+second-pass latent canvas and re-encodes them with the H3 video VAE. Reference
+blocks in `minimax_refs`, text conditioning, token tags, frame indexes, and other
+metadata are preserved. This prevents the keyframe row-count mismatch that
+occurs when first-pass keyframe latents are reused at a different resolution.
+
+## Pass 2 workflow
+
+[`MiniMax_H3_Easy_Pass2.json`](workflow/MiniMax_H3_Easy_Pass2.json) is the
+included two-stage refinement workflow. It uses the first model to establish
+motion, timing, composition, and audio, then uses a smaller pruned W4A8 H3 model
+to refine the upscaled video at a lower denoise value.
+
+The workflow:
+
+1. runs the first pass with the Easy loader, Turbo LoRA, and the selected H3
+   mode;
+2. separates the first-pass AV latent so the original audio latent can be
+   reused;
+3. decodes and resizes only the video, then encodes it at the independent Pass 2
+   megapixel target;
+4. rebuilds resolution-bound I2V/FL2V keyframes while preserving reference
+   media conditioning;
+5. rejoins the new video latent with the original audio latent and performs the
+   second sample.
+
+The included starting values are 8 steps at full denoise for Pass 1 and 3 steps
+at `0.25` denoise for Pass 2. They are presets rather than fixed requirements.
+The ratio is synchronized automatically from **MiniMax H3 Easy**, while the Pass
+2 megapixel target remains independently adjustable.
+
+The workflow supports T2V, I2V, first/last frame, and reference conditioning.
+The selected second-pass transformer must support the conditioning mode being
+used. Model filenames, download locations, required custom nodes, and Hugging
+Face repositories are listed in
+[`workflow/README_WORKFLOWS.md`](workflow/README_WORKFLOWS.md).
 
 ## Modes and media limits
 
