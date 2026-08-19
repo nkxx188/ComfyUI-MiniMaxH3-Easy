@@ -1787,7 +1787,12 @@ function patchGraphToPrompt() {
             promptNode.inputs.aspect_ratio = canonicalOption("aspect_ratio", getWidgetValue(node, "aspect_ratio", "16:9"));
             preserveLinkedPromptInput(promptNode, node, "width", Number(getWidgetValue(node, "width", 1344)));
             preserveLinkedPromptInput(promptNode, node, "height", Number(getWidgetValue(node, "height", 768)));
-            promptNode.inputs.seconds = Math.min(MAX_SECONDS, Math.max(MIN_SECONDS, Number(getWidgetValue(node, "seconds", 5)) || 5));
+            preserveLinkedPromptInput(
+                promptNode,
+                node,
+                "seconds",
+                Math.min(MAX_SECONDS, Math.max(MIN_SECONDS, Number(getWidgetValue(node, "seconds", 5)) || 5)),
+            );
             promptNode.inputs.advanced = asBoolean(getWidgetValue(node, "advanced", false));
             promptNode.inputs.prompt_optimizer = asBoolean(getWidgetValue(node, "prompt_optimizer", false));
             promptNode.inputs.prompt_optimizer_api_format = canonicalOption("prompt_optimizer_api_format", getWidgetValue(node, "prompt_optimizer_api_format", "openai"));
