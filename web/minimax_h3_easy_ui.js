@@ -4,6 +4,7 @@ import { api } from "../../scripts/api.js";
 const NODE_CLASS = "MiniMaxH3Easy";
 const LOADER_CLASS = "MiniMaxH3EasyLoader";
 const ADAPTER_CLASS = "MiniMaxH3EasyModelAdapter";
+const MEDIA_BRIDGE_CLASS = "MiniMaxH3EasyMediaBridge";
 const OUTPUT_CLASS = "MiniMaxH3EasyOutput";
 const LINKS_PROP = "minimax_h3_virtual_media_links";
 const PROMPT_DOC_PROP = "minimax_h3_prompt_reference_doc";
@@ -36,6 +37,12 @@ const REF_IMAGE_15K = "1.5k";
 const REF_IMAGE_2K = "2k";
 const REF_IMAGE_ORIGINAL = "original";
 const MAX_MEDIA = 15;
+const MEDIA_BUNDLE_TYPE = "MINIMAX_H3_MEDIA_BUNDLE";
+const MEDIA_BRIDGE_GROUPS = Object.freeze([
+    { type: "image", count: "image_count", max: 9 },
+    { type: "video", count: "video_count", max: 3 },
+    { type: "audio", count: "audio_count", max: 3 },
+]);
 const MIN_SECONDS = 0.2;
 const MAX_SECONDS = 30;
 const PROMPT_HISTORY_LIMIT = 120;
@@ -71,6 +78,7 @@ const TEXT = {
     mainTitle: "MiniMax H3 Easy",
     loaderTitle: ZH_BROWSER ? "MiniMax H3 Easy \u52a0\u8f7d\u5668" : "MiniMax H3 Easy Loader",
     adapterTitle: ZH_BROWSER ? "MiniMax H3 Easy \u6a21\u578b\u4e2d\u8f6c" : "MiniMax H3 Easy Model Bridge",
+    mediaBridgeTitle: ZH_BROWSER ? "MiniMax H3 Easy \u5a92\u4f53\u4e2d\u8f6c" : "MiniMax H3 Easy Media Bridge",
     outputTitle: ZH_BROWSER ? "MiniMax H3 Easy \u8f93\u51fa" : "MiniMax H3 Easy Output",
     category: "MiniMax H3 Easy",
     mode: ZH_BROWSER ? "\u6a21\u5f0f" : "Mode",
@@ -110,6 +118,10 @@ const TEXT = {
     outputFps: "FPS",
     outputContext: "H3 Context",
     inputMedia: "Media",
+    mediaBundle: ZH_BROWSER ? "\u5a92\u4f53\u5305" : "Media bundle",
+    imageCount: ZH_BROWSER ? "\u56fe\u7247\u6570\u91cf" : "Image count",
+    videoCount: ZH_BROWSER ? "\u89c6\u9891\u6570\u91cf" : "Video count",
+    audioCount: ZH_BROWSER ? "\u97f3\u9891\u6570\u91cf" : "Audio count",
 };
 const OPTION_DEFS = {
     mode: {
@@ -272,8 +284,178 @@ function isAdapter(node) {
     return nodeMatchesClass(node, ADAPTER_CLASS, TEXT.adapterTitle, "__h3EasyAdapterInstalled");
 }
 
+function isMediaBridge(node) {
+    return nodeMatchesClass(node, MEDIA_BRIDGE_CLASS, TEXT.mediaBridgeTitle, "__h3EasyMediaBridgeInstalled");
+}
+
+function isMediaBridgeOutput(node, sourceSlot = 0, sourceType = "") {
+    if (isMediaBridge(node)) return true;
+    const output = node?.outputs?.[Number(sourceSlot) || 0] || {};
+    const type = String(sourceType || output.type || "").trim().toUpperCase();
+    return type === MEDIA_BUNDLE_TYPE || String(output.name || "").toLowerCase() === "media_bundle";
+}
+
 function isOutput(node) {
     return nodeMatchesClass(node, OUTPUT_CLASS, TEXT.outputTitle, "__h3EasyOutputInstalled");
+}
+
+function mediaBridgeGroupForInput(name) {
+    const match = /^(image|video|audio)_(\d+)$/.exec(String(name || ""));
+    if (!match) return null;
+    return { type: match[1], index: Number(match[2]) };
+}
+
+function isMediaBridgeManagedInputName(name) {
+    return Boolean(mediaBridgeGroupForInput(name));
+}
+
+function mediaBridgeCount(node, group) {
+    const raw = Number(getWidget(node, group.count)?.value);
+    if (!Number.isFinite(raw)) return 0;
+    return Math.max(0, Math.min(group.max, Math.floor(raw)));
+}
+
+function desiredMediaBridgeInputNames(node) {
+    const names = [];
+    for (const group of MEDIA_BRIDGE_GROUPS) {
+        for (let index = 1; index <= mediaBridgeCount(node, group); index += 1) {
+            names.push(`${group.type}_${index}`);
+        }
+    }
+    return names;
+}
+
+function clampMediaBridgeWidgetValue(widget, group, value) {
+    if (!widget) return 0;
+    const parsed = Number.parseInt(value ?? widget.value ?? 0, 10);
+    const clamped = Number.isFinite(parsed) ? Math.max(0, Math.min(group.max, parsed)) : 0;
+    widget.value = clamped;
+    return clamped;
+}
+
+function mediaBridgeInputLabel(name) {
+    const parsed = mediaBridgeGroupForInput(name);
+    if (!parsed) return String(name || "");
+    const label = TEXT[parsed.type] || parsed.type;
+    return `${label} ${parsed.index}`;
+}
+
+function findInputByName(node, name) {
+    return (node?.inputs || []).find((input) => input?.name === name) || null;
+}
+
+function removeMediaBridgeInputAt(node, index) {
+    if (typeof node.removeInput === "function") {
+        node.removeInput(index);
+        return;
+    }
+    if (node.inputs?.[index]?.link != null) node.disconnectInput?.(index);
+    node.inputs?.splice(index, 1);
+}
+
+function updateMediaBridgeInputLinkTargets(node) {
+    const graph = node?.graph || app.graph;
+    if (!graph || !Array.isArray(node?.inputs)) return;
+    node.inputs.forEach((input, index) => {
+        if (input?.link == null) return;
+        const link = getNativeGraphLink(graph, input.link);
+        if (link) link.target_slot = index;
+    });
+}
+
+function rebuildMediaBridgeInputs(node, desiredNames) {
+    const desired = new Set(desiredNames);
+    const desiredOrder = new Map(desiredNames.map((name, index) => [name, index]));
+    const seen = new Set();
+    const removeSlots = [];
+
+    for (let index = 0; index < (node.inputs || []).length; index += 1) {
+        const input = node.inputs[index];
+        if (!isMediaBridgeManagedInputName(input?.name)) continue;
+        if (!desired.has(input.name) || seen.has(input.name)) removeSlots.push(index);
+        else seen.add(input.name);
+    }
+    for (const slot of removeSlots.reverse()) removeMediaBridgeInputAt(node, slot);
+
+    let changed = removeSlots.length > 0;
+    for (const name of desiredNames) {
+        if (findInputByName(node, name)) continue;
+        if (typeof node.addInput === "function") node.addInput(name, "*");
+        else {
+            node.inputs ||= [];
+            node.inputs.push({ name, type: "*", link: null });
+        }
+        changed = true;
+    }
+
+    const managed = [];
+    const unmanaged = [];
+    for (const input of node.inputs || []) {
+        if (!isMediaBridgeManagedInputName(input?.name)) {
+            unmanaged.push(input);
+            continue;
+        }
+        if (!desired.has(input.name)) continue;
+        input.type ||= "*";
+        const label = mediaBridgeInputLabel(input.name);
+        setLocalizedSlotLabel(input, label);
+        input.display_name = label;
+        managed.push(input);
+    }
+    managed.sort((a, b) => desiredOrder.get(a.name) - desiredOrder.get(b.name));
+    const sorted = [...managed, ...unmanaged];
+    const orderChanged = sorted.length !== (node.inputs || []).length
+        || sorted.some((input, index) => input !== node.inputs[index]);
+    if (changed || orderChanged) {
+        node.inputs ||= [];
+        node.inputs.splice(0, node.inputs.length, ...sorted);
+        updateMediaBridgeInputLinkTargets(node);
+        node._widgetSlotsDirty = true;
+        node.setDirtyCanvas?.(true, true);
+        node.graph?.setDirtyCanvas?.(true, true);
+        app.graph?.setDirtyCanvas?.(true, true);
+        return true;
+    }
+    return false;
+}
+
+function mediaBridgeSignature(node) {
+    return MEDIA_BRIDGE_GROUPS.map((group) => mediaBridgeCount(node, group)).join(":");
+}
+
+function updateMediaBridgeWidgets(node, options = {}) {
+    if (!node || node.__h3MediaBridgeUpdating) return false;
+    node.__h3MediaBridgeUpdating = true;
+    try {
+        const desiredNames = desiredMediaBridgeInputNames(node);
+        const signature = mediaBridgeSignature(node);
+        if (!options.force && node.__h3MediaBridgeSignature === signature) return false;
+        node.__h3MediaBridgeSignature = signature;
+        const changed = rebuildMediaBridgeInputs(node, desiredNames);
+        localizeNodeInstance(node);
+        refreshVueNodeWidgets(node);
+        if (changed) repairNodeLayout(node);
+        return changed;
+    } finally {
+        node.__h3MediaBridgeUpdating = false;
+    }
+}
+
+function trimMediaBridgeNodeDataInputs(nodeData) {
+    if (!nodeData?.input) return;
+    const managed = /^(image|video|audio)_\d+$/;
+    for (const section of ["required", "optional"]) {
+        if (!nodeData.input[section] || typeof nodeData.input[section] !== "object") continue;
+        for (const name of Object.keys(nodeData.input[section])) {
+            if (managed.test(name)) delete nodeData.input[section][name];
+        }
+    }
+    if (Array.isArray(nodeData.input_order?.required)) {
+        nodeData.input_order.required = nodeData.input_order.required.filter((name) => !managed.test(String(name)));
+    }
+    if (Array.isArray(nodeData.input_order?.optional)) {
+        nodeData.input_order.optional = nodeData.input_order.optional.filter((name) => !managed.test(String(name)));
+    }
 }
 
 function canonicalOption(name, value) {
@@ -374,6 +556,24 @@ function setLocalizedSlotLabel(slot, label) {
 
 function localizeNodeInstance(node) {
     if (!node) return;
+    if (isMediaBridge(node)) {
+        node.title = TEXT.mediaBridgeTitle;
+        const countLabels = {
+            image_count: TEXT.imageCount,
+            video_count: TEXT.videoCount,
+            audio_count: TEXT.audioCount,
+        };
+        for (const widget of node.widgets || []) {
+            if (countLabels[widget.name]) widget.label = countLabels[widget.name];
+        }
+        for (const input of node.inputs || []) {
+            if (isMediaBridgeManagedInputName(input.name)) setLocalizedSlotLabel(input, mediaBridgeInputLabel(input.name));
+        }
+        for (const output of node.outputs || []) {
+            if (String(output.name || "").toLowerCase() === "media_bundle") setLocalizedSlotLabel(output, TEXT.mediaBundle);
+        }
+        return;
+    }
     if (isLoader(node)) {
         node.title = TEXT.loaderTitle;
         const labels = { fl2va_model: TEXT.fl2vaModel, ref2va_model: TEXT.ref2vaModel, text_encoder: TEXT.textEncoder, video_vae: TEXT.videoVae, audio_vae: TEXT.audioVae };
@@ -423,11 +623,13 @@ function localizeNodeInstance(node) {
 }
 
 function localizeNodeDefinition(nodeData) {
-    if (!nodeData || ![NODE_CLASS, LOADER_CLASS, ADAPTER_CLASS, OUTPUT_CLASS].includes(nodeData.name)) return;
+    if (!nodeData || ![NODE_CLASS, LOADER_CLASS, ADAPTER_CLASS, MEDIA_BRIDGE_CLASS, OUTPUT_CLASS].includes(nodeData.name)) return;
     nodeData.display_name = nodeData.name === LOADER_CLASS
         ? TEXT.loaderTitle
         : nodeData.name === ADAPTER_CLASS
             ? TEXT.adapterTitle
+            : nodeData.name === MEDIA_BRIDGE_CLASS
+            ? TEXT.mediaBridgeTitle
             : nodeData.name === OUTPUT_CLASS
             ? TEXT.outputTitle
             : TEXT.mainTitle;
@@ -725,6 +927,52 @@ function getNativeGraphLink(graph, linkId) {
     return null;
 }
 
+function getNativeMediaBridgeLink(node) {
+    if (!isTarget(node)) return null;
+    const inputIndex = getMediaInputIndex(node);
+    const input = inputIndex >= 0 ? node.inputs?.[inputIndex] : null;
+    if (input?.link == null) return null;
+    const graph = node.graph || app.graph;
+    const link = getNativeGraphLink(graph, input.link);
+    if (!link) return null;
+    const sourceId = link.origin_id ?? link.originId ?? link.from_id ?? link.fromId;
+    const sourceNode = link.origin_node || link.originNode || link.fromNode || link.sourceNode
+        || graph?.getNodeById?.(Number(sourceId));
+    if (!sourceNode) return null;
+    const resolvedSourceId = sourceId ?? sourceNode.id;
+    if (resolvedSourceId == null) return null;
+    const rawSourceSlot = link.origin_slot ?? link.originSlot ?? link.from_slot ?? link.fromSlot ?? 0;
+    const parsedSourceSlot = Number(rawSourceSlot);
+    const sourceSlot = Number.isFinite(parsedSourceSlot) ? parsedSourceSlot : 0;
+    const sourceOutput = sourceNode?.outputs?.[sourceSlot] || {};
+    const sourceType = link.type ?? link.origin_type ?? link.originType ?? sourceOutput.type ?? "";
+    if (!isMediaBridgeOutput(sourceNode, sourceSlot, sourceType)) return null;
+    return {
+        source_id: resolvedSourceId,
+        source_slot: sourceSlot,
+    };
+}
+
+function getVirtualMediaBridgeLink(node) {
+    if (!isTarget(node)) return null;
+    const graph = node.graph || app.graph;
+    for (const link of normalizeLinks(node)) {
+        const sourceId = link.source_id ?? link.sourceId;
+        const sourceNode = graph?.getNodeById?.(Number(sourceId));
+        const sourceSlot = Number(link.source_slot ?? link.sourceSlot ?? 0) || 0;
+        const sourceOutput = sourceNode?.outputs?.[sourceSlot] || {};
+        const sourceType = link.source_type || link.sourceType || link.media_type || link.mediaType
+            || sourceOutput.type || "";
+        if (!sourceNode || !isMediaBridgeOutput(sourceNode, sourceSlot, sourceType)) continue;
+        return { source_id: sourceId, source_slot: sourceSlot };
+    }
+    return null;
+}
+
+function getMediaBridgeLink(node) {
+    return getNativeMediaBridgeLink(node) || getVirtualMediaBridgeLink(node);
+}
+
 function convertNativeMediaConnection(targetNode, inputIndex, linkInfo = null) {
     if (!isTarget(targetNode) || targetNode.__h3VirtualWireClearing) return false;
     const input = targetNode.inputs?.[inputIndex];
@@ -753,6 +1001,7 @@ function convertNativeMediaConnection(targetNode, inputIndex, linkInfo = null) {
     const output = sourceNode.outputs?.[sourceSlot] || {};
     const sourceType = getSlotType(output)
         || String(nativeLink.type || nativeLink.origin_type || nativeLink.originType || "*").toUpperCase();
+    if (isMediaBridgeOutput(sourceNode, sourceSlot, sourceType)) return false;
 
     const added = addVirtualLink(targetNode, sourceNode, sourceSlot, sourceType);
     targetNode.__h3VirtualWireClearing = true;
@@ -1501,13 +1750,17 @@ function patchGraphToPrompt() {
             const promptNode = output[String(node.id)];
             if (!promptNode) continue;
             promptNode.inputs ||= {};
-            delete promptNode.inputs.media;
+            const mediaBridgeLink = getMediaBridgeLink(node);
+            if (mediaBridgeLink) promptNode.inputs.media = [String(mediaBridgeLink.source_id), mediaBridgeLink.source_slot];
+            else delete promptNode.inputs.media;
             for (let index = 1; index <= MAX_MEDIA; index += 1) {
                 delete promptNode.inputs[`media_${index}`];
                 delete promptNode.inputs[`media_type_${index}`];
             }
             if (node.__h3Editor) syncPromptFromEditor(node, false);
-            const runtimeLinks = normalizeLinks(node).filter((link) => Boolean(output[String(link.source_id)]));
+            const runtimeLinks = mediaBridgeLink
+                ? []
+                : normalizeLinks(node).filter((link) => Boolean(output[String(link.source_id)]));
             runtimeLinks.forEach((link, index) => {
                 const source = output[String(link.source_id)];
                 const slot = Number(link.source_slot) || 0;
@@ -5089,6 +5342,58 @@ function installOutputNode(nodeType, nodeData) {
     };
 }
 
+function installMediaBridgeNode(nodeType, nodeData) {
+    if (nodeData?.name !== MEDIA_BRIDGE_CLASS) return;
+    trimMediaBridgeNodeDataInputs(nodeData);
+    if (nodeType?.nodeData && nodeType.nodeData !== nodeData) trimMediaBridgeNodeDataInputs(nodeType.nodeData);
+    if (nodeType?.prototype?.constructor?.nodeData && nodeType.prototype.constructor.nodeData !== nodeData) {
+        trimMediaBridgeNodeDataInputs(nodeType.prototype.constructor.nodeData);
+    }
+    if (nodeType.prototype.__h3EasyMediaBridgeInstalled) return;
+    nodeType.prototype.__h3EasyMediaBridgeInstalled = true;
+
+    const setup = (node) => {
+        if (!node || node.__h3MediaBridgeSetup) return;
+        node.__h3MediaBridgeSetup = true;
+        localizeNodeInstance(node);
+        for (const group of MEDIA_BRIDGE_GROUPS) {
+            const widget = getWidget(node, group.count);
+            if (!widget) continue;
+            clampMediaBridgeWidgetValue(widget, group, widget.value);
+            const original = widget.callback;
+            widget.callback = function onMediaBridgeCountChanged(value) {
+                original?.apply(this, arguments);
+                clampMediaBridgeWidgetValue(widget, group, value);
+                updateMediaBridgeWidgets(node);
+            };
+        }
+        updateMediaBridgeWidgets(node, { force: true });
+    };
+
+    const originalCreated = nodeType.prototype.onNodeCreated;
+    nodeType.prototype.onNodeCreated = function onNodeCreatedH3EasyMediaBridge() {
+        const result = originalCreated?.apply(this, arguments);
+        setup(this);
+        return result;
+    };
+
+    const originalAdded = nodeType.prototype.onAdded;
+    nodeType.prototype.onAdded = function onAddedH3EasyMediaBridge(graph) {
+        const result = originalAdded?.apply(this, arguments);
+        setup(this);
+        updateMediaBridgeWidgets(this);
+        return result;
+    };
+
+    const originalConfigure = nodeType.prototype.onConfigure;
+    nodeType.prototype.onConfigure = function onConfigureH3EasyMediaBridge(info) {
+        const result = originalConfigure?.apply(this, arguments);
+        setup(this);
+        updateMediaBridgeWidgets(this, { force: true });
+        return result;
+    };
+}
+
 function install() {
     if (installed) return;
     installed = true;
@@ -5226,6 +5531,7 @@ app.registerExtension({
         installMediaSourceNode(nodeType, nodeData);
         installLoaderNode(nodeType, nodeData);
         installAdapterNode(nodeType, nodeData);
+        installMediaBridgeNode(nodeType, nodeData);
         installOutputNode(nodeType, nodeData);
         installNode(nodeType, nodeData);
     },

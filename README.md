@@ -42,6 +42,23 @@ The visible single port is intentional. The frontend transports the ordered
 links through hidden execution inputs without turning the node back into a
 large set of fixed sockets.
 
+### Workflow API and headless execution
+
+The multi-link `Media` interface is designed for normal browser-based ComfyUI
+use. When a workflow is submitted through the ComfyUI API, a headless runner,
+or another server-side executor, use **MiniMax H3 Easy Media Bridge** to make
+the media inputs explicit:
+
+1. Set the image, video, and audio counts.
+2. Connect each source to its matching numbered input.
+3. Connect `Media bundle` to the main Easy node's `Media` input.
+
+<p align="center">
+  <img src="images/workflow-api-media-bridge.png" alt="Media Bridge for workflow API execution" width="960">
+</p>
+
+For normal canvas workflows, continue connecting media directly to `Media`.
+
 ### `@` media references
 
 In **Reference Video** mode, type `@` to select a connected image, video, or

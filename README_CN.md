@@ -35,6 +35,22 @@
 单一端口是核心设计。前端通过隐藏的执行输入传输有序媒体，不会把节点重新变成一排
 固定插槽。
 
+### 工作流 API 与无头执行
+
+多线 `Media` 界面面向浏览器中的常规 ComfyUI 使用。当通过 ComfyUI 工作流 API、无头
+运行器或其他服务端执行器提交工作流时，请使用 **MiniMax H3 Easy Media Bridge**，将媒体
+输入显式化：
+
+1. 设置图片、视频、音频的数量；
+2. 将每个素材连接到对应的编号输入；
+3. 将 `Media bundle` 输出连接到 Easy 主节点的 `Media` 输入。
+
+<p align="center">
+  <img src="images/workflow-api-media-bridge.png" alt="工作流 API 的 Media Bridge 接法" width="960">
+</p>
+
+常规画布工作流仍然直接连接主节点的 `Media` 端口即可。
+
 ### `@` 素材引用
 
 在**参考生视频**模式中输入 `@`，即可选择已连接的图片、视频或独立音频。选择器按照
