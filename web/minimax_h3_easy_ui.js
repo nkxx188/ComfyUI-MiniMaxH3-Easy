@@ -639,6 +639,45 @@ function localizeOptionalModelWidget(widget) {
     if (isNoneModelValue(widget.value)) widget.value = TEXT.noneModel;
 }
 
+function installPasswordWidgetMask(widget) {
+    if (!widget) return;
+    widget.options ||= {};
+    widget.options.password = true;
+
+    const applyPasswordInput = (input) => {
+        if (!input) return;
+        input.type = "password";
+        input.autocomplete = "off";
+        input.spellcheck = false;
+    };
+    applyPasswordInput(widget.inputEl || widget.element);
+
+    if (!widget.__h3PasswordDisplayMasked) {
+        try {
+            Object.defineProperty(widget, "_displayValue", {
+                configurable: true,
+                get() {
+                    if (this.computedDisabled) return "";
+                    return "\u2022".repeat(Array.from(String(this.value ?? "")).length);
+                },
+            });
+            widget.__h3PasswordDisplayMasked = true;
+        } catch {
+            // Older widget implementations may not expose a configurable display layer.
+        }
+    }
+
+    if (!widget.__h3PasswordClickMasked && typeof widget.onClick === "function") {
+        widget.__h3PasswordClickMasked = true;
+        const originalOnClick = widget.onClick;
+        widget.onClick = function onClickH3Password(options) {
+            const result = originalOnClick.apply(this, arguments);
+            applyPasswordInput(options?.canvas?.prompt_box?.querySelector?.("input.value"));
+            return result;
+        };
+    }
+}
+
 function setLocalizedSlotLabel(slot, label) {
     if (!slot || !label) return;
     slot.label = label;
@@ -758,6 +797,7 @@ function localizeNodeInstance(node) {
     for (const widget of node.widgets || []) {
         if (labels[widget.name]) widget.label = labels[widget.name];
         localizeComboWidget(widget, node);
+        if (widget.name === "prompt_optimizer_api_key") installPasswordWidgetMask(widget);
     }
     for (const input of node.inputs || []) {
         if (input.name === "h3_bundle") setLocalizedSlotLabel(input, TEXT.bundle);
