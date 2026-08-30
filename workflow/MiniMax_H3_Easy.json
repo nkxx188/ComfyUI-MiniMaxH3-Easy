@@ -1,122 +1,9 @@
 {
   "id": "594552d6-9e64-44e3-b347-f225aa52dab3",
   "revision": 0,
-  "last_node_id": 25,
-  "last_link_id": 28,
+  "last_node_id": 34,
+  "last_link_id": 38,
   "nodes": [
-    {
-      "id": 13,
-      "type": "MiniMaxH3EasyOutput",
-      "pos": [
-        1078.0601530122642,
-        -642.0998357415989
-      ],
-      "size": [
-        218.09212811279295,
-        106
-      ],
-      "flags": {},
-      "order": 6,
-      "mode": 0,
-      "inputs": [
-        {
-          "label": "H3 Context",
-          "name": "h3_context",
-          "type": "MINIMAX_H3_CONTEXT",
-          "link": 19
-        }
-      ],
-      "outputs": [
-        {
-          "label": "Conditioning",
-          "name": "positive",
-          "type": "CONDITIONING",
-          "links": [
-            5
-          ]
-        },
-        {
-          "label": "Latent",
-          "name": "latent",
-          "type": "LATENT",
-          "links": [
-            6
-          ]
-        },
-        {
-          "label": "Video VAE",
-          "name": "video_vae",
-          "type": "VAE",
-          "links": [
-            13
-          ]
-        },
-        {
-          "label": "Audio VAE",
-          "name": "audio_vae",
-          "type": "VAE",
-          "links": [
-            14
-          ]
-        },
-        {
-          "label": "FPS",
-          "name": "fps",
-          "type": "FLOAT",
-          "links": [
-            18
-          ]
-        }
-      ],
-      "properties": {
-        "cnr_id": "comfyui-minimaxh3-easy",
-        "ver": "1658798be6a8ac004aa3a3973b29a41d3e036abc",
-        "Node name for S&R": "MiniMaxH3EasyOutput"
-      },
-      "widgets_values": []
-    },
-    {
-      "id": 4,
-      "type": "BasicGuider",
-      "pos": [
-        1066.7050839065255,
-        -493.09526036705194
-      ],
-      "size": [
-        226.9910862670897,
-        61.898473114013655
-      ],
-      "flags": {},
-      "order": 8,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "model",
-          "type": "MODEL",
-          "link": 24
-        },
-        {
-          "name": "conditioning",
-          "type": "CONDITIONING",
-          "link": 5
-        }
-      ],
-      "outputs": [
-        {
-          "name": "GUIDER",
-          "type": "GUIDER",
-          "links": [
-            8
-          ]
-        }
-      ],
-      "properties": {
-        "cnr_id": "comfy-core",
-        "ver": "0.30.0",
-        "Node name for S&R": "BasicGuider"
-      },
-      "widgets_values": []
-    },
     {
       "id": 6,
       "type": "RandomNoise",
@@ -147,7 +34,7 @@
         "Node name for S&R": "RandomNoise"
       },
       "widgets_values": [
-        615102808938457,
+        283248527611089,
         "randomize"
       ]
     },
@@ -159,7 +46,7 @@
         -399.07143794829506
       ],
       "size": [
-        257.421875,
+        257.375,
         114
       ],
       "flags": {},
@@ -223,8 +110,8 @@
         -433.88337637748145
       ],
       "size": [
-        200.3709887817381,
-        60.83364061889654
+        225,
+        60.765625
       ],
       "flags": {},
       "order": 12,
@@ -265,8 +152,8 @@
         -330.97161248450425
       ],
       "size": [
-        198.47278375244127,
-        55.50965686645509
+        225,
+        55.5
       ],
       "flags": {},
       "order": 11,
@@ -300,11 +187,112 @@
       "widgets_values": []
     },
     {
+      "id": 11,
+      "type": "CreateVideo",
+      "pos": [
+        1831.0140950018085,
+        -412.88721252233904
+      ],
+      "size": [
+        225,
+        110
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 15
+        },
+        {
+          "name": "audio",
+          "shape": 7,
+          "type": "AUDIO",
+          "link": 16
+        },
+        {
+          "name": "fps",
+          "type": "FLOAT",
+          "widget": {
+            "name": "fps"
+          },
+          "link": 18
+        }
+      ],
+      "outputs": [
+        {
+          "name": "VIDEO",
+          "type": "VIDEO",
+          "links": [
+            17,
+            28
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.30.0",
+        "Node name for S&R": "CreateVideo"
+      },
+      "widgets_values": [
+        24,
+        8
+      ]
+    },
+    {
+      "id": 25,
+      "type": "RAMCleanup",
+      "pos": [
+        2164.420828852858,
+        -412.8756481741815
+      ],
+      "size": [
+        270,
+        170
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "anything",
+          "shape": 7,
+          "type": "*",
+          "link": 28
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "type": "*",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui_memory_cleanup",
+        "ver": "1.1.1",
+        "Node name for S&R": "RAMCleanup",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.2"
+        }
+      },
+      "widgets_values": [
+        true,
+        true,
+        true,
+        3
+      ]
+    },
+    {
       "id": 15,
       "type": "LoadImage",
       "pos": [
-        -310.32416410574086,
-        -448.1689572292407
+        -433.1537067891823,
+        -737.631210955108
       ],
       "size": [
         270,
@@ -337,42 +325,6 @@
       ]
     },
     {
-      "id": 18,
-      "type": "MiniMaxH3MemoryEfficientSageAttentionPatch",
-      "pos": [
-        622.4376246339244,
-        -307.17045994764186
-      ],
-      "size": [
-        320.323828125,
-        26
-      ],
-      "flags": {},
-      "order": 7,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "model",
-          "type": "MODEL",
-          "link": 26
-        }
-      ],
-      "outputs": [
-        {
-          "name": "model",
-          "type": "MODEL",
-          "links": [
-            24,
-            25
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "MiniMaxH3MemoryEfficientSageAttentionPatch"
-      },
-      "widgets_values": []
-    },
-    {
       "id": 1,
       "type": "MiniMaxH3EasyLoader",
       "pos": [
@@ -380,8 +332,8 @@
         -794.4432085375646
       ],
       "size": [
-        477.00870429521854,
-        156.73204548389367
+        470.53125,
+        198
       ],
       "flags": {},
       "order": 2,
@@ -438,7 +390,7 @@
           "name": "h3_bundle",
           "type": "MINIMAX_H3_BUNDLE",
           "links": [
-            1
+            35
           ]
         }
       ],
@@ -456,156 +408,15 @@
       ]
     },
     {
-      "id": 24,
-      "type": "LoraLoaderModelOnly",
-      "pos": [
-        570.6450725662371,
-        -491.9315226248658
-      ],
-      "size": [
-        442.3038966064453,
-        90.7120627746582
-      ],
-      "flags": {},
-      "order": 5,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "model",
-          "type": "MODEL",
-          "link": 27
-        }
-      ],
-      "outputs": [
-        {
-          "name": "MODEL",
-          "type": "MODEL",
-          "links": [
-            26
-          ]
-        }
-      ],
-      "properties": {
-        "cnr_id": "comfy-core",
-        "ver": "0.30.0",
-        "Node name for S&R": "LoraLoaderModelOnly"
-      },
-      "widgets_values": [
-        "minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors",
-        1
-      ]
-    },
-    {
-      "id": 11,
-      "type": "CreateVideo",
-      "pos": [
-        1831.0140950018085,
-        -412.88721252233904
-      ],
-      "size": [
-        222.50101121826174,
-        102
-      ],
-      "flags": {},
-      "order": 13,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "images",
-          "type": "IMAGE",
-          "link": 15
-        },
-        {
-          "name": "audio",
-          "shape": 7,
-          "type": "AUDIO",
-          "link": 16
-        },
-        {
-          "name": "fps",
-          "type": "FLOAT",
-          "widget": {
-            "name": "fps"
-          },
-          "link": 18
-        }
-      ],
-      "outputs": [
-        {
-          "name": "VIDEO",
-          "type": "VIDEO",
-          "links": [
-            17,
-            28
-          ]
-        }
-      ],
-      "properties": {
-        "cnr_id": "comfy-core",
-        "ver": "0.30.0",
-        "Node name for S&R": "CreateVideo"
-      },
-      "widgets_values": [
-        24,
-        8
-      ]
-    },
-    {
-      "id": 25,
-      "type": "RAMCleanup",
-      "pos": [
-        2164.420828852858,
-        -412.8756481741815
-      ],
-      "size": [
-        270,
-        130
-      ],
-      "flags": {},
-      "order": 15,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "anything",
-          "shape": 7,
-          "type": "*",
-          "link": 28
-        }
-      ],
-      "outputs": [
-        {
-          "name": "output",
-          "type": "*",
-          "links": null
-        }
-      ],
-      "properties": {
-        "cnr_id": "comfyui_memory_cleanup",
-        "ver": "1.1.1",
-        "Node name for S&R": "RAMCleanup",
-        "ue_properties": {
-          "widget_ue_connectable": {},
-          "input_ue_unconnectable": {},
-          "version": "7.5.2"
-        }
-      },
-      "widgets_values": [
-        true,
-        true,
-        true,
-        3
-      ]
-    },
-    {
       "id": 5,
       "type": "BasicScheduler",
       "pos": [
-        1067.5758304593196,
-        -385.5328582101905
+        1052.3691987121597,
+        -384.2105038067817
       ],
       "size": [
-        224.85011204223656,
-        106
+        225,
+        118
       ],
       "flags": {},
       "order": 9,
@@ -614,7 +425,7 @@
         {
           "name": "model",
           "type": "MODEL",
-          "link": 25
+          "link": 38
         }
       ],
       "outputs": [
@@ -641,12 +452,12 @@
       "id": 7,
       "type": "KSamplerSelect",
       "pos": [
-        1331.815929628573,
-        -519.7045632324068
+        1339.0886569013,
+        -505.15910868695187
       ],
       "size": [
-        220.60235938110372,
-        58
+        225,
+        62
       ],
       "flags": {},
       "order": 3,
@@ -671,6 +482,199 @@
       ]
     },
     {
+      "id": 4,
+      "type": "BasicGuider",
+      "pos": [
+        1068.6885600251321,
+        -480.5332819402054
+      ],
+      "size": [
+        226.921875,
+        61.875
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 37
+        },
+        {
+          "name": "conditioning",
+          "type": "CONDITIONING",
+          "link": 5
+        }
+      ],
+      "outputs": [
+        {
+          "name": "GUIDER",
+          "type": "GUIDER",
+          "links": [
+            8
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.30.0",
+        "Node name for S&R": "BasicGuider"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 13,
+      "type": "MiniMaxH3EasyOutput",
+      "pos": [
+        1069.4651268226344,
+        -653.3395429947946
+      ],
+      "size": [
+        225,
+        138
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "H3 Context",
+          "name": "h3_context",
+          "type": "MINIMAX_H3_CONTEXT",
+          "link": 19
+        }
+      ],
+      "outputs": [
+        {
+          "label": "Conditioning",
+          "name": "positive",
+          "type": "CONDITIONING",
+          "links": [
+            5
+          ]
+        },
+        {
+          "label": "Latent",
+          "name": "latent",
+          "type": "LATENT",
+          "links": [
+            6
+          ]
+        },
+        {
+          "label": "Video VAE",
+          "name": "video_vae",
+          "type": "VAE",
+          "links": [
+            13
+          ]
+        },
+        {
+          "label": "Audio VAE",
+          "name": "audio_vae",
+          "type": "VAE",
+          "links": [
+            14
+          ]
+        },
+        {
+          "label": "FPS",
+          "name": "fps",
+          "type": "FLOAT",
+          "links": [
+            18
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-minimaxh3-easy",
+        "ver": "1658798be6a8ac004aa3a3973b29a41d3e036abc",
+        "Node name for S&R": "MiniMaxH3EasyOutput"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 24,
+      "type": "LoraLoaderModelOnly",
+      "pos": [
+        570.6450725662371,
+        -491.9315226248658
+      ],
+      "size": [
+        443.03125,
+        90
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 27
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            36
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.30.0",
+        "Node name for S&R": "LoraLoaderModelOnly"
+      },
+      "widgets_values": [
+        "minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors",
+        1
+      ]
+    },
+    {
+      "id": 34,
+      "type": "ModelAttentionBackend",
+      "pos": [
+        700.4653442027225,
+        -346.2634792023769
+      ],
+      "size": [
+        270,
+        58
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 36
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            37,
+            38
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.32.0",
+        "Node name for S&R": "ModelAttentionBackend"
+      },
+      "widgets_values": [
+        "comfy kitchen attention"
+      ]
+    },
+    {
       "id": 12,
       "type": "SaveVideo",
       "pos": [
@@ -678,8 +682,8 @@
         -150.71278595367426
       ],
       "size": [
-        404,
-        825.1999999999999
+        508,
+        1012.4
       ],
       "flags": {},
       "order": 14,
@@ -713,12 +717,12 @@
       "id": 2,
       "type": "MiniMaxH3Easy",
       "pos": [
-        64.34587961801877,
-        -465.83804922084596
+        4.935593418622469,
+        -581.5365319978348
       ],
       "size": [
-        387.77573756312563,
-        267.18137854132465
+        418.6661784362793,
+        289.91364096069333
       ],
       "flags": {},
       "order": 4,
@@ -728,7 +732,7 @@
           "label": "H3 模型组合",
           "name": "h3_bundle",
           "type": "MINIMAX_H3_BUNDLE",
-          "link": 1
+          "link": 35
         },
         {
           "label": "Media",
@@ -771,52 +775,51 @@
         ],
         "minimax_h3_prompt_reference_doc": {
           "version": 1,
-          "text": "少女端起手中的咖啡喝了一口",
+          "text": "\n",
           "parts": [
             {
               "type": "text",
-              "text": "少女端起手中的咖啡喝了一口"
+              "text": "\n"
             }
           ]
         },
         "minimax_h3_prompt_view_mode": "structured",
         "minimax_h3_prompt_optimizer": {
           "enabled": true,
-          "api_format": "gemini",
-          "api_url": "https://grsai.dakka.com.cn",
-          "model": "gemini-3.5-flash",
+          "api_format": "openai",
+          "api_url": "https://zz.211b.site",
+          "model": "gpt-5.6-terra",
           "scene_guide": "none",
-          "read_media": false
+          "read_media": true,
+          "optimize_on_run": false
         }
       },
       "widgets_values": [
         "参考生视频",
-        "少女端起手中的咖啡喝了一口",
+        "\n",
         null,
-        "480P",
+        "360P",
         "9:16",
         1344,
         1344,
-        3,
+        5,
         false,
         24,
         "首帧优先",
-        "1K 面积（约1MP）",
+        "原图（不缩放）",
         "按序号",
-        false,
-        "仅通用方案"
+        true,
+        "openai",
+        "https://zz.211b.site",
+        "",
+        "gpt-5.6-terra",
+        "仅通用方案",
+        true,
+        false
       ]
     }
   ],
   "links": [
-    [
-      1,
-      1,
-      0,
-      2,
-      0,
-      "MINIMAX_H3_BUNDLE"
-    ],
     [
       5,
       13,
@@ -938,30 +941,6 @@
       "MINIMAX_H3_CONTEXT"
     ],
     [
-      24,
-      18,
-      0,
-      4,
-      0,
-      "MODEL"
-    ],
-    [
-      25,
-      18,
-      0,
-      5,
-      0,
-      "MODEL"
-    ],
-    [
-      26,
-      24,
-      0,
-      18,
-      0,
-      "MODEL"
-    ],
-    [
       27,
       2,
       0,
@@ -976,6 +955,38 @@
       25,
       0,
       "VIDEO"
+    ],
+    [
+      35,
+      1,
+      0,
+      2,
+      0,
+      "MINIMAX_H3_BUNDLE"
+    ],
+    [
+      36,
+      24,
+      0,
+      34,
+      0,
+      "MODEL"
+    ],
+    [
+      37,
+      34,
+      0,
+      4,
+      0,
+      "MODEL"
+    ],
+    [
+      38,
+      34,
+      0,
+      5,
+      0,
+      "MODEL"
     ]
   ],
   "groups": [
@@ -1030,13 +1041,13 @@
   ],
   "config": {},
   "extra": {
-    "frontendVersion": "1.48.6",
+    "frontendVersion": "1.48.7",
     "VHS_latentpreview": false,
     "ds": {
-      "scale": 0.620921323059155,
+      "scale": 0.7513148009015777,
       "offset": [
-        647.794042668517,
-        959.9950204242868
+        812.9460469784302,
+        1053.9884574085102
       ]
     },
     "VHS_latentpreviewrate": 0,

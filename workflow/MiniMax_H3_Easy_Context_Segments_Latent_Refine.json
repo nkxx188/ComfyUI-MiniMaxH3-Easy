@@ -1,0 +1,1105 @@
+{
+  "id": "1920c534-dac4-43eb-a246-748b577d8aaa",
+  "revision": 0,
+  "last_node_id": 34,
+  "last_link_id": 563,
+  "nodes": [
+    {
+      "id": 17,
+      "type": "KSamplerSelect",
+      "pos": [
+        975.9265745920002,
+        -818.4564005416045
+      ],
+      "size": [
+        210,
+        58
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "SAMPLER",
+          "type": "SAMPLER",
+          "links": [
+            550
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.30.0",
+        "Node name for S&R": "KSamplerSelect",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.5.2",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "euler"
+      ],
+      "widgets_values_named": {
+        "sampler_name": "euler"
+      }
+    },
+    {
+      "id": 6,
+      "type": "MiniMaxH3EasySegmentRender",
+      "pos": [
+        806.9942747314459,
+        -620.2831275756838
+      ],
+      "size": [
+        343.2257901687756,
+        142
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "h3_context",
+          "type": "MINIMAX_H3_CONTEXT",
+          "link": 539
+        },
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 541
+        },
+        {
+          "name": "sampler",
+          "type": "SAMPLER",
+          "link": 542
+        },
+        {
+          "name": "sigmas",
+          "type": "SIGMAS",
+          "link": 543
+        }
+      ],
+      "outputs": [
+        {
+          "name": "segments",
+          "type": "MINIMAX_H3_SEGMENTS",
+          "links": [
+            545,
+            559
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MiniMaxH3EasySegmentRender"
+      },
+      "widgets_values": [
+        3156251735,
+        "randomize"
+      ],
+      "widgets_values_named": {
+        "seed": 3156251735,
+        "control_after_generate": "randomize"
+      }
+    },
+    {
+      "id": 4,
+      "type": "KSamplerSelect",
+      "pos": [
+        528.1249831542968,
+        -761.9849573590094
+      ],
+      "size": [
+        210,
+        58
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "SAMPLER",
+          "type": "SAMPLER",
+          "links": [
+            542
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.30.0",
+        "Node name for S&R": "KSamplerSelect",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.5.2",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "euler"
+      ],
+      "widgets_values_named": {
+        "sampler_name": "euler"
+      }
+    },
+    {
+      "id": 33,
+      "type": "ModelAttentionBackend",
+      "pos": [
+        187.72607382593853,
+        -761.5911453931728
+      ],
+      "size": [
+        270,
+        58
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 561
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            562
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.34.0",
+        "Node name for S&R": "ModelAttentionBackend"
+      },
+      "widgets_values": [
+        "comfy kitchen attention"
+      ],
+      "widgets_values_named": {
+        "attention": "comfy kitchen attention"
+      }
+    },
+    {
+      "id": 5,
+      "type": "BasicScheduler",
+      "pos": [
+        516.0424587212374,
+        -522.7178596883925
+      ],
+      "size": [
+        210,
+        106
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 540
+        }
+      ],
+      "outputs": [
+        {
+          "name": "SIGMAS",
+          "type": "SIGMAS",
+          "links": [
+            543
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.30.0",
+        "Node name for S&R": "BasicScheduler",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.5.2",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "beta",
+        4,
+        1
+      ],
+      "widgets_values_named": {
+        "scheduler": "beta",
+        "steps": 4,
+        "denoise": 1
+      }
+    },
+    {
+      "id": 1,
+      "type": "MiniMaxH3EasyLoader",
+      "pos": [
+        -963.2429621015542,
+        -527.5993509837892
+      ],
+      "size": [
+        430,
+        156
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "FL2VA 模型",
+          "name": "fl2va_model",
+          "type": "COMBO",
+          "widget": {
+            "name": "fl2va_model"
+          },
+          "link": null
+        },
+        {
+          "label": "REF2VA 模型",
+          "name": "ref2va_model",
+          "type": "COMBO",
+          "widget": {
+            "name": "ref2va_model"
+          },
+          "link": null
+        },
+        {
+          "label": "文本编码器",
+          "name": "text_encoder",
+          "type": "COMBO",
+          "widget": {
+            "name": "text_encoder"
+          },
+          "link": null
+        },
+        {
+          "label": "视频 VAE",
+          "name": "video_vae",
+          "type": "COMBO",
+          "widget": {
+            "name": "video_vae"
+          },
+          "link": null
+        },
+        {
+          "label": "音频 VAE",
+          "name": "audio_vae",
+          "type": "COMBO",
+          "widget": {
+            "name": "audio_vae"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "h3_bundle",
+          "type": "MINIMAX_H3_BUNDLE",
+          "links": [
+            537
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MiniMaxH3EasyLoader",
+        "cnr_id": "comfyui-minimaxh3-easy",
+        "ver": "1.0.9"
+      },
+      "widgets_values": [
+        "无",
+        "minimax_h3_ref2va_int8_convrot.safetensors",
+        "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+        "minimax_h3_video_vae_fp16.safetensors",
+        "minimax_h3_audio_vae_fp32.safetensors"
+      ],
+      "widgets_values_named": {
+        "fl2va_model": "无",
+        "ref2va_model": "minimax_h3_ref2va_int8_convrot.safetensors",
+        "text_encoder": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+        "video_vae": "minimax_h3_video_vae_fp16.safetensors",
+        "audio_vae": "minimax_h3_audio_vae_fp32.safetensors"
+      }
+    },
+    {
+      "id": 29,
+      "type": "MiniMaxH3EasySegmentRefine",
+      "pos": [
+        1223.4274097051552,
+        -721.8002547288962
+      ],
+      "size": [
+        390,
+        306
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "H3 Context",
+          "name": "h3_context",
+          "type": "MINIMAX_H3_CONTEXT",
+          "link": 548
+        },
+        {
+          "label": "分段结果",
+          "name": "segments",
+          "type": "MINIMAX_H3_SEGMENTS",
+          "link": 545
+        },
+        {
+          "label": "Model",
+          "name": "model",
+          "type": "MODEL",
+          "link": 555
+        },
+        {
+          "name": "sampler",
+          "type": "SAMPLER",
+          "link": 550
+        },
+        {
+          "name": "sigmas",
+          "type": "SIGMAS",
+          "link": 551
+        }
+      ],
+      "outputs": [
+        {
+          "label": "分段结果",
+          "name": "refined_segments",
+          "type": "MINIMAX_H3_SEGMENTS",
+          "links": [
+            557
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MiniMaxH3EasySegmentRefine",
+        "cnr_id": "comfyui-minimaxh3-easy"
+      },
+      "widgets_values": [
+        "Latent Upscale",
+        0,
+        "fixed",
+        "Standard",
+        0,
+        0,
+        "minimax_h3_latent_upscaler_3d_fp16.safetensors",
+        2,
+        "cuda",
+        "fp16",
+        512,
+        512,
+        128,
+        32
+      ],
+      "widgets_values_named": {
+        "refine_mode": "Latent Upscale",
+        "seed": 0,
+        "control_after_generate": "fixed",
+        "refine_execution": "Standard",
+        "target_width": 0,
+        "target_height": 0,
+        "latent_upscale_model": "minimax_h3_latent_upscaler_3d_fp16.safetensors",
+        "latent_upscale_scale": 2,
+        "latent_upscale_device": "cuda",
+        "latent_upscale_precision": "fp16",
+        "tile_width": 512,
+        "tile_height": 512,
+        "tile_overlap": 128,
+        "tile_fade": 32
+      }
+    },
+    {
+      "id": 32,
+      "type": "MiniMaxH3EasySegmentDecode",
+      "pos": [
+        1221.6662122113617,
+        -367.83377277719626
+      ],
+      "size": [
+        306.1479675292968,
+        26
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "segments",
+          "type": "MINIMAX_H3_SEGMENTS",
+          "link": 559
+        }
+      ],
+      "outputs": [
+        {
+          "name": "preview",
+          "type": "VIDEO",
+          "links": [
+            560
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MiniMaxH3EasySegmentDecode"
+      }
+    },
+    {
+      "id": 31,
+      "type": "MiniMaxH3EasySegmentDecode",
+      "pos": [
+        1717.8241638602879,
+        -671.0762865758412
+      ],
+      "size": [
+        234.38836914062483,
+        26
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "segments",
+          "type": "MINIMAX_H3_SEGMENTS",
+          "link": 557
+        }
+      ],
+      "outputs": [
+        {
+          "name": "preview",
+          "type": "VIDEO",
+          "links": [
+            558
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MiniMaxH3EasySegmentDecode"
+      }
+    },
+    {
+      "id": 3,
+      "type": "LoraLoaderModelOnly",
+      "pos": [
+        180.22570265502927,
+        -650.4750777740472
+      ],
+      "size": [
+        277.81281460252853,
+        82
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 562
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            540,
+            541,
+            555,
+            556
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.31.0",
+        "Node name for S&R": "LoraLoaderModelOnly",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.2"
+        }
+      },
+      "widgets_values": [
+        "lightx2v-minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors",
+        1
+      ],
+      "widgets_values_named": {
+        "lora_name": "lightx2v-minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors",
+        "strength_model": 1
+      },
+      "color": "#223",
+      "bgcolor": "#335"
+    },
+    {
+      "id": 34,
+      "type": "MiniMaxH3EasyMediaLoader",
+      "pos": [
+        -850.9946709098557,
+        -292.318034046015
+      ],
+      "size": [
+        320,
+        316
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "label": "媒体包",
+          "name": "media_bundle",
+          "type": "MINIMAX_H3_MEDIA_BUNDLE",
+          "links": [
+            563
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MiniMaxH3EasyMediaLoader",
+        "media_loader_state": "{\"images\":[],\"audios\":[],\"videos\":[]}"
+      },
+      "widgets_values": [
+        "{\"images\":[],\"audios\":[],\"videos\":[]}"
+      ],
+      "widgets_values_named": {
+        "media_state": "{\"images\":[],\"audios\":[],\"videos\":[]}"
+      }
+    },
+    {
+      "id": 19,
+      "type": "BasicScheduler",
+      "pos": [
+        809.3805863173226,
+        -419.20398771090896
+      ],
+      "size": [
+        210,
+        106
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 556
+        }
+      ],
+      "outputs": [
+        {
+          "name": "SIGMAS",
+          "type": "SIGMAS",
+          "links": [
+            551
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.30.0",
+        "Node name for S&R": "BasicScheduler",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.5.2",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "beta",
+        3,
+        0.25
+      ],
+      "widgets_values_named": {
+        "scheduler": "beta",
+        "steps": 3,
+        "denoise": 0.25
+      }
+    },
+    {
+      "id": 2,
+      "type": "MiniMaxH3EasyContextSegments",
+      "pos": [
+        -400,
+        -470
+      ],
+      "size": [
+        430,
+        520
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "H3 模型组合",
+          "name": "h3_bundle",
+          "type": "MINIMAX_H3_BUNDLE",
+          "link": 537
+        },
+        {
+          "label": "Media",
+          "name": "media",
+          "shape": 7,
+          "type": "*",
+          "link": 563
+        }
+      ],
+      "outputs": [
+        {
+          "label": "Model",
+          "name": "model",
+          "type": "MODEL",
+          "links": [
+            561
+          ]
+        },
+        {
+          "label": "H3 Context",
+          "name": "h3_context",
+          "type": "MINIMAX_H3_CONTEXT",
+          "links": [
+            539,
+            548
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MiniMaxH3EasyContextSegments",
+        "minimax_h3_virtual_media_links": [],
+        "cnr_id": "comfyui-minimaxh3-easy",
+        "ver": "404e6e8c3af4d013c275f773da09e181765cdc14",
+        "minimax_h3_prompt_reference_doc": {
+          "version": 1,
+          "text": "For the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.\n\nintegrated_multimodal_description: [Shot 1] 2D-animated, chibi style, the young girl with long gradient blue hair, large blue eyes, fin-shaped blue ears, a white frilly headdress with blue bows, and a dark blue whale-themed maid dress with white frills and a whale-embroidered apron walks along a sunny street, preserving her appearance, clothing, and colors from <Picture 1>. The camera holds a medium-wide tracking shot as she steps forward at a relaxed pace, her apron and long hair swaying gently. She approaches a supermarket with sliding glass doors and a sign reading \"超市\" above the entrance. As she reaches the doorway, she slows and comes to a stop, tilting her head slightly as she gazes at the entrance.\n\noverall_soundscape: Light street ambience with distant traffic and occasional birdsong. Her soft footsteps tap against the pavement, and a faint mechanical hum from the supermarket grows louder as she nears the entrance.\n\nnon_diegetic_music: A light, cheerful flute melody at a moderate tempo, accompanied by gentle ukulele strumming.\n\n---\n\nFor the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.\n\nintegrated_multimodal_description: [Shot 1] 2D-animated, chibi style, the young girl with long gradient blue hair, large blue eyes, fin-shaped blue ears, a white frilly headdress with blue bows, and a dark blue whale-themed maid dress with white frills and a whale-embroidered apron stands before the supermarket entrance, preserving her appearance, clothing, and colors from <Picture 1>. The camera pushes in with small amplitude at slow speed as she steps forward, and the sliding glass doors part automatically with a soft hiss. She walks through the doorway into a bright interior lined with illuminated shelves and colorful products, her long blue hair and white apron flowing behind her. The doors slide shut behind her as she continues walking down the main aisle.\n\noverall_soundscape: The sliding doors hiss open and then close behind her. Supermarket ambience fills the space with soft background chatter, occasional barcode scanner beeps, and the low hum of refrigerated display cases.\n\nnon_diegetic_music: The same light flute and ukulele motif continues at a moderate tempo, becoming slightly warmer as the scene moves indoors.\n\n",
+          "parts": [
+            {
+              "type": "text",
+              "text": "For the target video, at 0.00 seconds into the target video, "
+            },
+            {
+              "type": "mention",
+              "token": "@图片1",
+              "tag": "<Picture 1>",
+              "label": "图片1",
+              "fullLabel": "微信图片_20260817224235_127_208.png",
+              "mediaType": "image",
+              "referenceMode": "index",
+              "ordinal": 1,
+              "mediaIndex": 1,
+              "sourceId": 34,
+              "sourceSlot": 0,
+              "previewUrl": ""
+            },
+            {
+              "type": "text",
+              "text": " (from [Shot 1]) is fully referenced.\n\nintegrated_multimodal_description: [Shot 1] 2D-animated, chibi style, the young girl with long gradient blue hair, large blue eyes, fin-shaped blue ears, a white frilly headdress with blue bows, and a dark blue whale-themed maid dress with white frills and a whale-embroidered apron walks along a sunny street, preserving her appearance, clothing, and colors from "
+            },
+            {
+              "type": "mention",
+              "token": "@图片1",
+              "tag": "<Picture 1>",
+              "label": "图片1",
+              "fullLabel": "微信图片_20260817224235_127_208.png",
+              "mediaType": "image",
+              "referenceMode": "index",
+              "ordinal": 1,
+              "mediaIndex": 1,
+              "sourceId": 34,
+              "sourceSlot": 0,
+              "previewUrl": ""
+            },
+            {
+              "type": "text",
+              "text": ". The camera holds a medium-wide tracking shot as she steps forward at a relaxed pace, her apron and long hair swaying gently. She approaches a supermarket with sliding glass doors and a sign reading \"超市\" above the entrance. As she reaches the doorway, she slows and comes to a stop, tilting her head slightly as she gazes at the entrance.\n\noverall_soundscape: Light street ambience with distant traffic and occasional birdsong. Her soft footsteps tap against the pavement, and a faint mechanical hum from the supermarket grows louder as she nears the entrance.\n\nnon_diegetic_music: A light, cheerful flute melody at a moderate tempo, accompanied by gentle ukulele strumming.\n\n---\n\nFor the target video, at 0.00 seconds into the target video, "
+            },
+            {
+              "type": "mention",
+              "token": "@图片1",
+              "tag": "<Picture 1>",
+              "label": "图片1",
+              "fullLabel": "微信图片_20260817224235_127_208.png",
+              "mediaType": "image",
+              "referenceMode": "index",
+              "ordinal": 1,
+              "mediaIndex": 1,
+              "sourceId": 34,
+              "sourceSlot": 0,
+              "previewUrl": ""
+            },
+            {
+              "type": "text",
+              "text": " (from [Shot 1]) is fully referenced.\n\nintegrated_multimodal_description: [Shot 1] 2D-animated, chibi style, the young girl with long gradient blue hair, large blue eyes, fin-shaped blue ears, a white frilly headdress with blue bows, and a dark blue whale-themed maid dress with white frills and a whale-embroidered apron stands before the supermarket entrance, preserving her appearance, clothing, and colors from "
+            },
+            {
+              "type": "mention",
+              "token": "@图片1",
+              "tag": "<Picture 1>",
+              "label": "图片1",
+              "fullLabel": "微信图片_20260817224235_127_208.png",
+              "mediaType": "image",
+              "referenceMode": "index",
+              "ordinal": 1,
+              "mediaIndex": 1,
+              "sourceId": 34,
+              "sourceSlot": 0,
+              "previewUrl": ""
+            },
+            {
+              "type": "text",
+              "text": ". The camera pushes in with small amplitude at slow speed as she steps forward, and the sliding glass doors part automatically with a soft hiss. She walks through the doorway into a bright interior lined with illuminated shelves and colorful products, her long blue hair and white apron flowing behind her. The doors slide shut behind her as she continues walking down the main aisle.\n\noverall_soundscape: The sliding doors hiss open and then close behind her. Supermarket ambience fills the space with soft background chatter, occasional barcode scanner beeps, and the low hum of refrigerated display cases.\n\nnon_diegetic_music: The same light flute and ukulele motif continues at a moderate tempo, becoming slightly warmer as the scene moves indoors.\n\n"
+            }
+          ]
+        },
+        "minimax_h3_prompt_view_mode": "structured"
+      },
+      "widgets_values": [
+        "上下文分段",
+        "默认",
+        "For the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.\n\nintegrated_multimodal_description: [Shot 1] 2D-animated, chibi style, the young girl with long gradient blue hair, large blue eyes, fin-shaped blue ears, a white frilly headdress with blue bows, and a dark blue whale-themed maid dress with white frills and a whale-embroidered apron walks along a sunny street, preserving her appearance, clothing, and colors from <Picture 1>. The camera holds a medium-wide tracking shot as she steps forward at a relaxed pace, her apron and long hair swaying gently. She approaches a supermarket with sliding glass doors and a sign reading \"超市\" above the entrance. As she reaches the doorway, she slows and comes to a stop, tilting her head slightly as she gazes at the entrance.\n\noverall_soundscape: Light street ambience with distant traffic and occasional birdsong. Her soft footsteps tap against the pavement, and a faint mechanical hum from the supermarket grows louder as she nears the entrance.\n\nnon_diegetic_music: A light, cheerful flute melody at a moderate tempo, accompanied by gentle ukulele strumming.\n\n---\n\nFor the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.\n\nintegrated_multimodal_description: [Shot 1] 2D-animated, chibi style, the young girl with long gradient blue hair, large blue eyes, fin-shaped blue ears, a white frilly headdress with blue bows, and a dark blue whale-themed maid dress with white frills and a whale-embroidered apron stands before the supermarket entrance, preserving her appearance, clothing, and colors from <Picture 1>. The camera pushes in with small amplitude at slow speed as she steps forward, and the sliding glass doors part automatically with a soft hiss. She walks through the doorway into a bright interior lined with illuminated shelves and colorful products, her long blue hair and white apron flowing behind her. The doors slide shut behind her as she continues walking down the main aisle.\n\noverall_soundscape: The sliding doors hiss open and then close behind her. Supermarket ambience fills the space with soft background chatter, occasional barcode scanner beeps, and the low hum of refrigerated display cases.\n\nnon_diegetic_music: The same light flute and ukulele motif continues at a moderate tempo, becoming slightly warmer as the scene moves indoors.\n\n",
+        null,
+        "416P",
+        "16:9",
+        960,
+        544,
+        8,
+        "4,4",
+        22,
+        "RGB Guide",
+        true,
+        24,
+        "首帧优先",
+        "1K 面积（约1MP）",
+        "按序号",
+        false,
+        "openai",
+        "",
+        "",
+        "",
+        "仅通用方案",
+        false,
+        false,
+        "整体优化",
+        3
+      ],
+      "widgets_values_named": {
+        "mode": "上下文分段",
+        "audio_mode": "默认",
+        "prompt": "For the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.\n\nintegrated_multimodal_description: [Shot 1] 2D-animated, chibi style, the young girl with long gradient blue hair, large blue eyes, fin-shaped blue ears, a white frilly headdress with blue bows, and a dark blue whale-themed maid dress with white frills and a whale-embroidered apron walks along a sunny street, preserving her appearance, clothing, and colors from <Picture 1>. The camera holds a medium-wide tracking shot as she steps forward at a relaxed pace, her apron and long hair swaying gently. She approaches a supermarket with sliding glass doors and a sign reading \"超市\" above the entrance. As she reaches the doorway, she slows and comes to a stop, tilting her head slightly as she gazes at the entrance.\n\noverall_soundscape: Light street ambience with distant traffic and occasional birdsong. Her soft footsteps tap against the pavement, and a faint mechanical hum from the supermarket grows louder as she nears the entrance.\n\nnon_diegetic_music: A light, cheerful flute melody at a moderate tempo, accompanied by gentle ukulele strumming.\n\n---\n\nFor the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.\n\nintegrated_multimodal_description: [Shot 1] 2D-animated, chibi style, the young girl with long gradient blue hair, large blue eyes, fin-shaped blue ears, a white frilly headdress with blue bows, and a dark blue whale-themed maid dress with white frills and a whale-embroidered apron stands before the supermarket entrance, preserving her appearance, clothing, and colors from <Picture 1>. The camera pushes in with small amplitude at slow speed as she steps forward, and the sliding glass doors part automatically with a soft hiss. She walks through the doorway into a bright interior lined with illuminated shelves and colorful products, her long blue hair and white apron flowing behind her. The doors slide shut behind her as she continues walking down the main aisle.\n\noverall_soundscape: The sliding doors hiss open and then close behind her. Supermarket ambience fills the space with soft background chatter, occasional barcode scanner beeps, and the low hum of refrigerated display cases.\n\nnon_diegetic_music: The same light flute and ukulele motif continues at a moderate tempo, becoming slightly warmer as the scene moves indoors.\n\n",
+        "resolution": "416P",
+        "aspect_ratio": "16:9",
+        "width": 960,
+        "height": 544,
+        "seconds": 8,
+        "segment_seconds": "4,4",
+        "context_length": 22,
+        "continuity_mode": "RGB Guide",
+        "advanced": true,
+        "fps": 24,
+        "keyframe_role": "首帧优先",
+        "ref_image_size": "1K 面积（约1MP）",
+        "reference_mention_mode": "按序号",
+        "prompt_optimizer": false,
+        "prompt_optimizer_api_format": "openai",
+        "prompt_optimizer_api_url": "",
+        "prompt_optimizer_api_key": "",
+        "prompt_optimizer_model": "",
+        "prompt_optimizer_scene_guide": "仅通用方案",
+        "prompt_optimizer_read_media": false,
+        "prompt_optimizer_optimize_on_run": false,
+        "context_prompt_optimizer_mode": "整体优化",
+        "context_prompt_optimizer_concurrency": 3
+      }
+    },
+    {
+      "id": 26,
+      "type": "SaveVideo",
+      "pos": [
+        350.2514825427604,
+        -137.46004541205767
+      ],
+      "size": [
+        480.2836923422608,
+        369.4646956717126
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "video",
+          "type": "VIDEO",
+          "link": 560
+        }
+      ],
+      "outputs": [
+        {
+          "name": "video",
+          "type": "VIDEO",
+          "links": []
+        }
+      ],
+      "title": "第一采成片",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.30.0",
+        "Node name for S&R": "SaveVideo",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.5.2",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "video/H3Seg_FirstPass",
+        "auto",
+        "auto",
+        "auto"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "video/H3Seg_FirstPass",
+        "format": "auto",
+        "format.codec": "auto",
+        "codec": "auto"
+      },
+      "color": "#232",
+      "bgcolor": "#353"
+    },
+    {
+      "id": 24,
+      "type": "SaveVideo",
+      "pos": [
+        892.9499755187172,
+        -131.65932411816985
+      ],
+      "size": [
+        480.2836923422608,
+        369.4646956717126
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "video",
+          "type": "VIDEO",
+          "link": 558
+        }
+      ],
+      "outputs": [
+        {
+          "name": "video",
+          "type": "VIDEO",
+          "links": []
+        }
+      ],
+      "title": "分段二采成片",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.30.0",
+        "Node name for S&R": "SaveVideo",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.5.2",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "video/H3Seg_SegmentRefine_Latent",
+        "auto",
+        "auto",
+        "auto"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "video/H3Seg_SegmentRefine_Latent",
+        "format": "auto",
+        "format.codec": "auto",
+        "codec": "auto"
+      },
+      "color": "#232",
+      "bgcolor": "#353"
+    }
+  ],
+  "links": [
+    [
+      537,
+      1,
+      0,
+      2,
+      0,
+      "MINIMAX_H3_BUNDLE"
+    ],
+    [
+      539,
+      2,
+      1,
+      6,
+      0,
+      "MINIMAX_H3_CONTEXT"
+    ],
+    [
+      540,
+      3,
+      0,
+      5,
+      0,
+      "MODEL"
+    ],
+    [
+      541,
+      3,
+      0,
+      6,
+      1,
+      "MODEL"
+    ],
+    [
+      542,
+      4,
+      0,
+      6,
+      2,
+      "SAMPLER"
+    ],
+    [
+      543,
+      5,
+      0,
+      6,
+      3,
+      "SIGMAS"
+    ],
+    [
+      545,
+      6,
+      0,
+      29,
+      1,
+      "MINIMAX_H3_SEGMENTS"
+    ],
+    [
+      548,
+      2,
+      1,
+      29,
+      0,
+      "MINIMAX_H3_CONTEXT"
+    ],
+    [
+      550,
+      17,
+      0,
+      29,
+      3,
+      "SAMPLER"
+    ],
+    [
+      551,
+      19,
+      0,
+      29,
+      4,
+      "SIGMAS"
+    ],
+    [
+      555,
+      3,
+      0,
+      29,
+      2,
+      "MODEL"
+    ],
+    [
+      556,
+      3,
+      0,
+      19,
+      0,
+      "MODEL"
+    ],
+    [
+      557,
+      29,
+      0,
+      31,
+      0,
+      "MINIMAX_H3_SEGMENTS"
+    ],
+    [
+      558,
+      31,
+      0,
+      24,
+      0,
+      "VIDEO"
+    ],
+    [
+      559,
+      6,
+      0,
+      32,
+      0,
+      "MINIMAX_H3_SEGMENTS"
+    ],
+    [
+      560,
+      32,
+      0,
+      26,
+      0,
+      "VIDEO"
+    ],
+    [
+      561,
+      2,
+      0,
+      33,
+      0,
+      "MODEL"
+    ],
+    [
+      562,
+      33,
+      0,
+      3,
+      0,
+      "MODEL"
+    ],
+    [
+      563,
+      34,
+      0,
+      2,
+      1,
+      "MINIMAX_H3_MEDIA_BUNDLE"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "frontendVersion": "1.49.6",
+    "ds": {
+      "scale": 0.8264462809917356,
+      "offset": [
+        1264.0422747760938,
+        740.0011947072969
+      ]
+    },
+    "VHS_latentpreview": false,
+    "VHS_latentpreviewrate": 0,
+    "VHS_MetadataImage": true,
+    "VHS_KeepIntermediate": true
+  },
+  "version": 0.4
+}

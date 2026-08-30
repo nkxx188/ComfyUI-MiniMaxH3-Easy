@@ -49,8 +49,6 @@ You can also install them by searching for their names in ComfyUI Manager. Resta
 
 The plugins, models, and related assets used by the workflows are available here:
 
-<https://pan.quark.cn/s/8be70c7581e6?pwd=6LmC>
-
 - [LightX2V MiniMax H3 Turbo (official 8-step LoRA)](https://huggingface.co/lightx2v/Minimax-h3-Turbo)
 - [MiniMax H3 FL2VA pruned W4A8 (minimax_h3_fl2va_pruned_w4a8_mixed.safetensors)](https://huggingface.co/Kijai/MiniMax-H3-experimental)
 

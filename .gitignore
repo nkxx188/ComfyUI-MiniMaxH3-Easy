@@ -6,4 +6,5 @@ Thumbs.db
 .idea/
 .vscode/
 *.log
+prompt_optimizer.json
 tools/
