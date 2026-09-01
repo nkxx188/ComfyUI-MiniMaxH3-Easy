@@ -45,6 +45,7 @@ import folder_paths
 import node_helpers
 import nodes
 from comfy_api.latest import InputImpl, Types
+from comfy_execution.graph_utils import ExecutionBlocker
 from comfy_extras import nodes_audio, nodes_custom_sampler
 from comfy_extras import nodes_minimax_h3 as h3
 from .h3_latent_upscaler import MiniMaxH3EasyLatentUpscaler3D, scan_models as scan_latent_upscaler_models
@@ -2324,7 +2325,10 @@ class MiniMaxH3EasyMediaSplitter:
             for index in range(count):
                 value = values[index] if index < len(values) else None
                 if value is None:
-                    outputs.append(None)
+                    # Silently skip every downstream branch connected to an
+                    # unpopulated spare port. Populated sibling outputs remain
+                    # executable, including Save Image/Video/Audio nodes.
+                    outputs.append(ExecutionBlocker(None))
                     continue
                 if kind == "video":
                     value = self._standard_video(value)
