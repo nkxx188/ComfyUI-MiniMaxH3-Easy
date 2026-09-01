@@ -2317,11 +2317,15 @@ class MiniMaxH3EasyMediaSplitter:
             ("audio", MEDIA_SPLITTER_MAX_AUDIOS, counts["audio"]),
         ):
             values = by_type[kind]
-            if len(values) < count:
-                raise ValueError(
-                    f"Requested {count} {kind} output(s), but the Media Bundle contains only {len(values)}"
-                )
-            for index, value in enumerate(values[:count]):
+            # The count widgets control how many ports are visible, not how
+            # many resources the bundle must contain. This lets a workflow
+            # expose spare ports in advance without failing when only the
+            # first few resources are currently present.
+            for index in range(count):
+                value = values[index] if index < len(values) else None
+                if value is None:
+                    outputs.append(None)
+                    continue
                 if kind == "video":
                     value = self._standard_video(value)
                 elif kind == "audio":
