@@ -47,7 +47,7 @@ The Easy Loader can select FL2VA, Ref2VA, the text encoder, and both VAEs direct
 
 ## Quick start
 
-The fastest route is to import [`workflow/MiniMax_H3_Easy.json`](workflow/MiniMax_H3_Easy.json), then:
+The fastest route is to import [`workflow/1.MiniMax_H3_Easy.json`](workflow/1.MiniMax_H3_Easy.json), then:
 
 1. Select the models in **MiniMax H3 Easy Loader**.
 2. Select a mode in **MiniMax H3 Easy**.
@@ -89,15 +89,18 @@ Digital Human mode locks the single Media audio item into the generated result a
 
 ## Media and prompt editing
 
-### Three ways to provide media
+### Four ways to provide media
 
 | Method | Best for |
 |---|---|
 | **Media Loader** | Recommended daily use; manage media in one place with decoded-video reference caching |
 | **Direct Media-port links** | Connect ordinary image, video, and audio nodes; one visible port accepts multiple virtual links |
 | **Media Bridge** | Workflow API, headless execution, or workflows that need explicit numbered inputs |
+| **Media Splitter** | Split one Media Bundle into standalone image, video, and audio outputs for other workflows |
 
-Media Loader can hold a large shared library; the consuming Easy or Context Segments node applies the actual media limits. **Of the three input methods, only Media Loader caches decoded video references.** After a video is decoded once, later generations can reuse it through ComfyUI's node cache, reducing the loading and decoding time when the same reference video is used repeatedly. Replacing or modifying the file invalidates the cache automatically. Direct Media-port links and Media Bridge do not provide this decoded-video cache. It saves video preparation time, not the model's sampling time.
+Media Loader can hold a large shared library; the consuming Easy or Context Segments node applies the actual media limits. **Of the four methods, only Media Loader caches decoded video references.** After a video is decoded once, later generations can reuse it through ComfyUI's node cache, reducing the loading and decoding time when the same reference video is used repeatedly. Replacing or modifying the file invalidates the cache automatically. Direct Media-port links, Media Bridge, and Media Splitter do not provide this decoded-video cache. It saves video preparation time, not the model's sampling time.
+
+`Media Splitter` is the reverse utility of Media Loader / Media Bridge: it expands one `Media Bundle` into standard `IMAGE`, `VIDEO`, and `AUDIO` outputs. Set the three counts and only that many output ports are shown; unused ports do not take up canvas space. This makes it useful for sending one shared media library into other ComfyUI workflows.
 
 With direct Media links, drag from the port to an empty area to create a compatible media node, or click a virtual-link number to remove that item.
 
@@ -147,7 +150,13 @@ Context Segments → Segment Sample → Segment Decode → first-pass video
 
 Regular first-pass workflow:
 
-- [`MiniMax_H3_Easy_Context_Segments.json`](workflow/MiniMax_H3_Easy_Context_Segments.json)
+- [`4.MiniMax_H3_Easy_Context_Segments.json`](workflow/4.MiniMax_H3_Easy_Context_Segments.json)
+
+### Optional per-segment control
+
+If you only want one chain that generates every segment, use **Segment Sample**. To adjust seeds per segment, temporarily replace one segment's prompt, or optionally rerun only the affected part later, use [`7.MiniMax_H3_Easy_Context_Segments_Control.json`](workflow/7.MiniMax_H3_Easy_Context_Segments_Control.json). It connects the shared Context, Model, SAMPLER, and SIGMAS once through **MiniMax H3 Easy Sample Setup**, then chains multiple **Segment Step** nodes. The first run still generates the complete video; selective reruns are an extra capability.
+
+The first Step receives Setup; later Steps only connect `Previous segment`, and the segment order is inferred from the chain. Each Step has its own seed, while `Prompt override` is optional. If it is not connected, the Step keeps using the segment prompt and `@` media from Context Segments. The example contains 3 Steps; add or remove Steps as needed.
 
 ### Segment prompts and reference media
 
@@ -182,8 +191,8 @@ Context Segments also supports Digital Human audio mode. Connect exactly one aud
 
 Example workflows:
 
-- [`MiniMax_H3_Easy_Context_Segments_Pixel_Refine.json`](workflow/MiniMax_H3_Easy_Context_Segments_Pixel_Refine.json)
-- [`MiniMax_H3_Easy_Context_Segments_Latent_Refine.json`](workflow/MiniMax_H3_Easy_Context_Segments_Latent_Refine.json)
+- [`6.MiniMax_H3_Easy_Context_Segments_Pixel_Refine.json`](workflow/6.MiniMax_H3_Easy_Context_Segments_Pixel_Refine.json)
+- [`5.MiniMax_H3_Easy_Context_Segments_Latent_Refine.json`](workflow/5.MiniMax_H3_Easy_Context_Segments_Latent_Refine.json)
 
 Segment Decode decodes one segment at a time into a temporary video file and returns a complete ComfyUI `VIDEO` with audio. It does not keep the full RGB timeline in memory.
 
@@ -229,10 +238,14 @@ API settings belong to each node and are serialized into the workflow. This make
 | MiniMax H3 Easy Model Adapter | Use external MODEL, CLIP, and VAE loaders |
 | MiniMax H3 Easy Media Loader | Visually manage images, audio, and video |
 | MiniMax H3 Easy Media Bridge | Provide explicit media inputs for API or headless workflows |
+| MiniMax H3 Easy Media Splitter | Split a Media Bundle into standalone IMAGE, VIDEO, and AUDIO outputs; up to 27 images, 9 videos, and 9 audio clips |
 | MiniMax H3 Easy | Regular generation, reference generation, and Digital Human |
 | MiniMax H3 Easy Output | Expand H3 Context into conditioning, latent, VAEs, FPS, and driving audio |
 | MiniMax H3 Easy Context Segments | Build a long-video segment plan |
 | MiniMax H3 Easy Segment Sample | Run the first-pass segment chain |
+| MiniMax H3 Easy Sample Setup | Provide shared sampling settings once for per-segment workflows |
+| MiniMax H3 Easy Segment Step | Process one segment with an independent seed and optional prompt override |
+| MiniMax H3 Easy Segment Collect | Collect the chained segment results |
 | MiniMax H3 Easy Segment Refine | Run Pixel or Latent per-segment refinement |
 | MiniMax H3 Easy Segment Decode | Stream-decode and return a complete VIDEO |
 | MiniMax H3 Easy Aspect Ratio | Pass the first-pass aspect ratio to downstream resolution controls |
@@ -245,7 +258,7 @@ API settings belong to each node and are serialized into the workflow. This make
 - The Context Segments shared library accepts up to 27 images, 9 videos, and 9 audio clips. Each individual segment still follows the regular per-call reference limits.
 - Digital Human mode accepts only one driving audio track.
 - Media Loader caches decoded frames. Long or high-resolution reference videos can use substantial system RAM.
-- Context Segment Sample and Segment Refine currently execute again on every queue, even when their seed and inputs are unchanged.
+- The regular Segment Sample and Segment Refine nodes currently execute again on every queue, even when their seed and inputs are unchanged; the per-segment control workflow can use ComfyUI's native cache for unchanged preceding Steps.
 - Segment Decode requires FFmpeg. The project prefers `imageio-ffmpeg` and can also use FFmpeg from the system PATH.
 - Prompt optimization is optional and is not required for generation.
 

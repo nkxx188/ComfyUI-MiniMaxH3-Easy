@@ -1,0 +1,1007 @@
+{
+  "id": "d827d6c0-284a-491f-ba96-ebf75ea08ad9",
+  "revision": 0,
+  "last_node_id": 25,
+  "last_link_id": 548,
+  "nodes": [
+    {
+      "id": 10,
+      "type": "ModelAttentionBackend",
+      "pos": [
+        -165,
+        -485
+      ],
+      "size": [
+        270,
+        58
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 512
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            510
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.33.0",
+        "Node name for S&R": "ModelAttentionBackend"
+      },
+      "widgets_values": [
+        "comfy kitchen attention"
+      ],
+      "widgets_values_named": {
+        "attention": "comfy kitchen attention"
+      }
+    },
+    {
+      "id": 3,
+      "type": "LoraLoaderModelOnly",
+      "pos": [
+        -165,
+        -365
+      ],
+      "size": [
+        273.60542420351,
+        82
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 510
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            503,
+            516
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.31.0",
+        "Node name for S&R": "LoraLoaderModelOnly",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.2"
+        }
+      },
+      "widgets_values": [
+        "minimax_h3_fl2v_turbo_4step_v1.0_768p_comfyui_bf16.safetensors",
+        1
+      ],
+      "widgets_values_named": {
+        "lora_name": "minimax_h3_fl2v_turbo_4step_v1.0_768p_comfyui_bf16.safetensors",
+        "strength_model": 1
+      },
+      "color": "#223",
+      "bgcolor": "#335"
+    },
+    {
+      "id": 4,
+      "type": "KSamplerSelect",
+      "pos": [
+        -165,
+        -95
+      ],
+      "size": [
+        210,
+        58
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "SAMPLER",
+          "type": "SAMPLER",
+          "links": [
+            519
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.30.0",
+        "Node name for S&R": "KSamplerSelect",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.5.2",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "euler"
+      ],
+      "widgets_values_named": {
+        "sampler_name": "euler"
+      }
+    },
+    {
+      "id": 5,
+      "type": "BasicScheduler",
+      "pos": [
+        -165,
+        -235
+      ],
+      "size": [
+        210,
+        106
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 503
+        }
+      ],
+      "outputs": [
+        {
+          "name": "SIGMAS",
+          "type": "SIGMAS",
+          "links": [
+            522
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.30.0",
+        "Node name for S&R": "BasicScheduler",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.5.2",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "beta",
+        4,
+        1
+      ],
+      "widgets_values_named": {
+        "scheduler": "beta",
+        "steps": 4,
+        "denoise": 1
+      }
+    },
+    {
+      "id": 1,
+      "type": "MiniMaxH3EasyLoader",
+      "pos": [
+        -1210,
+        -490
+      ],
+      "size": [
+        430,
+        156
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "FL2VA 模型",
+          "name": "fl2va_model",
+          "type": "COMBO",
+          "widget": {
+            "name": "fl2va_model"
+          },
+          "link": null
+        },
+        {
+          "label": "REF2VA 模型",
+          "name": "ref2va_model",
+          "type": "COMBO",
+          "widget": {
+            "name": "ref2va_model"
+          },
+          "link": null
+        },
+        {
+          "label": "文本编码器",
+          "name": "text_encoder",
+          "type": "COMBO",
+          "widget": {
+            "name": "text_encoder"
+          },
+          "link": null
+        },
+        {
+          "label": "视频 VAE",
+          "name": "video_vae",
+          "type": "COMBO",
+          "widget": {
+            "name": "video_vae"
+          },
+          "link": null
+        },
+        {
+          "label": "音频 VAE",
+          "name": "audio_vae",
+          "type": "COMBO",
+          "widget": {
+            "name": "audio_vae"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "h3_bundle",
+          "type": "MINIMAX_H3_BUNDLE",
+          "links": [
+            501
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-minimaxh3-easy",
+        "ver": "1.0.9",
+        "Node name for S&R": "MiniMaxH3EasyLoader"
+      },
+      "widgets_values": [
+        "minimax_h3_fl2va_int8_convrot.safetensors",
+        "无",
+        "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+        "minimax_h3_video_vae_fp16.safetensors",
+        "minimax_h3_audio_vae_fp32.safetensors"
+      ],
+      "widgets_values_named": {
+        "fl2va_model": "minimax_h3_fl2va_int8_convrot.safetensors",
+        "ref2va_model": "无",
+        "text_encoder": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+        "video_vae": "minimax_h3_video_vae_fp16.safetensors",
+        "audio_vae": "minimax_h3_audio_vae_fp32.safetensors"
+      }
+    },
+    {
+      "id": 11,
+      "type": "MiniMaxH3EasyMediaLoader",
+      "pos": [
+        -1155,
+        -255
+      ],
+      "size": [
+        320,
+        316
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "label": "Media bundle",
+          "name": "media_bundle",
+          "type": "MINIMAX_H3_MEDIA_BUNDLE",
+          "links": [
+            513
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-minimaxh3-easy",
+        "ver": "4138b716fc3e2a2780487c5e9cf2e3c5903afc92",
+        "Node name for S&R": "MiniMaxH3EasyMediaLoader",
+        "media_loader_state": "{\"images\":[{\"filename\":\"downloaded-image.jpeg\"}],\"audios\":[],\"videos\":[]}"
+      },
+      "widgets_values": [
+        "{\"images\":[{\"filename\":\"downloaded-image.jpeg\"}],\"audios\":[],\"videos\":[]}"
+      ],
+      "widgets_values_named": {
+        "media_state": "{\"images\":[{\"filename\":\"downloaded-image.jpeg\"}],\"audios\":[],\"videos\":[]}"
+      }
+    },
+    {
+      "id": 17,
+      "type": "MiniMaxH3EasySegmentSampleSetup",
+      "pos": [
+        144.38648066244878,
+        -423.1308426569879
+      ],
+      "size": [
+        242.4181538010996,
+        86
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "H3 Context",
+          "name": "h3_context",
+          "type": "MINIMAX_H3_CONTEXT",
+          "link": 525
+        },
+        {
+          "label": "Model",
+          "name": "model",
+          "type": "MODEL",
+          "link": 516
+        },
+        {
+          "name": "sampler",
+          "type": "SAMPLER",
+          "link": 519
+        },
+        {
+          "name": "sigmas",
+          "type": "SIGMAS",
+          "link": 522
+        }
+      ],
+      "outputs": [
+        {
+          "label": "采样设置",
+          "name": "setup",
+          "type": "MINIMAX_H3_SEGMENT_SAMPLE_SETUP",
+          "links": [
+            540
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-minimaxh3-easy",
+        "ver": "1.0.14",
+        "Node name for S&R": "MiniMaxH3EasySegmentSampleSetup"
+      }
+    },
+    {
+      "id": 19,
+      "type": "MiniMaxH3EasySegmentStep",
+      "pos": [
+        420.76843370726516,
+        -447.07424678476997
+      ],
+      "size": [
+        255.78121679456888,
+        122
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "上一分段",
+          "name": "previous_segment",
+          "shape": 7,
+          "type": "MINIMAX_H3_SEGMENT_STEP",
+          "link": null
+        },
+        {
+          "label": "提示词覆盖",
+          "name": "prompt_override",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "label": "采样设置",
+          "name": "sample_setup",
+          "shape": 7,
+          "type": "MINIMAX_H3_SEGMENT_SAMPLE_SETUP",
+          "link": 540
+        }
+      ],
+      "outputs": [
+        {
+          "label": "分段结果",
+          "name": "segment",
+          "type": "MINIMAX_H3_SEGMENT_STEP",
+          "links": [
+            542
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-minimaxh3-easy",
+        "ver": "4138b716fc3e2a2780487c5e9cf2e3c5903afc92",
+        "Node name for S&R": "MiniMaxH3EasySegmentStep"
+      },
+      "widgets_values": [
+        1,
+        "fixed"
+      ],
+      "widgets_values_named": {
+        "seed": 1,
+        "control_after_generate": "fixed"
+      }
+    },
+    {
+      "id": 20,
+      "type": "MiniMaxH3EasySegmentStep",
+      "pos": [
+        697.3498724347539,
+        -447.2123184163158
+      ],
+      "size": [
+        250.6294748930046,
+        122
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "上一分段",
+          "name": "previous_segment",
+          "shape": 7,
+          "type": "MINIMAX_H3_SEGMENT_STEP",
+          "link": 542
+        },
+        {
+          "label": "提示词覆盖",
+          "name": "prompt_override",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "label": "采样设置",
+          "name": "sample_setup",
+          "shape": 7,
+          "type": "MINIMAX_H3_SEGMENT_SAMPLE_SETUP",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "label": "分段结果",
+          "name": "segment",
+          "type": "MINIMAX_H3_SEGMENT_STEP",
+          "links": [
+            543
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-minimaxh3-easy",
+        "ver": "4138b716fc3e2a2780487c5e9cf2e3c5903afc92",
+        "Node name for S&R": "MiniMaxH3EasySegmentStep"
+      },
+      "widgets_values": [
+        1,
+        "fixed"
+      ],
+      "widgets_values_named": {
+        "seed": 1,
+        "control_after_generate": "fixed"
+      }
+    },
+    {
+      "id": 21,
+      "type": "MiniMaxH3EasySegmentStep",
+      "pos": [
+        966.3102574935465,
+        -450.39739238840957
+      ],
+      "size": [
+        233.45647344487918,
+        122
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "上一分段",
+          "name": "previous_segment",
+          "shape": 7,
+          "type": "MINIMAX_H3_SEGMENT_STEP",
+          "link": 543
+        },
+        {
+          "label": "提示词覆盖",
+          "name": "prompt_override",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "label": "采样设置",
+          "name": "sample_setup",
+          "shape": 7,
+          "type": "MINIMAX_H3_SEGMENT_SAMPLE_SETUP",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "label": "分段结果",
+          "name": "segment",
+          "type": "MINIMAX_H3_SEGMENT_STEP",
+          "links": [
+            546
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-minimaxh3-easy",
+        "ver": "4138b716fc3e2a2780487c5e9cf2e3c5903afc92",
+        "Node name for S&R": "MiniMaxH3EasySegmentStep"
+      },
+      "widgets_values": [
+        1,
+        "fixed"
+      ],
+      "widgets_values_named": {
+        "seed": 1,
+        "control_after_generate": "fixed"
+      }
+    },
+    {
+      "id": 22,
+      "type": "MiniMaxH3EasySegmentCollect",
+      "pos": [
+        1220.4142638000637,
+        -464.9077734354031
+      ],
+      "size": [
+        250.83556720913376,
+        26
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "分段结果",
+          "name": "final_segment",
+          "type": "MINIMAX_H3_SEGMENT_STEP",
+          "link": 546
+        }
+      ],
+      "outputs": [
+        {
+          "label": "分段结果",
+          "name": "segments",
+          "type": "MINIMAX_H3_SEGMENTS",
+          "links": [
+            547
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-minimaxh3-easy",
+        "ver": "4138b716fc3e2a2780487c5e9cf2e3c5903afc92",
+        "Node name for S&R": "MiniMaxH3EasySegmentCollect"
+      }
+    },
+    {
+      "id": 12,
+      "type": "MiniMaxH3EasySegmentDecode",
+      "pos": [
+        1225.4027673079097,
+        -390.1918729262326
+      ],
+      "size": [
+        272.4859375,
+        26
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "segments",
+          "type": "MINIMAX_H3_SEGMENTS",
+          "link": 547
+        }
+      ],
+      "outputs": [
+        {
+          "name": "preview",
+          "type": "VIDEO",
+          "links": [
+            515
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-minimaxh3-easy",
+        "ver": "4138b716fc3e2a2780487c5e9cf2e3c5903afc92",
+        "Node name for S&R": "MiniMaxH3EasySegmentDecode"
+      }
+    },
+    {
+      "id": 8,
+      "type": "SaveVideo",
+      "pos": [
+        1229.5680297013043,
+        -320.0411582593845
+      ],
+      "size": [
+        480.2836923422608,
+        106
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "video",
+          "type": "VIDEO",
+          "link": 515
+        }
+      ],
+      "outputs": [
+        {
+          "name": "video",
+          "type": "VIDEO",
+          "links": []
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.30.0",
+        "Node name for S&R": "SaveVideo",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.5.2",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "video/H3Seg_Local_Rerun",
+        "auto",
+        "auto",
+        "auto"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "video/H3Seg_Local_Rerun",
+        "format": "auto",
+        "format.codec": "auto",
+        "codec": "auto"
+      },
+      "color": "#232",
+      "bgcolor": "#353"
+    },
+    {
+      "id": 2,
+      "type": "MiniMaxH3EasyContextSegments",
+      "pos": [
+        -690,
+        -470
+      ],
+      "size": [
+        430,
+        520
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "H3 模型组合",
+          "name": "h3_bundle",
+          "type": "MINIMAX_H3_BUNDLE",
+          "link": 501
+        },
+        {
+          "label": "Media",
+          "name": "media",
+          "shape": 7,
+          "type": "*",
+          "link": 513
+        }
+      ],
+      "outputs": [
+        {
+          "label": "Model",
+          "name": "model",
+          "type": "MODEL",
+          "links": [
+            512
+          ]
+        },
+        {
+          "label": "H3 Context",
+          "name": "h3_context",
+          "type": "MINIMAX_H3_CONTEXT",
+          "links": [
+            525
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-minimaxh3-easy",
+        "ver": "404e6e8c3af4d013c275f773da09e181765cdc14",
+        "Node name for S&R": "MiniMaxH3EasyContextSegments",
+        "minimax_h3_virtual_media_links": [],
+        "minimax_h3_prompt_reference_doc": {
+          "version": 1,
+          "text": "For the target video, at 0.00 seconds into the target video, <Picture 1> is fully referenced.\n\nintegrated_multimodal_description: Pixel art style. The farmer from <Picture 1>, wearing his straw hat and blue plaid shirt, stands in a sunny orchard. The camera pans slowly as he reaches up and plucks a ripe red apple from a tree branch.\n\noverall_soundscape: Soft rustling of leaves and distant birds chirping.\n\nnon_diegetic_music: Light, cheerful acoustic guitar melody.\n\n---\n\nintegrated_multimodal_description: Pixel art style. The farmer from <Picture 1> holds the plucked red apple in his gloved hand. The camera slowly pushes in as he smiles and wipes the apple against his blue plaid shirt.\n\noverall_soundscape: Soft fabric rustling against the apple.\n\nnon_diegetic_music: Gentle acoustic guitar notes continuing.\n\n---\n\nintegrated_multimodal_description: Pixel art style. The farmer from <Picture 1> lifts the red apple and takes a crisp bite. The camera holds a static close-up as he chews with a satisfied expression.\n\noverall_soundscape: A loud, crisp crunch of biting into an apple.\n\nnon_diegetic_music: A warm acoustic guitar chord fading out.",
+          "parts": [
+            {
+              "type": "text",
+              "text": "For the target video, at 0.00 seconds into the target video, "
+            },
+            {
+              "type": "mention",
+              "token": "@图片1",
+              "tag": "<Picture 1>",
+              "label": "图片1",
+              "fullLabel": "downloaded-image.jpeg",
+              "mediaType": "image",
+              "referenceMode": "index",
+              "ordinal": 1,
+              "mediaIndex": 1,
+              "sourceId": 11,
+              "sourceSlot": 0,
+              "previewUrl": "/view?filename=downloaded-image.jpeg&type=input"
+            },
+            {
+              "type": "text",
+              "text": " is fully referenced.\n\nintegrated_multimodal_description: Pixel art style. The farmer from "
+            },
+            {
+              "type": "mention",
+              "token": "@图片1",
+              "tag": "<Picture 1>",
+              "label": "图片1",
+              "fullLabel": "downloaded-image.jpeg",
+              "mediaType": "image",
+              "referenceMode": "index",
+              "ordinal": 1,
+              "mediaIndex": 1,
+              "sourceId": 11,
+              "sourceSlot": 0,
+              "previewUrl": "/view?filename=downloaded-image.jpeg&type=input"
+            },
+            {
+              "type": "text",
+              "text": ", wearing his straw hat and blue plaid shirt, stands in a sunny orchard. The camera pans slowly as he reaches up and plucks a ripe red apple from a tree branch.\n\noverall_soundscape: Soft rustling of leaves and distant birds chirping.\n\nnon_diegetic_music: Light, cheerful acoustic guitar melody.\n\n---\n\nintegrated_multimodal_description: Pixel art style. The farmer from "
+            },
+            {
+              "type": "mention",
+              "token": "@图片1",
+              "tag": "<Picture 1>",
+              "label": "图片1",
+              "fullLabel": "downloaded-image.jpeg",
+              "mediaType": "image",
+              "referenceMode": "index",
+              "ordinal": 1,
+              "mediaIndex": 1,
+              "sourceId": 11,
+              "sourceSlot": 0,
+              "previewUrl": "/view?filename=downloaded-image.jpeg&type=input"
+            },
+            {
+              "type": "text",
+              "text": " holds the plucked red apple in his gloved hand. The camera slowly pushes in as he smiles and wipes the apple against his blue plaid shirt.\n\noverall_soundscape: Soft fabric rustling against the apple.\n\nnon_diegetic_music: Gentle acoustic guitar notes continuing.\n\n---\n\nintegrated_multimodal_description: Pixel art style. The farmer from "
+            },
+            {
+              "type": "mention",
+              "token": "@图片1",
+              "tag": "<Picture 1>",
+              "label": "图片1",
+              "fullLabel": "downloaded-image.jpeg",
+              "mediaType": "image",
+              "referenceMode": "index",
+              "ordinal": 1,
+              "mediaIndex": 1,
+              "sourceId": 11,
+              "sourceSlot": 0,
+              "previewUrl": "/view?filename=downloaded-image.jpeg&type=input"
+            },
+            {
+              "type": "text",
+              "text": " lifts the red apple and takes a crisp bite. The camera holds a static close-up as he chews with a satisfied expression.\n\noverall_soundscape: A loud, crisp crunch of biting into an apple.\n\nnon_diegetic_music: A warm acoustic guitar chord fading out."
+            }
+          ]
+        },
+        "minimax_h3_prompt_view_mode": "structured"
+      },
+      "widgets_values": [
+        "上下文分段",
+        "默认",
+        "For the target video, at 0.00 seconds into the target video, <Picture 1> is fully referenced.\n\nintegrated_multimodal_description: Pixel art style. The farmer from <Picture 1>, wearing his straw hat and blue plaid shirt, stands in a sunny orchard. The camera pans slowly as he reaches up and plucks a ripe red apple from a tree branch.\n\noverall_soundscape: Soft rustling of leaves and distant birds chirping.\n\nnon_diegetic_music: Light, cheerful acoustic guitar melody.\n\n---\n\nintegrated_multimodal_description: Pixel art style. The farmer from <Picture 1> holds the plucked red apple in his gloved hand. The camera slowly pushes in as he smiles and wipes the apple against his blue plaid shirt.\n\noverall_soundscape: Soft fabric rustling against the apple.\n\nnon_diegetic_music: Gentle acoustic guitar notes continuing.\n\n---\n\nintegrated_multimodal_description: Pixel art style. The farmer from <Picture 1> lifts the red apple and takes a crisp bite. The camera holds a static close-up as he chews with a satisfied expression.\n\noverall_soundscape: A loud, crisp crunch of biting into an apple.\n\nnon_diegetic_music: A warm acoustic guitar chord fading out.",
+        null,
+        "480P",
+        "16:9",
+        1344,
+        768,
+        12,
+        "4,4,4",
+        22,
+        "RGB Guide",
+        true,
+        24,
+        "首帧优先",
+        "1K 面积（约1MP）",
+        "按序号",
+        false,
+        "仅通用方案",
+        "整体优化",
+        3
+      ],
+      "widgets_values_named": {
+        "mode": "上下文分段",
+        "audio_mode": "默认",
+        "prompt": "For the target video, at 0.00 seconds into the target video, <Picture 1> is fully referenced.\n\nintegrated_multimodal_description: Pixel art style. The farmer from <Picture 1>, wearing his straw hat and blue plaid shirt, stands in a sunny orchard. The camera pans slowly as he reaches up and plucks a ripe red apple from a tree branch.\n\noverall_soundscape: Soft rustling of leaves and distant birds chirping.\n\nnon_diegetic_music: Light, cheerful acoustic guitar melody.\n\n---\n\nintegrated_multimodal_description: Pixel art style. The farmer from <Picture 1> holds the plucked red apple in his gloved hand. The camera slowly pushes in as he smiles and wipes the apple against his blue plaid shirt.\n\noverall_soundscape: Soft fabric rustling against the apple.\n\nnon_diegetic_music: Gentle acoustic guitar notes continuing.\n\n---\n\nintegrated_multimodal_description: Pixel art style. The farmer from <Picture 1> lifts the red apple and takes a crisp bite. The camera holds a static close-up as he chews with a satisfied expression.\n\noverall_soundscape: A loud, crisp crunch of biting into an apple.\n\nnon_diegetic_music: A warm acoustic guitar chord fading out.",
+        "resolution": "480P",
+        "aspect_ratio": "16:9",
+        "width": 1344,
+        "height": 768,
+        "seconds": 12,
+        "segment_seconds": "4,4,4",
+        "context_length": 22,
+        "continuity_mode": "RGB Guide",
+        "advanced": true,
+        "fps": 24,
+        "keyframe_role": "首帧优先",
+        "ref_image_size": "1K 面积（约1MP）",
+        "reference_mention_mode": "按序号",
+        "prompt_optimizer_settings": false,
+        "prompt_optimizer_scene_guide": "仅通用方案",
+        "context_prompt_optimizer_mode": "整体优化",
+        "context_prompt_optimizer_concurrency": 3
+      }
+    }
+  ],
+  "links": [
+    [
+      501,
+      1,
+      0,
+      2,
+      0,
+      "MINIMAX_H3_BUNDLE"
+    ],
+    [
+      503,
+      3,
+      0,
+      5,
+      0,
+      "MODEL"
+    ],
+    [
+      510,
+      10,
+      0,
+      3,
+      0,
+      "MODEL"
+    ],
+    [
+      512,
+      2,
+      0,
+      10,
+      0,
+      "MODEL"
+    ],
+    [
+      513,
+      11,
+      0,
+      2,
+      1,
+      "MINIMAX_H3_MEDIA_BUNDLE"
+    ],
+    [
+      515,
+      12,
+      0,
+      8,
+      0,
+      "VIDEO"
+    ],
+    [
+      516,
+      3,
+      0,
+      17,
+      1,
+      "MODEL"
+    ],
+    [
+      519,
+      4,
+      0,
+      17,
+      2,
+      "SAMPLER"
+    ],
+    [
+      522,
+      5,
+      0,
+      17,
+      3,
+      "SIGMAS"
+    ],
+    [
+      525,
+      2,
+      1,
+      17,
+      0,
+      "MINIMAX_H3_CONTEXT"
+    ],
+    [
+      540,
+      17,
+      0,
+      19,
+      2,
+      "MINIMAX_H3_SEGMENT_SAMPLE_SETUP"
+    ],
+    [
+      542,
+      19,
+      0,
+      20,
+      0,
+      "MINIMAX_H3_SEGMENT_STEP"
+    ],
+    [
+      543,
+      20,
+      0,
+      21,
+      0,
+      "MINIMAX_H3_SEGMENT_STEP"
+    ],
+    [
+      546,
+      21,
+      0,
+      22,
+      0,
+      "MINIMAX_H3_SEGMENT_STEP"
+    ],
+    [
+      547,
+      22,
+      0,
+      12,
+      0,
+      "MINIMAX_H3_SEGMENTS"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "frontendVersion": "1.49.6",
+    "ds": {
+      "scale": 0.6363636363636387,
+      "offset": [
+        1150.5480723131611,
+        910.2217857142314
+      ]
+    },
+    "VHS_latentpreview": false,
+    "VHS_latentpreviewrate": 0,
+    "VHS_MetadataImage": true,
+    "VHS_KeepIntermediate": true
+  },
+  "version": 0.4
+}

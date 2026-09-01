@@ -28,8 +28,9 @@ import weakref
 from collections import OrderedDict
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import lru_cache
+from fractions import Fraction
 from typing import Any
 
 import torch
@@ -43,7 +44,7 @@ import comfy.model_management
 import folder_paths
 import node_helpers
 import nodes
-from comfy_api.latest import InputImpl
+from comfy_api.latest import InputImpl, Types
 from comfy_extras import nodes_audio, nodes_custom_sampler
 from comfy_extras import nodes_minimax_h3 as h3
 from .h3_latent_upscaler import MiniMaxH3EasyLatentUpscaler3D, scan_models as scan_latent_upscaler_models
@@ -131,8 +132,16 @@ MAX_MEDIA = 15
 MAX_IMAGES = 9
 MAX_VIDEOS = 3
 MAX_AUDIOS = 3
+# The splitter is a general-purpose counterpart to Media Bridge.  It accepts
+# the larger context-library budget while keeping a finite, stable output
+# schema for ComfyUI workflows.
+MEDIA_SPLITTER_MAX_IMAGES = 27
+MEDIA_SPLITTER_MAX_VIDEOS = 9
+MEDIA_SPLITTER_MAX_AUDIOS = 9
 MEDIA_BUNDLE_TYPE = "MINIMAX_H3_MEDIA_BUNDLE"
 SEGMENT_RESULT_TYPE = "MINIMAX_H3_SEGMENTS"
+SEGMENT_STEP_TYPE = "MINIMAX_H3_SEGMENT_STEP"
+SEGMENT_SAMPLE_SETUP_TYPE = "MINIMAX_H3_SEGMENT_SAMPLE_SETUP"
 MIN_SECONDS = 0.2
 MAX_SECONDS = 30.0
 REFERENCE_VIDEO_CACHE_MAX_ENTRIES = 2
@@ -218,6 +227,14 @@ SEGMENT_REFINE_TILED = "tiled_low_vram"
 SEGMENT_REFINE_EXECUTION_MODES = (
     SEGMENT_REFINE_WHOLE,
     SEGMENT_REFINE_TILED,
+)
+SELECTED_VIDEO_SEGMENT_WHOLE = "whole_video"
+SELECTED_VIDEO_SEGMENT_TIME_CUTS = "time_cuts"
+SELECTED_VIDEO_SEGMENT_FRAME_CUTS = "frame_cuts"
+SELECTED_VIDEO_SEGMENT_MODES = (
+    SELECTED_VIDEO_SEGMENT_WHOLE,
+    SELECTED_VIDEO_SEGMENT_TIME_CUTS,
+    SELECTED_VIDEO_SEGMENT_FRAME_CUTS,
 )
 # Keep the canonical divider narrow enough to avoid splitting prompt prose, but
 # accept the harmless escaping that chat agents sometimes add while emitting a
@@ -1920,6 +1937,10 @@ class MiniMaxH3Context:
     keyframe_sources: tuple[_MiniMaxH3KeyframeSource, ...] = ()
     segment_plan: Any = None
     source_audio: Mapping[str, Any] | None = None
+    # A selected candidate VIDEO can travel with the dedicated selected-video
+    # context node. Existing Easy/Context Segments contexts leave this unset,
+    # so the field remains backwards-compatible with older workflows.
+    selected_video: Any = None
 
 
 @dataclass(frozen=True)
@@ -1930,6 +1951,35 @@ class MiniMaxH3SegmentSample:
     audio_latent: torch.Tensor
     head_frames: int
     delivery_frames: int
+    # Optional exact source/output frame count. H3 latent segments are rounded
+    # up to the native 17k+5 grid, while imported candidate-video intervals can
+    # be shorter; this lets the decoder preserve the requested timeline.
+    output_frames: int | None = None
+    # Step nodes preserve the effective local prompt/media so the collector
+    # can rebuild the final plan, including an optional external prompt override.
+    prompt: str | None = None
+    media: tuple[Any, ...] | None = None
+
+
+@dataclass(frozen=True)
+class MiniMaxH3SegmentSampleSetup:
+    """Shared inputs used by every per-segment first-pass step."""
+
+    context: MiniMaxH3Context
+    model: Any
+    sampler: Any
+    sigmas: Any
+
+
+@dataclass(frozen=True)
+class MiniMaxH3SegmentStep:
+    """One cacheable context segment and the shared plan that produced it."""
+
+    plan: Mapping[str, Any]
+    sample: MiniMaxH3SegmentSample
+    index: int
+    setup: MiniMaxH3SegmentSampleSetup
+    previous: "MiniMaxH3SegmentStep | None" = None
 
 
 @dataclass(frozen=True)
@@ -2162,6 +2212,122 @@ class MiniMaxH3EasyMediaBridge:
                 input_index += 1
                 items.append(_MediaInput(input_index, media_type, value))
         return (MiniMaxH3MediaBundle(tuple(items)),)
+
+
+class MiniMaxH3EasyMediaSplitter:
+    """Expose individual standard media values from one Media Bundle."""
+
+    CATEGORY = "MiniMax H3 Easy"
+    FUNCTION = "split"
+    # Outputs are rebuilt in the frontend according to the three count
+    # widgets.  `*` keeps the transport connectable to any standard ComfyUI
+    # media input while the runtime tuple contains only the active outputs.
+    RETURN_TYPES = ("*",) * (
+        MEDIA_SPLITTER_MAX_IMAGES + MEDIA_SPLITTER_MAX_VIDEOS + MEDIA_SPLITTER_MAX_AUDIOS
+    )
+    RETURN_NAMES = (
+        *(f"image_{index}" for index in range(1, MEDIA_SPLITTER_MAX_IMAGES + 1)),
+        *(f"video_{index}" for index in range(1, MEDIA_SPLITTER_MAX_VIDEOS + 1)),
+        *(f"audio_{index}" for index in range(1, MEDIA_SPLITTER_MAX_AUDIOS + 1)),
+    )
+    DESCRIPTION = (
+        "Split one Media Bundle into standard IMAGE, VIDEO, and AUDIO outputs. "
+        "Set the counts to expose the resources you want to use downstream."
+    )
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "media_bundle": (MEDIA_BUNDLE_TYPE,),
+                "image_count": (
+                    "INT",
+                    {"default": 1, "min": 0, "max": MEDIA_SPLITTER_MAX_IMAGES, "step": 1},
+                ),
+                "video_count": (
+                    "INT",
+                    {"default": 0, "min": 0, "max": MEDIA_SPLITTER_MAX_VIDEOS, "step": 1},
+                ),
+                "audio_count": (
+                    "INT",
+                    {"default": 0, "min": 0, "max": MEDIA_SPLITTER_MAX_AUDIOS, "step": 1},
+                ),
+            }
+        }
+
+    @staticmethod
+    def _standard_video(value: Any) -> Any:
+        """Return a ComfyUI VIDEO payload without decoding a file a second time."""
+        if hasattr(value, "get_components"):
+            return value
+        if isinstance(value, Mapping):
+            frames = value.get("images")
+            if frames is None:
+                frames = value.get("frames")
+            if isinstance(frames, torch.Tensor) and frames.ndim == 4 and frames.shape[0] > 0:
+                audio = value.get("audio")
+                fps = value.get("fps") or value.get("frame_rate") or 24.0
+                waveform = audio.get("waveform") if isinstance(audio, Mapping) else None
+                audio_payload = None
+                if isinstance(waveform, torch.Tensor):
+                    audio_payload = {
+                        "waveform": waveform,
+                        "sample_rate": _audio_sample_rate(audio),
+                    }
+                try:
+                    components = Types.VideoComponents(
+                        images=frames,
+                        frame_rate=Fraction(str(float(fps))),
+                        audio=audio_payload,
+                    )
+                    return InputImpl.VideoFromComponents(components)
+                except Exception as exc:
+                    raise ValueError(f"Could not package media bundle video as VIDEO: {exc}") from exc
+        raise ValueError("Media bundle contains an unsupported video payload")
+
+    @staticmethod
+    def _standard_audio(value: Any) -> Mapping[str, Any]:
+        if not isinstance(value, Mapping):
+            raise ValueError("Media bundle contains an unsupported audio payload")
+        waveform = value.get("waveform")
+        if not isinstance(waveform, torch.Tensor) or waveform.ndim != 3:
+            raise ValueError("Media bundle audio must contain a [B, C, T] waveform")
+        return {
+            "waveform": waveform,
+            "sample_rate": _audio_sample_rate(value),
+        }
+
+    def split(self, media_bundle, image_count=1, video_count=0, audio_count=0):
+        if not isinstance(media_bundle, MiniMaxH3MediaBundle):
+            raise ValueError("Connect a Media Bundle from Media Loader or Media Bridge")
+        counts = {
+            "image": max(0, min(MEDIA_SPLITTER_MAX_IMAGES, int(image_count))),
+            "video": max(0, min(MEDIA_SPLITTER_MAX_VIDEOS, int(video_count))),
+            "audio": max(0, min(MEDIA_SPLITTER_MAX_AUDIOS, int(audio_count))),
+        }
+        by_type = {kind: [] for kind in counts}
+        for item in media_bundle.items:
+            if item.media_type in by_type:
+                by_type[item.media_type].append(item.value)
+
+        outputs: list[Any] = []
+        for kind, maximum, count in (
+            ("image", MEDIA_SPLITTER_MAX_IMAGES, counts["image"]),
+            ("video", MEDIA_SPLITTER_MAX_VIDEOS, counts["video"]),
+            ("audio", MEDIA_SPLITTER_MAX_AUDIOS, counts["audio"]),
+        ):
+            values = by_type[kind]
+            if len(values) < count:
+                raise ValueError(
+                    f"Requested {count} {kind} output(s), but the Media Bundle contains only {len(values)}"
+                )
+            for index, value in enumerate(values[:count]):
+                if kind == "video":
+                    value = self._standard_video(value)
+                elif kind == "audio":
+                    value = self._standard_audio(value)
+                outputs.append(value)
+        return tuple(outputs)
 
 
 class MiniMaxH3EasyLoader:
@@ -2483,6 +2649,100 @@ def _resample_video_frames(frames: torch.Tensor, source_fps: float) -> torch.Ten
     count = max(1, round(frames.shape[0] * h3.FPS / source_fps))
     indexes = torch.linspace(0, frames.shape[0] - 1, count, device=frames.device).round().long()
     return frames[indexes]
+
+
+def _normalize_video_frames(frames: torch.Tensor) -> torch.Tensor:
+    """Normalize VIDEO RGB frames to CPU float RGB in [0, 1]."""
+    if not isinstance(frames, torch.Tensor) or frames.ndim != 4:
+        raise ValueError("Video must provide frames with shape [frames, height, width, channels]")
+    if frames.shape[0] < 1 or frames.shape[1] < 1 or frames.shape[2] < 1 or frames.shape[-1] < 3:
+        raise ValueError("Video contains no usable RGB frames")
+    frames = frames[..., :3].detach().to(device="cpu", dtype=torch.float32).contiguous()
+    try:
+        if float(frames.max()) > 1.5:
+            frames = frames / 255.0
+    except Exception:
+        pass
+    return frames.clamp(0.0, 1.0)
+
+
+def _fit_video_frame_count(frames: torch.Tensor, frame_count: int) -> torch.Tensor:
+    """Pad a short clip with its edge frame, or crop it to a target count."""
+    wanted = max(1, int(frame_count))
+    current = int(frames.shape[0])
+    if current >= wanted:
+        return frames[:wanted].contiguous()
+    if current <= 0:
+        raise ValueError("Video contains no frames")
+    return torch.cat((frames, frames[-1:].repeat(wanted - current, 1, 1, 1)), dim=0).contiguous()
+
+
+def _selected_video_delivery_frames(output_frames: int) -> int:
+    """Round a source interval up to MiniMax H3's 17k+5 temporal grid."""
+    count = max(5, int(output_frames))
+    while count % 17 != 5:
+        count += 1
+    return count
+
+
+def _selected_video_segment_boundaries(
+    total_frames: int,
+    segment_mode: str,
+    cuts: Any,
+) -> list[tuple[int, int]]:
+    """Resolve selected-video cut points on the normalized 24 FPS timeline."""
+    total = max(5, int(total_frames))
+    mode = str(segment_mode or SELECTED_VIDEO_SEGMENT_WHOLE).strip().lower()
+    if mode not in SELECTED_VIDEO_SEGMENT_MODES:
+        raise ValueError(f"Unsupported selected-video segment mode: {segment_mode}")
+    if mode == SELECTED_VIDEO_SEGMENT_WHOLE:
+        return [(0, total)]
+    raw = str(cuts or "").replace("，", ",")
+    entries = [item.strip() for item in raw.split(",") if item.strip()]
+    if not entries:
+        return [(0, total)]
+    resolved: list[int] = []
+    for index, entry in enumerate(entries, start=1):
+        try:
+            if mode == SELECTED_VIDEO_SEGMENT_TIME_CUTS:
+                value = float(entry)
+                if not math.isfinite(value):
+                    raise ValueError
+                frame = round(value * float(h3.FPS))
+            else:
+                frame = int(entry)
+        except (TypeError, ValueError):
+            unit = "seconds" if mode == SELECTED_VIDEO_SEGMENT_TIME_CUTS else "24 FPS frame number"
+            raise ValueError(f"Selected-video cut {index} must be a valid {unit}: {entry!r}") from None
+        if frame <= 0 or frame >= total:
+            raise ValueError(f"Selected-video cut {index} must be between 1 and {total - 1}; got {frame}")
+        if resolved and frame <= resolved[-1]:
+            raise ValueError("Selected-video cuts must be strictly increasing")
+        resolved.append(frame)
+    boundaries = []
+    start = 0
+    for end in (*resolved, total):
+        if end - start < 5:
+            raise ValueError("Each selected-video segment must contain at least 5 frames")
+        boundaries.append((start, end))
+        start = end
+    return boundaries
+
+
+def _selected_video_prompt_parts(prompt: str, segment_count: int) -> list[str]:
+    """Match a selected-video prompt to its cut count without forcing optimization."""
+    count = max(1, int(segment_count))
+    parts = split_prompt_segments(str(prompt or ""))
+    if not parts:
+        parts = [""]
+    if len(parts) == 1 and count > 1:
+        return parts * count
+    if len(parts) != count:
+        raise ValueError(
+            f"Selected-video prompt has {len(parts)} blocks, but the video has {count} segments; "
+            "use --- between prompt blocks or enable prompt optimization"
+        )
+    return parts
 
 
 def _encode_reference_audio(audio_vae, audio: Mapping):
@@ -3215,6 +3475,50 @@ def parse_segment_seconds(value: Any, segment_count: int) -> list[float]:
     return seconds_list
 
 
+def parse_segment_seeds(value: Any, segment_count: int, fallback: int = 0) -> list[int]:
+    """Resolve an optional per-segment seed list.
+
+    A single numeric value broadcasts to every segment.  A shorter
+    comma-separated numeric list fills the remaining segments with the node's
+    main seed.  The explicit ``default`` keyword means "use the node's main
+    seed for every segment" and must be used on its own; it cannot be mixed
+    with numeric seeds.  The keyword is intentionally case-insensitive so the
+    visible English value remains valid in every UI language.
+    """
+    count = max(0, int(segment_count))
+    base = int(fallback) % 4294967296
+    raw = str(value or "").replace("，", ",").strip()
+    if not raw or count <= 0:
+        return [base] * count
+    if raw.lower() == "default":
+        return [base] * count
+    entries = [item.strip() for item in raw.split(",")]
+    if len(entries) == 1:
+        entries *= count
+    elif len(entries) > count:
+        raise ValueError(
+            f"Segment seeds cannot contain more than {count} numeric values"
+        )
+    entries.extend([""] * (count - len(entries)))
+    seeds = []
+    for index, item in enumerate(entries, start=1):
+        if item.lower() == "default" or item == "-":
+            raise ValueError(
+                "Segment seeds keyword 'default' must be used alone; do not mix it with numeric seeds"
+            )
+        if not item:
+            seeds.append(base)
+            continue
+        try:
+            seed = int(item)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Segment {index} seed is not an integer: {item!r}") from exc
+        if not 0 <= seed <= 4294967295:
+            raise ValueError(f"Segment {index} seed must be between 0 and 4294967295")
+        seeds.append(seed)
+    return seeds
+
+
 def _segment_expand_media_placeholders(text: str, items: list[_MediaInput]) -> str:
     """Resolve frontend @-mention placeholders before per-shot tag binding."""
     counters = {"image": 0, "video": 0, "audio": 0}
@@ -3666,6 +3970,218 @@ class MiniMaxH3Easy:
         return result
 
 
+class MiniMaxH3EasySelectedVideoContext(MiniMaxH3Easy):
+    """Build a context-segment plan from an already-rendered candidate video.
+
+    The candidate VIDEO is kept inside the context object.  Segment Sample
+    detects it and converts the selected timeline ranges into the same segment
+    intermediate used by the ordinary text-to-video Context Segments path.
+    This keeps the Context Segments node focused on text generation and avoids
+    adding a second video input to it.
+    """
+
+    CATEGORY = "MiniMax H3 Easy"
+    FUNCTION = "generate"
+    RETURN_TYPES = ("MODEL", "MINIMAX_H3_CONTEXT")
+    RETURN_NAMES = ("model", "h3_context")
+    DESCRIPTION = (
+        "Prepare a custom one- or multi-segment plan from a selected candidate VIDEO. "
+        "Connect the H3 Context to Segment Sample, then Segment Refine and Segment Decode."
+    )
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        base = super().INPUT_TYPES()
+        base_required = dict(base.get("required") or {})
+        selected = {
+            "h3_bundle": base_required.pop("h3_bundle"),
+            "selected_video": ("VIDEO",),
+        }
+        for name in ("mode", "prompt"):
+            if name in base_required:
+                selected[name] = base_required.pop(name)
+        selected.update({
+            "segment_mode": (list(SELECTED_VIDEO_SEGMENT_MODES), {"default": SELECTED_VIDEO_SEGMENT_WHOLE}),
+            "segment_cuts": ("STRING", {"default": ""}),
+            "context_length": ("INT", {
+                "default": SEGMENT_DEFAULT_CONTEXT_FRAMES,
+                "min": SEGMENT_MIN_CONTEXT_FRAMES,
+                "max": SEGMENT_MAX_CONTEXT_FRAMES,
+                "step": 17,
+            }),
+            "continuity_mode": (list(CONTEXT_CONTINUITY_MODES), {"default": CONTEXT_CONTINUITY_LATENT}),
+            # The toggle belongs immediately before the controls it reveals.
+            # When collapsed, those controls disappear and the toggle becomes
+            # the final visible row in the node.
+            "advanced": ("BOOLEAN", {"default": False}),
+        })
+        for name in (
+            "keyframe_role",
+            "ref_image_size",
+            "reference_mention_mode",
+            "prompt_optimizer",
+            "prompt_optimizer_api_format",
+            "prompt_optimizer_api_url",
+            "prompt_optimizer_api_key",
+            "prompt_optimizer_model",
+            "prompt_optimizer_scene_guide",
+            "prompt_optimizer_read_media",
+            "prompt_optimizer_optimize_on_run",
+        ):
+            if name in base_required:
+                selected[name] = base_required.pop(name)
+        selected.update({
+            "context_prompt_optimizer_mode": (
+                list(CONTEXT_PROMPT_OPTIMIZER_MODES),
+                {"default": CONTEXT_PROMPT_OPTIMIZER_WHOLE},
+            ),
+            "context_prompt_optimizer_concurrency": (
+                "INT",
+                {
+                    "default": CONTEXT_PROMPT_OPTIMIZER_DEFAULT_CONCURRENCY,
+                    "min": 1,
+                    "max": CONTEXT_PROMPT_OPTIMIZER_MAX_CONCURRENCY,
+                    "step": 1,
+                },
+            ),
+        })
+        # Keep the inherited hidden media/optimizer transport inputs intact;
+        # this gives the dedicated node the same @-mention and Media Loader /
+        # Media Bridge behaviour as the normal Easy node.
+        return {"required": selected, "optional": dict(base.get("optional") or {})}
+
+    @staticmethod
+    def _nearest_aspect_ratio(width: int, height: int) -> str:
+        if width <= 0 or height <= 0:
+            return ASPECT_WIDESCREEN
+        ratio = float(width) / float(height)
+        return min(
+            ASPECT_RATIOS,
+            key=lambda name: abs(math.log(max(1e-6, ratio) / (ASPECT_RATIOS[name][0] / ASPECT_RATIOS[name][1]))),
+        )
+
+    @classmethod
+    def generate(cls, h3_bundle, selected_video, mode, prompt, segment_mode, segment_cuts,
+                 context_length, continuity_mode, context_prompt_optimizer_mode,
+                 context_prompt_optimizer_concurrency, advanced, keyframe_role,
+                 ref_image_size, reference_mention_mode, **kwargs):
+        if not hasattr(selected_video, "get_components") and not isinstance(selected_video, (Mapping, torch.Tensor)):
+            raise ValueError("Connect a completed candidate video from Load Video or another VIDEO node")
+        frames, source_audio, source_fps = _video_parts(selected_video)
+        frames = _normalize_video_frames(frames)
+        frames = _resample_video_frames(frames, float(source_fps or h3.FPS))
+        source_frame_count = max(5, int(frames.shape[0]))
+        max_frames = _frame_length(MAX_SECONDS, h3.FPS)
+        if source_frame_count > max_frames:
+            raise ValueError(
+                f"Selected Video Context supports candidate videos up to {MAX_SECONDS:g} seconds"
+            )
+        boundaries = _selected_video_segment_boundaries(
+            source_frame_count,
+            str(segment_mode or SELECTED_VIDEO_SEGMENT_WHOLE),
+            segment_cuts,
+        )
+        segment_count = len(boundaries)
+        duration_spec = ",".join(
+            f"{(end - start) / float(h3.FPS):.6f}" for start, end in boundaries
+        )
+        items = cls._collect_media(kwargs)
+        _validate_context_media_library(items)
+        optimizer_mode = (
+            MODE_REFERENCE
+            if any(item.media_type in {"image", "video"} for item in items)
+            or SEGMENT_TAG_PATTERN.search(str(prompt or ""))
+            else MODE_IMAGE
+        )
+        settings = _workflow_prompt_optimizer_settings(kwargs)
+        optimization = _optimize_prompt_on_run(
+            prompt,
+            optimizer_mode,
+            min(MAX_SECONDS, max(MIN_SECONDS, source_frame_count / float(h3.FPS))),
+            items,
+            settings,
+            kwargs.get("prompt_optimizer_resources"),
+            kwargs.get("prompt_optimizer_marker"),
+            bool(kwargs.get("prompt_optimizer_prompt_connected", False)),
+            segment_spec=(segment_count, duration_spec) if segment_count >= 2 else None,
+            context_optimizer_mode=str(context_prompt_optimizer_mode or CONTEXT_PROMPT_OPTIMIZER_WHOLE),
+            context_optimizer_concurrency=int(
+                context_prompt_optimizer_concurrency or CONTEXT_PROMPT_OPTIMIZER_DEFAULT_CONCURRENCY
+            ),
+        )
+        prompt_parts = _selected_video_prompt_parts(optimization.prompt, segment_count)
+        width = _align_canvas_dimension(int(frames.shape[2]))
+        height = _align_canvas_dimension(int(frames.shape[1]))
+        width = max(h3.CANVAS_MULTIPLE, min(int(nodes.MAX_RESOLUTION), width))
+        height = max(h3.CANVAS_MULTIPLE, min(int(nodes.MAX_RESOLUTION), height))
+        aspect_ratio = cls._nearest_aspect_ratio(width, height)
+        shots = []
+        uses_visual_media = False
+        for index, ((start, end), text) in enumerate(zip(boundaries, prompt_parts), start=1):
+            media, rewritten = bind_segment_media(text, items)
+            if media:
+                _validate_reference_media(media, f"Selected Video Segment {index}")
+                uses_visual_media = uses_visual_media or any(
+                    item.media_type in {"image", "video"} for item in media
+                )
+            output_frames = end - start
+            shots.append({
+                "index": index,
+                "prompt": rewritten,
+                "seconds": output_frames / float(h3.FPS),
+                "delivery_frames": _selected_video_delivery_frames(output_frames),
+                "output_frames": output_frames,
+                "source_start_frame": start,
+                "source_end_frame": end,
+                "media": media,
+            })
+        plan = {
+            "bundle": h3_bundle,
+            "width": width,
+            "height": height,
+            "fps": float(h3.FPS),
+            "context_length": _segment_context_frame_count_for_mode(
+                context_length, continuity_mode,
+            ),
+            "continuity_mode": (
+                str(continuity_mode)
+                if str(continuity_mode) in CONTEXT_CONTINUITY_MODES
+                else CONTEXT_CONTINUITY_LATENT
+            ),
+            "audio_mode": CONTEXT_AUDIO_GENERATED,
+            "source_audio": source_audio,
+            "model_role": "ref2va" if uses_visual_media else "fl2va",
+            "ref_image_size": ref_image_size,
+            "shots": shots,
+            "selected_video": selected_video,
+            "selected_video_segment_mode": str(segment_mode or SELECTED_VIDEO_SEGMENT_WHOLE),
+            "selected_video_source_frames": source_frame_count,
+        }
+        model = h3_bundle.model_for(plan["model_role"])
+        context = MiniMaxH3Context(
+            conditioning=None,
+            latent=None,
+            video_vae=h3_bundle.video_vae,
+            audio_vae=h3_bundle.audio_vae,
+            fps=float(h3.FPS),
+            aspect_ratio=aspect_ratio,
+            keyframe_sources=(),
+            segment_plan=plan,
+            source_audio=source_audio,
+            selected_video=selected_video,
+        )
+        result = (model, context)
+        if optimization.marker:
+            return {
+                "ui": {
+                    "auto_optimized_prompt": [optimization.prompt],
+                    "auto_optimization_marker": [json.dumps(optimization.marker, sort_keys=True, separators=(",", ":"))],
+                },
+                "result": result,
+            }
+        return result
+
+
 class MiniMaxH3EasyContextSegments:
     """Build a multi-shot context plan for MiniMaxH3EasySegmentRender."""
 
@@ -3745,7 +4261,20 @@ class MiniMaxH3EasyContextSegments:
 
     @classmethod
     def IS_CHANGED(cls, **kwargs):
-        return float("nan")
+        settings = _workflow_prompt_optimizer_settings(kwargs)
+        if settings["enabled"] and settings["optimize_on_run"]:
+            return float("nan")
+        return repr(tuple(kwargs.get(key) for key in (
+            "mode", "audio_mode", "prompt", "resolution", "aspect_ratio",
+            "width", "height", "seconds", "segment_seconds", "context_length",
+            "continuity_mode", "advanced", "fps", "keyframe_role", "ref_image_size",
+            "reference_mention_mode", "prompt_optimizer",
+            "prompt_optimizer_api_format", "prompt_optimizer_api_url",
+            "prompt_optimizer_api_key", "prompt_optimizer_model",
+            "prompt_optimizer_scene_guide", "prompt_optimizer_read_media",
+            "prompt_optimizer_optimize_on_run", "context_prompt_optimizer_mode",
+            "context_prompt_optimizer_concurrency",
+        )))
 
     @staticmethod
     def _collect_media(kwargs: dict) -> list[_MediaInput]:
@@ -3803,6 +4332,7 @@ class MiniMaxH3EasyContextSegments:
             "source_audio": source_audio,
             "model_role": "ref2va" if uses_media else "fl2va",
             "ref_image_size": ref_image_size,
+            "media_items": tuple(items),
             "shots": shots,
         }
         model = h3_bundle.model_for(plan["model_role"])
@@ -3926,8 +4456,10 @@ class MiniMaxH3EasySegmentRender:
 
     @classmethod
     def IS_CHANGED(cls, **kwargs):
-        # Every queue is a distinct segment run with fresh sampling.
-        return float("nan")
+        # Sampling is deterministic for fixed inputs and seeds, so let
+        # ComfyUI cache the complete node output.  ``randomize`` still changes
+        # the widget value after a run and therefore naturally invalidates it.
+        return repr((kwargs.get("seed"), kwargs.get("segment_seeds")))
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -3946,6 +4478,7 @@ class MiniMaxH3EasySegmentRender:
                         "control_after_generate": True,
                     },
                 ),
+                "segment_seeds": ("STRING", {"default": "default", "multiline": False}),
             },
         }
 
@@ -3997,7 +4530,98 @@ class MiniMaxH3EasySegmentRender:
         )
 
     @classmethod
-    def render_chain(cls, h3_context, model, sampler, sigmas, seed):
+    def _prepare_selected_video_chain(cls, h3_context, plan) -> MiniMaxH3SegmentResult:
+        """Convert selected-video timeline ranges into first-pass segments.
+
+        No H3 denoising happens here.  The existing Segment Refine node owns
+        both the Pixel Resize and Latent Upscale second-pass paths, so this
+        branch only makes a candidate VIDEO look like the normal segment
+        sampler's intermediate result.
+        """
+        selected_video = plan.get("selected_video") or getattr(h3_context, "selected_video", None)
+        if not hasattr(selected_video, "get_components") and not isinstance(selected_video, (Mapping, torch.Tensor)):
+            raise ValueError("Selected-video context has no usable candidate VIDEO")
+        bundle = plan.get("bundle")
+        if not isinstance(bundle, MiniMaxH3Bundle):
+            raise ValueError("The selected-video segment plan has no MiniMax H3 bundle")
+        frames, source_audio, source_fps = _video_parts(selected_video)
+        frames = _normalize_video_frames(frames)
+        frames = _resample_video_frames(frames, float(source_fps or h3.FPS))
+        source_frame_count = max(5, int(frames.shape[0]))
+        planned_frame_count = max(5, int(plan.get("selected_video_source_frames") or source_frame_count))
+        frames = _fit_video_frame_count(frames, planned_frame_count)
+        width = int(plan["width"])
+        height = int(plan["height"])
+        if int(frames.shape[2]) != width or int(frames.shape[1]) != height:
+            frames = h3._resize(frames, width, height, "disabled")
+        shots = list(plan.get("shots") or [])
+        if not shots:
+            raise ValueError("The selected-video segment plan contains no segments")
+        context_length = _segment_context_frame_count_for_mode(
+            plan.get("context_length", SEGMENT_DEFAULT_CONTEXT_FRAMES),
+            plan.get("continuity_mode", CONTEXT_CONTINUITY_LATENT),
+        )
+        samples = []
+        progress = comfy.utils.ProgressBar(max(1, len(shots)))
+        terminal_progress = _H3TerminalProgress("Selected Video Prepare", len(shots))
+        for position, shot in enumerate(shots):
+            start = max(0, int(shot.get("source_start_frame") or 0))
+            end = min(planned_frame_count, int(shot.get("source_end_frame") or planned_frame_count))
+            if end <= start:
+                raise ValueError(f"Selected-video segment {position + 1} has an invalid frame range")
+            output_frames = max(5, int(shot.get("output_frames") or (end - start)))
+            delivery_frames = max(
+                output_frames,
+                int(shot.get("delivery_frames") or _selected_video_delivery_frames(output_frames)),
+            )
+            head_frames = context_length if position else 0
+            head_start = max(0, start - head_frames)
+            head = frames[head_start:start]
+            if head_frames and int(head.shape[0]) < head_frames:
+                pad = frames[:1].repeat(head_frames - int(head.shape[0]), 1, 1, 1)
+                head = torch.cat((pad, head), dim=0)
+            body = frames[start:end]
+            combined = torch.cat((head, body), dim=0) if head_frames else body
+            sample_length = _segment_target_length(delivery_frames, head_frames)
+            combined = _fit_video_frame_count(combined, sample_length)
+            video_latent = bundle.video_vae.encode(combined)
+            if not isinstance(video_latent, torch.Tensor) or video_latent.ndim != 5:
+                raise RuntimeError(f"Selected-video segment {position + 1} VAE encode returned an invalid latent")
+
+            empty_latent, _ = h3._empty_av_latent(width, height, sample_length)
+            _empty_video, empty_audio = _segment_latent_streams(empty_latent)
+            audio_latent = empty_audio
+            audio_source = plan.get("source_audio") if isinstance(plan.get("source_audio"), Mapping) else source_audio
+            if isinstance(audio_source, Mapping):
+                audio_slice = _segment_trim_audio(
+                    audio_source,
+                    max(0, start - head_frames),
+                    sample_length,
+                )
+                if audio_slice is not None:
+                    encoded, _audio_steps = _encode_reference_audio(bundle.audio_vae, audio_slice)
+                    audio_latent = _fit_audio_latent(encoded, empty_audio)
+            samples.append(
+                MiniMaxH3SegmentSample(
+                    video_latent=video_latent.detach().to("cpu").contiguous(),
+                    audio_latent=audio_latent.detach().to("cpu").contiguous(),
+                    head_frames=head_frames,
+                    delivery_frames=delivery_frames,
+                    output_frames=(end - start),
+                    prompt=str(shot.get("prompt") or ""),
+                    media=tuple(shot.get("media") or ()),
+                )
+            )
+            progress.update_absolute(position + 1, max(1, len(shots)))
+            terminal_progress.update(position + 1, f"segment {position + 1} prepared")
+            del combined, video_latent, empty_latent
+        terminal_progress.finish()
+        prepared_plan = dict(plan)
+        prepared_plan["selected_video_source_frames"] = planned_frame_count
+        return MiniMaxH3SegmentResult(plan=prepared_plan, samples=tuple(samples))
+
+    @classmethod
+    def render_chain(cls, h3_context, model, sampler, sigmas, seed, segment_seeds="default"):
         plan = getattr(h3_context, "segment_plan", None)
         shots = plan.get("shots") if isinstance(plan, Mapping) else None
         if not shots:
@@ -4007,6 +4631,8 @@ class MiniMaxH3EasySegmentRender:
         bundle = plan.get("bundle")
         if not isinstance(bundle, MiniMaxH3Bundle):
             raise ValueError("The segment plan has no MiniMax H3 bundle")
+        if plan.get("selected_video") is not None or getattr(h3_context, "selected_video", None) is not None:
+            return (cls._prepare_selected_video_chain(h3_context, plan),)
         width = int(plan["width"])
         height = int(plan["height"])
         continuity_mode = str(plan.get("continuity_mode") or CONTEXT_CONTINUITY_LATENT)
@@ -4016,6 +4642,7 @@ class MiniMaxH3EasySegmentRender:
             plan.get("context_length", SEGMENT_DEFAULT_CONTEXT_FRAMES),
             continuity_mode,
         )
+        segment_seed_values = parse_segment_seeds(segment_seeds, len(shots), seed)
         source_audio = plan.get("source_audio")
         digital_human = str(plan.get("audio_mode") or CONTEXT_AUDIO_GENERATED) == CONTEXT_AUDIO_DIGITAL_HUMAN
         steps_per_shot = max(1, int(sigmas.shape[-1]) - 1)
@@ -4032,6 +4659,7 @@ class MiniMaxH3EasySegmentRender:
         for position, shot in enumerate(shots):
             terminal_progress.update(position, f"segment {position + 1} sampling")
             delivery_frames = max(5, int(shot.get("delivery_frames") or 5))
+            output_frames = max(5, int(shot.get("output_frames") or delivery_frames))
             # Native Add Guide samples a target that starts with the guide
             # prefix. The workflow discards that repeated/noisy prefix before
             # delivering the new segment. Keep the same temporal handoff for
@@ -4072,7 +4700,7 @@ class MiniMaxH3EasySegmentRender:
             if continuity_mode == CONTEXT_CONTINUITY_GUIDE:
                 audio_context_reference = None
             # Keep the node seed user-controlled across every context segment.
-            shot_seed = int(seed) % 4294967296
+            shot_seed = segment_seed_values[position]
             guides = []
             if (
                 delivered_video_latent is not None
@@ -4115,13 +4743,13 @@ class MiniMaxH3EasySegmentRender:
             )
             video_stream, audio_stream = _segment_latent_streams(sampled)
             video_prefix = h3.temporal_shape(head_frames)[1] if head_frames else 0
-            video_length = h3.temporal_shape(delivery_frames)[1]
+            video_length = h3.temporal_shape(output_frames)[1]
             delivered_video_latent = video_stream[:, :, video_prefix:video_prefix + video_length].detach().to("cpu").contiguous()
 
             if continuity_mode == CONTEXT_CONTINUITY_GUIDE:
                 # RGB Guide needs the delivered tail before the next segment is sampled.
                 images = nodes.VAEDecode().decode(bundle.video_vae, sampled)[0]
-                delivered = images[head_frames:head_frames + delivery_frames].detach().to("cpu").contiguous()
+                delivered = images[head_frames:head_frames + output_frames].detach().to("cpu").contiguous()
                 keep = min(context_length, int(delivered.shape[0]))
                 tail_frames = (
                     delivered[-keep:].detach().to("cpu").contiguous()
@@ -4139,6 +4767,9 @@ class MiniMaxH3EasySegmentRender:
                     audio_latent=audio_stream.detach().to("cpu").contiguous(),
                     head_frames=head_frames,
                     delivery_frames=delivery_frames,
+                    output_frames=shot.get("output_frames"),
+                    prompt=prompt_text,
+                    media=tuple(items),
                 )
             )
             audio_reference = (
@@ -4146,7 +4777,7 @@ class MiniMaxH3EasySegmentRender:
                 if source_audio is not None
                 else _segment_context_audio_reference(sampled, head_frames + delivery_frames, context_length)
             )
-            timeline_frame += delivery_frames
+            timeline_frame += output_frames
             if continuity_mode != CONTEXT_CONTINUITY_GUIDE:
                 # Latent/AV continuity never needs decoded pixels between shots.
                 tail_frames = None
@@ -4155,6 +4786,353 @@ class MiniMaxH3EasySegmentRender:
 
         terminal_progress.finish()
         return (MiniMaxH3SegmentResult(plan=plan, samples=tuple(segment_samples)),)
+
+
+def _segment_step_prompt_media(
+    plan: Mapping[str, Any],
+    shot: Mapping[str, Any],
+    prompt_override: str | None,
+) -> tuple[str, list[_MediaInput]]:
+    """Resolve one step's default or externally overridden local conditions."""
+    default_prompt = str(shot.get("prompt") or "")
+    default_media = list(shot.get("media") or [])
+    if prompt_override is None:
+        return default_prompt, default_media
+
+    parts = split_prompt_segments(str(prompt_override))
+    if len(parts) > 1:
+        raise ValueError("A Segment Sample Step prompt override must contain exactly one segment")
+    override_prompt = parts[0] if parts else ""
+    library = list(plan.get("media_items") or [])
+    explicit_tags = bool(SEGMENT_TAG_PATTERN.search(override_prompt))
+    chosen, rewritten = bind_segment_media(override_prompt, library)
+    # A text-only override changes the wording without silently dropping the
+    # references already assigned to this segment by the Context node.  Add
+    # explicit <Picture/Video/Audio N> tags to select a different subset.
+    media = chosen if chosen else default_media
+    if not explicit_tags and default_media:
+        # The plan prompt already uses compact local ordinals matching
+        # ``default_media``. Preserve those tags when the external text only
+        # replaces prose, otherwise the media tensors would still be supplied
+        # but the prompt would no longer refer to them.
+        tags = []
+        seen = set()
+        for match in SEGMENT_TAG_PATTERN.finditer(default_prompt):
+            tag = f"<{match.group(1).capitalize()} {int(match.group(2))}>"
+            key = tag.lower()
+            if key not in seen:
+                seen.add(key)
+                tags.append(tag)
+        if tags:
+            rewritten = " ".join(part for part in (rewritten.strip(), " ".join(tags)) if part)
+    if str(plan.get("audio_mode") or CONTEXT_AUDIO_GENERATED) == CONTEXT_AUDIO_DIGITAL_HUMAN:
+        media = [item for item in media if item.media_type in {"image", "video"}]
+        rewritten = re.sub(r"<Audio\s+\d+>", "", rewritten, flags=re.IGNORECASE)
+    if media:
+        _validate_reference_media(media, "Segment Sample Step")
+    return rewritten, media
+
+
+class MiniMaxH3EasySegmentSampleSetup:
+    """Pack the shared context/model/sampler inputs for per-segment sampling."""
+
+    CATEGORY = "MiniMax H3 Easy"
+    FUNCTION = "build_setup"
+    RETURN_TYPES = (SEGMENT_SAMPLE_SETUP_TYPE,)
+    RETURN_NAMES = ("setup",)
+    DESCRIPTION = "Connect the Context, Model, sampler, and sigmas once, then use the setup on the first Segment Step."
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "h3_context": ("MINIMAX_H3_CONTEXT",),
+                "model": ("MODEL",),
+                "sampler": ("SAMPLER",),
+                "sigmas": ("SIGMAS",),
+            }
+        }
+
+    @staticmethod
+    def build_setup(h3_context, model, sampler, sigmas):
+        if not isinstance(h3_context, MiniMaxH3Context):
+            raise ValueError("Connect the H3 Context output from MiniMax H3 Easy Context Segments")
+        plan = h3_context.segment_plan
+        if not isinstance(plan, Mapping) or not list(plan.get("shots") or []):
+            raise ValueError("The connected H3 Context contains no segment plan")
+        if plan.get("selected_video") is not None or h3_context.selected_video is not None:
+            raise ValueError("Segment Sample Setup supports generated Context Segments, not selected-video preparation")
+        return (MiniMaxH3SegmentSampleSetup(h3_context, model, sampler, sigmas),)
+
+
+class MiniMaxH3EasySegmentStep:
+    """Sample one context segment and carry the accumulated chain downstream."""
+
+    CATEGORY = "MiniMax H3 Easy"
+    FUNCTION = "sample_step"
+    RETURN_TYPES = (SEGMENT_STEP_TYPE,)
+    RETURN_NAMES = ("segment",)
+    DESCRIPTION = (
+        "Process one Context Segment. Connect Sample Setup only to the first step, then chain each next step through "
+        "Previous segment. Segment order is inferred from the chain; optionally override only this segment's prompt."
+    )
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "seed": (
+                    "INT",
+                    {
+                        "default": 0,
+                        "min": 0,
+                        "max": 4294967295,
+                        "control_after_generate": True,
+                    },
+                ),
+            },
+            "optional": {
+                "previous_segment": (SEGMENT_STEP_TYPE,),
+                "prompt_override": ("STRING", {"forceInput": True}),
+                "sample_setup": (SEGMENT_SAMPLE_SETUP_TYPE,),
+            },
+        }
+
+    @classmethod
+    def IS_CHANGED(cls, **kwargs):
+        return repr((kwargs.get("seed"), kwargs.get("prompt_override")))
+
+    @staticmethod
+    def _resolve_state(sample_setup, previous_segment):
+        if previous_segment is None:
+            if not isinstance(sample_setup, MiniMaxH3SegmentSampleSetup):
+                raise ValueError("Connect Segment Sample Setup to the first Segment Step")
+            setup = sample_setup
+            previous_sample = None
+            index = 1
+        else:
+            if not isinstance(previous_segment, MiniMaxH3SegmentStep):
+                raise ValueError("Connect the previous Segment Step")
+            if sample_setup is not None:
+                raise ValueError("Connect Segment Sample Setup only to the first Segment Step")
+            setup = previous_segment.setup
+            if not isinstance(setup, MiniMaxH3SegmentSampleSetup):
+                raise ValueError("The previous Segment Step has no shared sampling setup")
+            previous_sample = previous_segment.sample
+            index = int(previous_segment.index) + 1
+        context = setup.context
+        plan = context.segment_plan
+        shots = list(plan.get("shots") or []) if isinstance(plan, Mapping) else []
+        if not shots:
+            raise ValueError("The connected H3 Context contains no segment plan")
+        if index > len(shots):
+            raise ValueError(f"The chain contains more steps ({index}) than Context Segments ({len(shots)})")
+        if previous_segment is not None and previous_segment.plan is not plan:
+            raise ValueError("The chained Segment Steps come from different H3 Context plans")
+        return setup, plan, shots, index, previous_sample
+
+    @classmethod
+    def sample_step(cls, seed, sample_setup=None, previous_segment=None, prompt_override=None):
+        setup, plan, shots, index, previous_sample = cls._resolve_state(sample_setup, previous_segment)
+        position = index - 1
+        shot = shots[position]
+        bundle = plan.get("bundle")
+        if not isinstance(bundle, MiniMaxH3Bundle):
+            raise ValueError("The segment plan has no usable MiniMax H3 bundle")
+
+        width = int(plan["width"])
+        height = int(plan["height"])
+        continuity_mode = str(plan.get("continuity_mode") or CONTEXT_CONTINUITY_LATENT)
+        if continuity_mode not in CONTEXT_CONTINUITY_MODES:
+            continuity_mode = CONTEXT_CONTINUITY_LATENT
+        context_length = _segment_context_frame_count_for_mode(
+            plan.get("context_length", SEGMENT_DEFAULT_CONTEXT_FRAMES),
+            continuity_mode,
+        )
+        source_audio = plan.get("source_audio")
+        digital_human = str(plan.get("audio_mode") or CONTEXT_AUDIO_GENERATED) == CONTEXT_AUDIO_DIGITAL_HUMAN
+        delivery_frames = max(5, int(shot.get("delivery_frames") or 5))
+        output_frames = max(5, int(shot.get("output_frames") or delivery_frames))
+        head_frames = context_length if position else 0
+        sample_length = _segment_target_length(delivery_frames, head_frames)
+        prompt_text, items = _segment_step_prompt_media(plan, shot, prompt_override)
+
+        timeline_frame = sum(
+            max(5, int(item.get("output_frames") or item.get("delivery_frames") or 5))
+            for item in shots[:position]
+        )
+        source_audio_reference = _segment_source_audio_reference(
+            bundle,
+            source_audio,
+            max(0, timeline_frame - head_frames),
+            head_frames + delivery_frames,
+        ) if source_audio is not None else None
+        if digital_human and source_audio_reference is None:
+            raise ValueError(f"Context Segments digital human audio does not cover segment {index}")
+
+        if items:
+            conditioning, latent = _reference_conditioning(
+                bundle,
+                prompt_text,
+                width,
+                height,
+                sample_length,
+                plan.get("ref_image_size"),
+                items,
+                include_audio=not digital_human,
+            )
+        else:
+            conditioning, latent, _sources = _empty_image_conditioning(
+                bundle, prompt_text, width, height, sample_length,
+            )
+
+        previous_video = None
+        previous_audio_reference = None
+        tail_frames = None
+        if previous_sample is not None:
+            previous_video, _previous_audio = MiniMaxH3EasySegmentRefine._delivered_streams(previous_sample)
+            previous_latent = _segment_pack_latent(
+                previous_sample.video_latent,
+                previous_sample.audio_latent,
+            )
+            if source_audio is None:
+                previous_audio_reference = _segment_context_audio_reference(
+                    previous_latent,
+                    previous_sample.head_frames + previous_sample.delivery_frames,
+                    context_length,
+                )
+            if continuity_mode == CONTEXT_CONTINUITY_GUIDE:
+                previous_images = nodes.VAEDecode().decode(bundle.video_vae, previous_latent)[0]
+                previous_output = int(previous_sample.output_frames or previous_sample.delivery_frames)
+                delivered = previous_images[
+                    previous_sample.head_frames:previous_sample.head_frames + previous_output
+                ].detach().to("cpu").contiguous()
+                keep = min(context_length, int(delivered.shape[0]))
+                tail_frames = delivered[-keep:].contiguous()
+                del previous_images, delivered
+
+        audio_context_reference = None if digital_human else (
+            source_audio_reference if source_audio_reference is not None else previous_audio_reference
+        )
+        if continuity_mode == CONTEXT_CONTINUITY_GUIDE:
+            audio_context_reference = None
+        guides = []
+        if previous_video is not None and continuity_mode == CONTEXT_CONTINUITY_LATENT:
+            guides, _covered = _segment_context_keyframes_from_latent(previous_video, context_length)
+        elif tail_frames is not None and continuity_mode == CONTEXT_CONTINUITY_GUIDE:
+            guides, _covered = _segment_context_keyframes(
+                bundle, tail_frames, width, height, context_length,
+            )
+        conditioning = _segment_add_context_conditioning(
+            conditioning,
+            guides,
+            h3.temporal_shape(sample_length)[0],
+            audio_context_reference,
+        )
+        if previous_video is not None and continuity_mode == CONTEXT_CONTINUITY_LATENT:
+            latent = _segment_apply_guide_handoff(
+                latent, previous_video, audio_context_reference, context_length,
+            )
+        if previous_video is not None and continuity_mode in CONTEXT_CONTINUITY_AV_MODES:
+            latent = _segment_apply_av_prefix(
+                latent, previous_video, audio_context_reference, context_length, continuity_mode,
+            )
+        if digital_human:
+            latent = _lock_audio_latent(latent, source_audio_reference["audio_latent"])
+
+        steps = max(1, int(setup.sigmas.shape[-1]) - 1)
+        progress = comfy.utils.ProgressBar(steps)
+        sampled = MiniMaxH3EasySegmentRender._sample_one(
+            setup.model,
+            conditioning,
+            latent,
+            setup.sampler,
+            setup.sigmas,
+            int(seed) % 4294967296,
+            progress,
+            0,
+            steps,
+        )
+        video_stream, audio_stream = _segment_latent_streams(sampled)
+        sample = MiniMaxH3SegmentSample(
+            video_latent=video_stream.detach().to("cpu").contiguous(),
+            audio_latent=audio_stream.detach().to("cpu").contiguous(),
+            head_frames=head_frames,
+            delivery_frames=delivery_frames,
+            output_frames=shot.get("output_frames"),
+            prompt=prompt_text,
+            media=tuple(items),
+        )
+        return (MiniMaxH3SegmentStep(
+            plan=plan,
+            sample=sample,
+            index=index,
+            setup=setup,
+            previous=previous_segment,
+        ),)
+
+
+class MiniMaxH3EasySegmentCollect:
+    """Turn the final cacheable step into the existing segment-result type."""
+
+    CATEGORY = "MiniMax H3 Easy"
+    FUNCTION = "collect"
+    RETURN_TYPES = (SEGMENT_RESULT_TYPE,)
+    RETURN_NAMES = ("segments",)
+    DESCRIPTION = "Connect only the final Segment Step, then pass the complete chain to Segment Decode."
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {"final_segment": (SEGMENT_STEP_TYPE,)},
+        }
+
+    @staticmethod
+    def collect(final_segment):
+        if not isinstance(final_segment, MiniMaxH3SegmentStep):
+            raise ValueError("Connect the final Segment Step")
+        context_plan = final_segment.plan
+        shots = list(context_plan.get("shots") or []) if isinstance(context_plan, Mapping) else []
+        if not shots:
+            raise ValueError("The final Segment Step contains no Context Segment plan")
+        if int(final_segment.index) != len(shots):
+            raise ValueError(
+                f"Segment Collect needs the final step ({len(shots)}); got segment {final_segment.index}"
+            )
+        chain = []
+        cursor = final_segment
+        seen = set()
+        while cursor is not None:
+            marker = id(cursor)
+            if marker in seen:
+                raise ValueError("The Segment Step chain contains a cycle")
+            seen.add(marker)
+            if not isinstance(cursor, MiniMaxH3SegmentStep):
+                raise ValueError("The Segment Step chain contains an invalid result")
+            chain.append(cursor)
+            cursor = cursor.previous
+        chain.reverse()
+        if len(chain) != len(shots):
+            raise ValueError(
+                f"The final Segment Step contains {len(chain)} segments; expected {len(shots)}"
+            )
+        resolved_shots = []
+        samples = []
+        for expected, value in enumerate(chain, start=1):
+            if int(value.index) != expected or value.plan is not context_plan:
+                raise ValueError("The Segment Step chain is not a continuous Context plan")
+            sample = value.sample
+            shot = dict(shots[expected - 1])
+            if sample.prompt is not None:
+                shot["prompt"] = sample.prompt
+            if sample.media is not None:
+                shot["media"] = list(sample.media)
+            samples.append(sample)
+            resolved_shots.append(shot)
+        plan = dict(context_plan)
+        plan["shots"] = resolved_shots
+        plan["step_stage"] = "sample"
+        return (MiniMaxH3SegmentResult(plan=plan, samples=tuple(samples)),)
 
 
 class MiniMaxH3EasySegmentRefine:
@@ -4177,7 +5155,12 @@ class MiniMaxH3EasySegmentRefine:
 
     @classmethod
     def IS_CHANGED(cls, **kwargs):
-        return float("nan")
+        return repr(tuple(kwargs.get(key) for key in (
+            "refine_mode", "seed", "refine_execution", "target_width", "target_height",
+            "latent_upscale_model", "latent_upscale_scale", "latent_upscale_device",
+            "latent_upscale_precision", "tile_width", "tile_height", "tile_overlap",
+            "tile_fade", "segment_seeds",
+        )))
 
     @classmethod
     def _upscale_model_choices(cls) -> list[str]:
@@ -4217,6 +5200,7 @@ class MiniMaxH3EasySegmentRefine:
                 "tile_height": ("INT", {"default": 512, "min": 32, "max": nodes.MAX_RESOLUTION, "step": 32}),
                 "tile_overlap": ("INT", {"default": 128, "min": 32, "max": nodes.MAX_RESOLUTION, "step": 32}),
                 "tile_fade": ("INT", {"default": 32, "min": 0, "max": nodes.MAX_RESOLUTION, "step": 32}),
+                "segment_seeds": ("STRING", {"default": "default", "multiline": False}),
             },
         }
 
@@ -4261,8 +5245,9 @@ class MiniMaxH3EasySegmentRefine:
         audio = sample.audio_latent
         video_prefix = h3.temporal_shape(sample.head_frames)[1] if sample.head_frames else 0
         audio_prefix = h3.temporal_shape(sample.head_frames)[2] if sample.head_frames else 0
-        video_length = h3.temporal_shape(sample.delivery_frames)[1]
-        audio_length = h3.temporal_shape(sample.delivery_frames)[2]
+        output_frames = int(sample.output_frames or sample.delivery_frames)
+        video_length = h3.temporal_shape(output_frames)[1]
+        audio_length = h3.temporal_shape(output_frames)[2]
         video = video[:, :, video_prefix:video_prefix + video_length]
         audio = audio[..., audio_prefix:audio_prefix + audio_length]
         return (
@@ -4285,7 +5270,8 @@ class MiniMaxH3EasySegmentRefine:
         prefix plus body here, then crop it again after the transform.
         """
         video_prefix = h3.temporal_shape(head_frames)[1] if head_frames else 0
-        video_length = h3.temporal_shape(delivery_frames)[1]
+        output_frames = int(sample.output_frames or delivery_frames)
+        video_length = h3.temporal_shape(output_frames)[1]
         wanted = video_prefix + video_length
         return cls._fit_time_tokens(sample.video_latent, wanted, 2)
 
@@ -4628,6 +5614,7 @@ class MiniMaxH3EasySegmentRefine:
         tile_height,
         tile_overlap,
         tile_fade,
+        segment_seeds="default",
     ):
         if not isinstance(h3_context, MiniMaxH3Context):
             raise ValueError("Connect the H3 Context output from MiniMax H3 Easy Context Segments")
@@ -4653,6 +5640,7 @@ class MiniMaxH3EasySegmentRefine:
         if execution not in SEGMENT_REFINE_EXECUTION_MODES:
             raise ValueError(f"Unsupported segment refine execution mode: {execution}")
         steps_per_segment = max(1, int(sigmas.shape[-1]) - 1)
+        segment_seed_values = parse_segment_seeds(segment_seeds, len(shots), seed)
         planned_passes = len(shots)
         if execution == SEGMENT_REFINE_TILED:
             planned_passes = sum(
@@ -4688,6 +5676,10 @@ class MiniMaxH3EasySegmentRefine:
                 f"segment {position + 1} {'tiled refine' if execution == SEGMENT_REFINE_TILED else 'refine'}",
             )
             delivery_frames = max(5, int(shot.get("delivery_frames") or first_pass.delivery_frames))
+            output_frames = max(
+                5,
+                int(shot.get("output_frames") or first_pass.output_frames or delivery_frames),
+            )
             # The native Guide workflow samples the repeated guide prefix and
             # crops it from the delivered segment after sampling.
             head_frames = context_length if position else 0
@@ -4706,12 +5698,20 @@ class MiniMaxH3EasySegmentRefine:
                 str(latent_upscale_device),
                 str(latent_upscale_precision),
                 head_frames,
-                delivery_frames,
+                output_frames,
                 model,
             )
 
-            prompt_text = str(shot.get("prompt") or "")
-            items = list(shot.get("media") or [])
+            prompt_text = (
+                str(first_pass.prompt)
+                if first_pass.prompt is not None
+                else str(shot.get("prompt") or "")
+            )
+            items = (
+                list(first_pass.media)
+                if first_pass.media is not None
+                else list(shot.get("media") or [])
+            )
             if items:
                 conditioning, _unused_latent = _reference_conditioning(
                     bundle,
@@ -4803,7 +5803,7 @@ class MiniMaxH3EasySegmentRefine:
             if digital_human:
                 latent = _lock_audio_latent(latent, source_audio_reference["audio_latent"])
 
-            shot_seed = int(seed) % 4294967296
+            shot_seed = segment_seed_values[position]
             if execution == SEGMENT_REFINE_TILED:
                 sampled = cls._tiled_sample(
                     model,
@@ -4843,11 +5843,11 @@ class MiniMaxH3EasySegmentRefine:
             completed_steps += sampling_passes * steps_per_segment
             sampled_video, _sampled_audio = _segment_latent_streams(sampled)
             video_prefix = h3.temporal_shape(head_frames)[1] if head_frames else 0
-            video_length = h3.temporal_shape(delivery_frames)[1]
+            video_length = h3.temporal_shape(output_frames)[1]
             delivered_video = sampled_video[:, :, video_prefix:video_prefix + video_length].detach().to("cpu").contiguous()
             input_video, input_audio = _segment_latent_streams(latent)
             audio_prefix = h3.temporal_shape(head_frames)[2] if head_frames else 0
-            audio_length = h3.temporal_shape(delivery_frames)[2]
+            audio_length = h3.temporal_shape(output_frames)[2]
             refined_audio = input_audio.detach().to("cpu").clone()
             if isinstance(audio_reference, Mapping) and audio_prefix > 0:
                 reference_audio = audio_reference.get("audio_latent")
@@ -4858,7 +5858,7 @@ class MiniMaxH3EasySegmentRefine:
 
             if continuity_mode == CONTEXT_CONTINUITY_GUIDE:
                 decoded_full = cls._decode_video_body(bundle, sampled_video)
-                delivered_tail = decoded_full[head_frames:head_frames + delivery_frames].contiguous()
+                delivered_tail = decoded_full[head_frames:head_frames + output_frames].contiguous()
                 keep = min(context_length, int(delivered_tail.shape[0]))
                 previous_tail_frames = (
                     delivered_tail[-keep:].detach().to("cpu").contiguous()
@@ -4877,12 +5877,15 @@ class MiniMaxH3EasySegmentRefine:
                     audio_latent=refined_audio,
                     head_frames=head_frames,
                     delivery_frames=delivery_frames,
+                    output_frames=shot.get("output_frames") or first_pass.output_frames,
+                    prompt=first_pass.prompt if first_pass.prompt is not None else prompt_text,
+                    media=first_pass.media if first_pass.media is not None else tuple(items),
                 )
             )
             previous_video = delivered_video
             previous_audio = delivered_audio
-            previous_delivery_frames = delivery_frames
-            timeline_frame += delivery_frames
+            previous_delivery_frames = output_frames
+            timeline_frame += output_frames
             terminal_progress.update(position + 1, f"segment {position + 1} completed")
             del sampled
 
@@ -4934,7 +5937,11 @@ class MiniMaxH3EasySegmentDecode:
         audio_channels = 0
         audio_sample_rate = 0
         preview_frame = None
-        delivered_total = sum(sample.delivery_frames for sample in segments.samples)
+        shots = list(segments.plan.get("shots") or []) if isinstance(segments.plan, Mapping) else []
+        delivered_total = sum(
+            max(5, int((shots[index].get("output_frames") if index < len(shots) else None) or sample.delivery_frames))
+            for index, sample in enumerate(segments.samples)
+        )
 
         def start_video(frame: torch.Tensor):
             height, width = int(frame.shape[0]), int(frame.shape[1])
@@ -4955,8 +5962,16 @@ class MiniMaxH3EasySegmentDecode:
                 delivered = None
                 try:
                     decoded_full = nodes.VAEDecode().decode(bundle.video_vae, latent)[0]
+                    output_frames = max(
+                        5,
+                        int(
+                            (shots[index - 1].get("output_frames") if index - 1 < len(shots) else None)
+                            or sample.output_frames
+                            or sample.delivery_frames
+                        ),
+                    )
                     delivered = decoded_full[
-                        sample.head_frames:sample.head_frames + sample.delivery_frames
+                        sample.head_frames:sample.head_frames + output_frames
                     ].detach().to("cpu").contiguous()
                     if preview_frame is None:
                         preview_frame = delivered[:1].detach().to("cpu").contiguous()
@@ -4970,7 +5985,7 @@ class MiniMaxH3EasySegmentDecode:
 
                 if source_audio is None:
                     audio = nodes_audio.vae_decode_audio(bundle.audio_vae, latent)
-                    trimmed = _segment_trim_audio(audio, sample.head_frames, sample.delivery_frames)
+                    trimmed = _segment_trim_audio(audio, sample.head_frames, output_frames)
                     if trimmed is not None:
                         if audio_writer is None:
                             audio_writer = _H3PCMWriter(raw_audio_path)
@@ -5053,6 +6068,263 @@ class MiniMaxH3EasySegmentDecode:
         result = cls._decode_streaming(segments, bundle, source_audio, progress, terminal_progress)
         terminal_progress.finish()
         return result
+
+
+class MiniMaxH3EasySelectedVideoRefine:
+    """Upscale and refine one already-rendered, single-shot H3 video.
+
+    This is intentionally separate from Context Segments.  The selected MP4 is
+    decoded and re-encoded as the visual starting latent, while the connected
+    ``MiniMax H3 Easy`` context supplies the original prompt and any reference
+    media.  The latent upscaler only changes the spatial grid; H3 performs the
+    final low-noise second pass.
+    """
+
+    CATEGORY = "MiniMax H3 Easy"
+    FUNCTION = "refine_video"
+    RETURN_TYPES = ("VIDEO",)
+    RETURN_NAMES = ("video",)
+    DESCRIPTION = (
+        "Take a selected single-shot H3 MP4, re-encode and latent-upscale its video, "
+        "then run a low-noise H3 second pass using the connected prompt/reference context. "
+        "This node is independent of Context Segments."
+    )
+
+    @classmethod
+    def _upscale_model_choices(cls) -> list[str]:
+        try:
+            choices = list(scan_latent_upscaler_models())
+            return choices or ["(no latent upscaler models)"]
+        except Exception:
+            return ["(no latent upscaler models)"]
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "h3_context": ("MINIMAX_H3_CONTEXT",),
+                "model": ("MODEL",),
+                "sampler": ("SAMPLER",),
+                "sigmas": ("SIGMAS",),
+                "seed": (
+                    "INT",
+                    {
+                        "default": 0,
+                        "min": 0,
+                        "max": 4294967295,
+                        "control_after_generate": True,
+                    },
+                ),
+                "refine_execution": (list(SEGMENT_REFINE_EXECUTION_MODES), {"default": SEGMENT_REFINE_WHOLE}),
+                "latent_upscale_model": (cls._upscale_model_choices(),),
+                "latent_upscale_scale": ("FLOAT", {"default": 1.3, "min": 1.0, "max": 4.0, "step": 0.1}),
+                "latent_upscale_device": (["cuda", "cpu"], {"default": "cuda"}),
+                "latent_upscale_precision": (["fp32", "fp16", "bf16"], {"default": "fp16"}),
+                "tile_width": ("INT", {"default": 512, "min": 32, "max": nodes.MAX_RESOLUTION, "step": 32}),
+                "tile_height": ("INT", {"default": 512, "min": 32, "max": nodes.MAX_RESOLUTION, "step": 32}),
+                "tile_overlap": ("INT", {"default": 128, "min": 32, "max": nodes.MAX_RESOLUTION, "step": 32}),
+                "tile_fade": ("INT", {"default": 32, "min": 0, "max": nodes.MAX_RESOLUTION, "step": 32}),
+                "preserve_audio": ("BOOLEAN", {"default": True}),
+            },
+        }
+
+    @staticmethod
+    def _normalize_frames(frames: torch.Tensor) -> torch.Tensor:
+        if not isinstance(frames, torch.Tensor) or frames.ndim != 4:
+            raise ValueError("Selected video must provide frames with shape [frames, height, width, channels]")
+        if frames.shape[0] < 1 or frames.shape[1] < 1 or frames.shape[2] < 1 or frames.shape[-1] < 3:
+            raise ValueError("Selected video contains no usable RGB frames")
+        frames = frames[..., :3].detach().to(device="cpu", dtype=torch.float32).contiguous()
+        # Native ComfyUI VIDEO components are normally float RGB in [0, 1].
+        # Accept uint8-like tensors too, so a third-party loader can be used.
+        try:
+            if float(frames.max()) > 1.5:
+                frames = frames / 255.0
+        except Exception:
+            pass
+        return frames.clamp(0.0, 1.0)
+
+    @staticmethod
+    def _fit_frame_grid(frames: torch.Tensor, frame_count: int) -> torch.Tensor:
+        frame_count = max(5, int(frame_count))
+        current = int(frames.shape[0])
+        if current >= frame_count:
+            return frames[:frame_count].contiguous()
+        if current <= 0:
+            raise ValueError("Selected video contains no frames")
+        padding = frames[-1:].repeat(frame_count - current, 1, 1, 1)
+        return torch.cat((frames, padding), dim=0).contiguous()
+
+    @classmethod
+    def refine_video(
+        cls,
+        h3_context,
+        model,
+        sampler,
+        sigmas,
+        seed,
+        refine_execution,
+        latent_upscale_model,
+        latent_upscale_scale,
+        latent_upscale_device,
+        latent_upscale_precision,
+        tile_width,
+        tile_height,
+        tile_overlap,
+        tile_fade,
+        preserve_audio,
+    ):
+        if not isinstance(h3_context, MiniMaxH3Context):
+            raise ValueError("Connect the H3 Context output from a MiniMax H3 Easy node")
+        selected_video = getattr(h3_context, "selected_video", None)
+        if h3_context.conditioning is None:
+            raise ValueError("The connected H3 Context has no conditioning")
+        if getattr(h3_context, "segment_plan", None) is not None:
+            raise ValueError(
+                "Selected Video Refine is for one completed video; use Segment Refine for Context Segments"
+            )
+        if not hasattr(selected_video, "get_components"):
+            raise ValueError("Connect a completed video from Load Video or another VIDEO node")
+        if not latent_upscale_model or str(latent_upscale_model).startswith("("):
+            raise ValueError("Select an H3 latent upscaler model for selected-video refinement")
+
+        frames, source_audio, source_fps = _video_parts(selected_video)
+        frames = cls._normalize_frames(frames)
+        frames = _resample_video_frames(frames, float(source_fps or h3.FPS))
+        frame_count = h3.align_frame_count(max(5, int(frames.shape[0])))
+        frames = cls._fit_frame_grid(frames, frame_count)
+
+        source_height, source_width = int(frames.shape[1]), int(frames.shape[2])
+        width = _align_canvas_dimension(source_width)
+        height = _align_canvas_dimension(source_height)
+        if width != source_width or height != source_height:
+            frames = h3._resize(frames, width, height, "disabled")
+
+        video_latent = h3_context.video_vae.encode(frames)
+        if not isinstance(video_latent, torch.Tensor) or video_latent.ndim != 5 or video_latent.shape[1] != 24:
+            raise ValueError("The connected video VAE did not produce a valid 24-channel H3 video latent")
+        video_latent = video_latent.detach().to(device="cpu").contiguous()
+        del frames
+
+        # The learned upscaler and H3 denoiser are normally the two largest
+        # models in this path.  Release the denoiser before loading the
+        # upscaler; ComfyUI will load it again for the sampling call.
+        if str(latent_upscale_device).lower() in {"cuda", "rocm"}:
+            try:
+                comfy.model_management.unload_model_and_clones(
+                    model,
+                    unload_additional_models=False,
+                )
+                comfy.model_management.soft_empty_cache()
+            except Exception:
+                pass
+
+        result = MiniMaxH3EasyLatentUpscaler3D.execute(
+            {"samples": video_latent},
+            str(latent_upscale_model),
+            {"mode": "scale by multiplier", "scale": float(latent_upscale_scale)},
+            32,
+            True,
+            str(latent_upscale_device),
+            str(latent_upscale_precision),
+        )[0]
+        upscaled_video = result.get("samples") if isinstance(result, Mapping) else None
+        if not isinstance(upscaled_video, torch.Tensor) or upscaled_video.ndim != 5 or upscaled_video.shape[1] != 24:
+            raise RuntimeError("H3 latent upscaler returned an invalid video latent")
+        if int(upscaled_video.shape[2]) != int(video_latent.shape[2]):
+            raise RuntimeError("H3 latent upscaler changed the temporal latent length")
+        upscaled_video = upscaled_video.detach().to(device="cpu").contiguous()
+        target_width = int(upscaled_video.shape[-1]) * 16
+        target_height = int(upscaled_video.shape[-2]) * 16
+
+        empty_latent, _ = h3._empty_av_latent(target_width, target_height, frame_count)
+        _empty_video, empty_audio = _segment_latent_streams(empty_latent)
+        encoded_audio = None
+        source_audio_payload = source_audio if isinstance(source_audio, Mapping) else None
+        if source_audio_payload is not None and isinstance(source_audio_payload.get("waveform"), torch.Tensor):
+            encoded_audio, _audio_steps = _encode_reference_audio(
+                h3_context.audio_vae,
+                source_audio_payload,
+            )
+            encoded_audio = _fit_audio_latent(encoded_audio, empty_audio)
+        audio_latent = encoded_audio if encoded_audio is not None else empty_audio
+        latent = _segment_pack_latent(upscaled_video, audio_latent)
+        if bool(preserve_audio) and encoded_audio is not None:
+            # Keep the soundtrack from the selected MP4 bit-for-bit in the
+            # output timeline while also using its encoding as H3 guidance.
+            latent = _lock_audio_latent(latent, encoded_audio)
+
+        conditioning = MiniMaxH3EasySecondPassConditioning.rebuild(
+            h3_context,
+            {"samples": upscaled_video},
+        )[0]
+        conditioning = node_helpers.conditioning_set_values(
+            conditioning,
+            {"minimax_frame_count": frame_count},
+        )
+
+        execution = str(refine_execution or SEGMENT_REFINE_WHOLE)
+        if execution not in SEGMENT_REFINE_EXECUTION_MODES:
+            raise ValueError(f"Unsupported selected-video refine execution mode: {execution}")
+        steps = max(1, int(sigmas.shape[-1]) - 1)
+        seed_value = int(seed) % 4294967296
+        if execution == SEGMENT_REFINE_TILED:
+            passes = MiniMaxH3EasySegmentRefine._tiled_pass_count(
+                target_width,
+                target_height,
+                int(tile_width),
+                int(tile_height),
+                int(tile_overlap),
+            )
+            total_steps = max(1, passes * steps)
+            progress = comfy.utils.ProgressBar(total_steps)
+            sampled = MiniMaxH3EasySegmentRefine._tiled_sample(
+                model,
+                conditioning,
+                latent,
+                sampler,
+                sigmas,
+                seed_value,
+                progress,
+                0,
+                total_steps,
+                int(tile_width),
+                int(tile_height),
+                int(tile_overlap),
+                int(tile_fade),
+            )
+        else:
+            progress = comfy.utils.ProgressBar(steps)
+            sampled = MiniMaxH3EasySegmentRender._sample_one(
+                model,
+                conditioning,
+                latent,
+                sampler,
+                sigmas,
+                seed_value,
+                progress,
+                0,
+                steps,
+            )
+        decoded = nodes.VAEDecode().decode(h3_context.video_vae, sampled)[0]
+        if not isinstance(decoded, torch.Tensor) or decoded.ndim != 4 or decoded.shape[-1] < 3:
+            raise RuntimeError("H3 second pass did not produce decodable RGB video frames")
+        decoded = cls._fit_frame_grid(decoded[..., :3].detach().to(device="cpu").contiguous(), frame_count)
+
+        if bool(preserve_audio) and source_audio_payload is not None:
+            output_audio = _segment_trim_audio(source_audio_payload, 0, frame_count)
+        else:
+            output_audio = nodes_audio.vae_decode_audio(h3_context.audio_vae, sampled)
+            output_audio = _segment_trim_audio(output_audio, 0, frame_count) or output_audio
+
+        output_video = InputImpl.VideoFromComponents(
+            Types.VideoComponents(
+                images=decoded,
+                audio=output_audio,
+                frame_rate=Fraction(h3.FPS),
+            )
+        )
+        return (output_video,)
 
 
 class MiniMaxH3EasyAspectRatio:
@@ -5152,8 +6424,12 @@ NODE_CLASS_MAPPINGS = {
     "MiniMaxH3EasyContextSegments": MiniMaxH3EasyContextSegments,
     "MiniMaxH3EasyOutput": MiniMaxH3EasyOutput,
     "MiniMaxH3EasySegmentRender": MiniMaxH3EasySegmentRender,
+    "MiniMaxH3EasySegmentSampleSetup": MiniMaxH3EasySegmentSampleSetup,
+    "MiniMaxH3EasySegmentStep": MiniMaxH3EasySegmentStep,
+    "MiniMaxH3EasySegmentCollect": MiniMaxH3EasySegmentCollect,
     "MiniMaxH3EasySegmentRefine": MiniMaxH3EasySegmentRefine,
     "MiniMaxH3EasySegmentDecode": MiniMaxH3EasySegmentDecode,
+    "MiniMaxH3EasySelectedVideoContext": MiniMaxH3EasySelectedVideoContext,
     "MiniMaxH3EasyAspectRatio": MiniMaxH3EasyAspectRatio,
     "MiniMaxH3EasySecondPassConditioning": MiniMaxH3EasySecondPassConditioning,
 }

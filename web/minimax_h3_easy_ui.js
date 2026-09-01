@@ -3,12 +3,17 @@ import { api } from "../../scripts/api.js";
 
 const NODE_CLASS = "MiniMaxH3Easy";
 const CONTEXT_SEGMENTS_CLASS = "MiniMaxH3EasyContextSegments";
+const SELECTED_VIDEO_CONTEXT_CLASS = "MiniMaxH3EasySelectedVideoContext";
 const LOADER_CLASS = "MiniMaxH3EasyLoader";
 const ADAPTER_CLASS = "MiniMaxH3EasyModelAdapter";
 const MEDIA_LOADER_CLASS = "MiniMaxH3EasyMediaLoader";
 const MEDIA_BRIDGE_CLASS = "MiniMaxH3EasyMediaBridge";
+const MEDIA_SPLITTER_CLASS = "MiniMaxH3EasyMediaSplitter";
 const SEGMENT_RENDER_CLASS = "MiniMaxH3EasySegmentRender";
 const SEGMENT_REFINE_CLASS = "MiniMaxH3EasySegmentRefine";
+const SEGMENT_SAMPLE_SETUP_CLASS = "MiniMaxH3EasySegmentSampleSetup";
+const SEGMENT_STEP_CLASS = "MiniMaxH3EasySegmentStep";
+const SEGMENT_COLLECT_CLASS = "MiniMaxH3EasySegmentCollect";
 const SEGMENT_DECODE_CLASS = "MiniMaxH3EasySegmentDecode";
 const OUTPUT_CLASS = "MiniMaxH3EasyOutput";
 const LINKS_PROP = "minimax_h3_virtual_media_links";
@@ -41,6 +46,9 @@ const CONTINUITY_GUIDE = "guide";
 const CONTINUITY_LATENT = "latent_guide";
 const CONTINUITY_SOFT_AV = "soft_av";
 const CONTINUITY_HARD_AV = "hard_av";
+const SELECTED_VIDEO_SEGMENT_WHOLE = "whole_video";
+const SELECTED_VIDEO_SEGMENT_TIME_CUTS = "time_cuts";
+const SELECTED_VIDEO_SEGMENT_FRAME_CUTS = "frame_cuts";
 const GUIDE_CONTEXT_FRAME_GRID = Object.freeze([5, 22, 39, 56, 73]);
 const AV_CONTEXT_FRAME_GRID = Object.freeze([39, 90, 141]);
 const AV_CONTINUITY_MODES = new Set([CONTINUITY_SOFT_AV, CONTINUITY_HARD_AV]);
@@ -66,6 +74,16 @@ const MEDIA_BRIDGE_GROUPS = Object.freeze([
     { type: "video", count: "video_count", max: MAX_VIDEOS },
     { type: "audio", count: "audio_count", max: MAX_AUDIOS },
 ]);
+const MEDIA_SPLITTER_GROUPS = Object.freeze([
+    { type: "image", count: "image_count", max: 27 },
+    { type: "video", count: "video_count", max: 9 },
+    { type: "audio", count: "audio_count", max: 9 },
+]);
+const MEDIA_SPLITTER_OUTPUT_TYPES = Object.freeze({
+    image: "IMAGE",
+    video: "VIDEO",
+    audio: "AUDIO",
+});
 const MEDIA_LOADER_GROUPS = Object.freeze([
     { type: "image", key: "images" },
     { type: "audio", key: "audios" },
@@ -105,10 +123,12 @@ const TEXT = {
     mentionTitle: ZH_BROWSER ? "\u5f15\u7528\u7d20\u6750" : "Reference media",
     mentionEmpty: ZH_BROWSER ? "\u5148\u5c06\u7d20\u6750\u8fde\u63a5\u5230\u4e3b\u8282\u70b9" : "Connect media to the main node first",
     mainTitle: "MiniMax H3 Easy",
+    selectedVideoContextTitle: ZH_BROWSER ? "MiniMax H3 Easy 已选视频上下文" : "MiniMax H3 Easy Selected Video Context",
     loaderTitle: ZH_BROWSER ? "MiniMax H3 Easy \u52a0\u8f7d\u5668" : "MiniMax H3 Easy Loader",
     adapterTitle: ZH_BROWSER ? "MiniMax H3 Easy \u6a21\u578b\u4e2d\u8f6c" : "MiniMax H3 Easy Model Bridge",
     mediaBridgeTitle: ZH_BROWSER ? "MiniMax H3 Easy \u5a92\u4f53\u4e2d\u8f6c" : "MiniMax H3 Easy Media Bridge",
     mediaLoaderTitle: ZH_BROWSER ? "MiniMax H3 Easy \u5a92\u4f53\u52a0\u8f7d\u5668" : "MiniMax H3 Easy Media Loader",
+    mediaSplitterTitle: ZH_BROWSER ? "MiniMax H3 Easy \u5a92\u4f53\u62c6\u5206" : "MiniMax H3 Easy Media Splitter",
     mediaLoaderMenuTitle: ZH_BROWSER ? "\u5a92\u4f53\u52a0\u8f7d\u5668" : "Media Loader",
     mediaLoaderAll: ZH_BROWSER ? "\u5a92\u4f53\u8d44\u6e90" : "Media resources",
     mediaLoaderImages: ZH_BROWSER ? "\u56fe\u7247" : "Images",
@@ -162,14 +182,23 @@ const TEXT = {
     outputFps: "FPS",
     drivingAudio: ZH_BROWSER ? "\u9a71\u52a8\u97f3\u9891" : "Driving audio",
     outputContext: "H3 Context",
-     inputMedia: "Media",
+    inputMedia: "Media",
+    selectedVideoInput: ZH_BROWSER ? "候选视频" : "Selected video",
+    selectedVideoSegmentMode: ZH_BROWSER ? "候选视频分段方式" : "Candidate segmentation",
+    selectedVideoTimeCuts: ZH_BROWSER ? "时间切点（秒）" : "Time cut points (seconds)",
+    selectedVideoFrameCuts: ZH_BROWSER ? "帧切点（24 FPS）" : "Frame cut points (24 FPS)",
     mediaBundle: ZH_BROWSER ? "\u5a92\u4f53\u5305" : "Media bundle",
     imageCount: ZH_BROWSER ? "\u56fe\u7247\u6570\u91cf" : "Image count",
     videoCount: ZH_BROWSER ? "\u89c6\u9891\u6570\u91cf" : "Video count",
     audioCount: ZH_BROWSER ? "\u97f3\u9891\u6570\u91cf" : "Audio count",
     seedLabel: "Seed",
+    segmentSeeds: ZH_BROWSER ? "\u5206\u6bb5 Seed\uff08\u53ef\u9009\uff09" : "Segment seeds (optional)",
     segmentRenderTitle: ZH_BROWSER ? "MiniMax H3 Easy \u5206\u6bb5\u91c7\u6837" : "MiniMax H3 Easy Segment Sample",
     segmentRefineTitle: ZH_BROWSER ? "MiniMax H3 Easy \u5206\u6bb5\u4e8c\u91c7" : "MiniMax H3 Easy Segment Refine",
+    segmentSampleSetupTitle: ZH_BROWSER ? "MiniMax H3 Easy \u91c7\u6837\u8bbe\u7f6e" : "MiniMax H3 Easy Sample Setup",
+    segmentSampleSetupPort: ZH_BROWSER ? "\u91c7\u6837\u8bbe\u7f6e" : "Sample Setup",
+    segmentStepTitle: ZH_BROWSER ? "MiniMax H3 Easy \u5206\u6bb5\u6b65\u9aa4" : "MiniMax H3 Easy Segment Step",
+    segmentCollectTitle: ZH_BROWSER ? "MiniMax H3 Easy \u5206\u6bb5\u6c47\u603b" : "MiniMax H3 Easy Segment Collect",
     segmentDecodeTitle: ZH_BROWSER ? "MiniMax H3 Easy \u5206\u6bb5\u89e3\u7801" : "MiniMax H3 Easy Segment Decode",
     contextSegmentsTitle: ZH_BROWSER ? "MiniMax H3 Easy \u4e0a\u4e0b\u6587\u5206\u6bb5" : "MiniMax H3 Easy Context Segments",
     segmentSeconds: ZH_BROWSER ? "\u5206\u6bb5\u79d2\u6570" : "Segment seconds",
@@ -180,6 +209,9 @@ const TEXT = {
     segmentPreview: ZH_BROWSER ? "\u9884\u89c8" : "Preview",
     refineMode: ZH_BROWSER ? "\u4e8c\u91c7\u653e\u5927\u6a21\u5f0f" : "Refine mode",
     refineExecution: ZH_BROWSER ? "\u4e8c\u91c7\u6267\u884c\u65b9\u5f0f" : "Refine execution",
+    segmentIndex: ZH_BROWSER ? "\u5206\u6bb5\u5e8f\u53f7" : "Segment index",
+    previousSegment: ZH_BROWSER ? "\u4e0a\u4e00\u5206\u6bb5" : "Previous segment",
+    promptOverride: ZH_BROWSER ? "\u63d0\u793a\u8bcd\u8986\u76d6" : "Prompt override",
     tileWidth: ZH_BROWSER ? "Tile \u5bbd\u5ea6" : "Tile width",
     tileHeight: ZH_BROWSER ? "Tile \u9ad8\u5ea6" : "Tile height",
     tileOverlap: ZH_BROWSER ? "Tile \u91cd\u53e0\u533a" : "Tile overlap",
@@ -236,6 +268,11 @@ const OPTION_DEFS = {
     context_prompt_optimizer_mode: {
         whole_sequence: ZH_BROWSER ? "\u6574\u4f53\u4f18\u5316" : "Whole sequence",
         per_segment: ZH_BROWSER ? "\u9010\u6bb5\u4f18\u5316" : "Per segment",
+    },
+    selected_video_segment_mode: {
+        [SELECTED_VIDEO_SEGMENT_WHOLE]: ZH_BROWSER ? "整段视频" : "Whole video",
+        [SELECTED_VIDEO_SEGMENT_TIME_CUTS]: ZH_BROWSER ? "按时间切分" : "Split by time",
+        [SELECTED_VIDEO_SEGMENT_FRAME_CUTS]: ZH_BROWSER ? "按帧切分" : "Split by frame",
     },
     resolution: {
         "360P": "360P",
@@ -382,15 +419,41 @@ function nodeMatchesClass(node, className, displayName, installedMarker) {
 
 function isTarget(node) {
     return nodeMatchesClass(node, NODE_CLASS, TEXT.mainTitle, "__h3EasyNodeInstalled")
-        || nodeMatchesClass(node, CONTEXT_SEGMENTS_CLASS, TEXT.contextSegmentsTitle, "__h3ContextSegmentsNodeInstalled");
+        || nodeMatchesClass(node, CONTEXT_SEGMENTS_CLASS, TEXT.contextSegmentsTitle, "__h3ContextSegmentsNodeInstalled")
+        || nodeMatchesClass(node, SELECTED_VIDEO_CONTEXT_CLASS, TEXT.selectedVideoContextTitle, "__h3SelectedVideoContextNodeInstalled");
 }
 
 function isContextSegmentsNode(node) {
     return nodeMatchesClass(node, CONTEXT_SEGMENTS_CLASS, TEXT.contextSegmentsTitle, "__h3ContextSegmentsNodeInstalled");
 }
 
+function isSelectedVideoContextNode(node) {
+    return nodeMatchesClass(node, SELECTED_VIDEO_CONTEXT_CLASS, TEXT.selectedVideoContextTitle, "__h3SelectedVideoContextNodeInstalled");
+}
+
+function isSelectedVideoContextSegmented(node) {
+    if (!isSelectedVideoContextNode(node)) return false;
+    const mode = canonicalOption(
+        "selected_video_segment_mode",
+        getWidgetValue(node, "segment_mode", SELECTED_VIDEO_SEGMENT_WHOLE),
+    );
+    return mode !== SELECTED_VIDEO_SEGMENT_WHOLE;
+}
+
 function isSegmentRefineNode(node) {
     return nodeMatchesClass(node, SEGMENT_REFINE_CLASS, TEXT.segmentRefineTitle, "__h3SegmentRefineInstalled");
+}
+
+function isSegmentSampleSetupNode(node) {
+    return nodeMatchesClass(node, SEGMENT_SAMPLE_SETUP_CLASS, TEXT.segmentSampleSetupTitle, "__h3SegmentSampleSetupInstalled");
+}
+
+function isSegmentStepNode(node) {
+    return nodeMatchesClass(node, SEGMENT_STEP_CLASS, TEXT.segmentStepTitle, "__h3SegmentStepInstalled");
+}
+
+function isSegmentCollectNode(node) {
+    return nodeMatchesClass(node, SEGMENT_COLLECT_CLASS, TEXT.segmentCollectTitle, "__h3SegmentCollectInstalled");
 }
 
 function isLoader(node) {
@@ -403,6 +466,10 @@ function isAdapter(node) {
 
 function isMediaBridge(node) {
     return nodeMatchesClass(node, MEDIA_BRIDGE_CLASS, TEXT.mediaBridgeTitle, "__h3EasyMediaBridgeInstalled");
+}
+
+function isMediaSplitter(node) {
+    return nodeMatchesClass(node, MEDIA_SPLITTER_CLASS, TEXT.mediaSplitterTitle, "__h3EasyMediaSplitterInstalled");
 }
 
 function isMediaLoader(node) {
@@ -608,7 +675,9 @@ function localizeComboWidget(widget, node = null) {
         widget.__h3PromptGuideLocalized = true;
         return;
     }
-    let definition = OPTION_DEFS[name];
+    let definition = name === "segment_mode"
+        ? OPTION_DEFS.selected_video_segment_mode
+        : OPTION_DEFS[name];
     if (name === "mode" && node) {
         definition = isContextSegmentsNode(node)
             ? { [MODE_SEGMENTS]: OPTION_DEFS.mode[MODE_SEGMENTS] }
@@ -686,6 +755,26 @@ function setLocalizedSlotLabel(slot, label) {
 
 function localizeNodeInstance(node) {
     if (!node) return;
+    if (isMediaSplitter(node)) {
+        node.title = TEXT.mediaSplitterTitle;
+        const countLabels = {
+            image_count: TEXT.imageCount,
+            video_count: TEXT.videoCount,
+            audio_count: TEXT.audioCount,
+        };
+        for (const widget of node.widgets || []) {
+            if (countLabels[widget.name]) widget.label = countLabels[widget.name];
+        }
+        for (const input of node.inputs || []) {
+            if (input.name === "media_bundle") setLocalizedSlotLabel(input, TEXT.mediaBundle);
+        }
+        for (const output of node.outputs || []) {
+            if (mediaSplitterGroupForOutput(output.name)) {
+                setLocalizedSlotLabel(output, mediaSplitterOutputLabel(output.name));
+            }
+        }
+        return;
+    }
     if (isMediaLoader(node)) {
         node.title = TEXT.mediaLoaderTitle;
         for (const output of node.outputs || []) {
@@ -742,7 +831,7 @@ function localizeNodeInstance(node) {
     }
     if (nodeMatchesClass(node, SEGMENT_RENDER_CLASS, TEXT.segmentRenderTitle, "__h3SegmentRenderInstalled")) {
         node.title = TEXT.segmentRenderTitle;
-        const widgetLabels = { seed: TEXT.seedLabel };
+        const widgetLabels = { seed: TEXT.seedLabel, segment_seeds: TEXT.segmentSeeds };
         for (const widget of node.widgets || []) {
             if (widgetLabels[widget.name]) widget.label = widgetLabels[widget.name];
         }
@@ -756,6 +845,54 @@ function localizeNodeInstance(node) {
         }
         return;
     }
+    if (isSegmentStepNode(node)) {
+        node.title = TEXT.segmentStepTitle;
+        const widgetLabels = {
+            seed: TEXT.seedLabel,
+        };
+        for (const widget of node.widgets || []) {
+            if (widgetLabels[widget.name]) widget.label = widgetLabels[widget.name];
+            localizeComboWidget(widget, node);
+        }
+        const inputLabels = {
+            sample_setup: TEXT.segmentSampleSetupPort,
+            previous_segment: TEXT.previousSegment,
+            prompt_override: TEXT.promptOverride,
+        };
+        for (const input of node.inputs || []) {
+            if (inputLabels[input.name]) setLocalizedSlotLabel(input, inputLabels[input.name]);
+        }
+        for (const output of node.outputs || []) {
+            if (output.name === "segment") setLocalizedSlotLabel(output, TEXT.segmentResult);
+        }
+        return;
+    }
+    if (isSegmentSampleSetupNode(node)) {
+        node.title = TEXT.segmentSampleSetupTitle;
+        const inputLabels = {
+            h3_context: TEXT.outputContext,
+            model: TEXT.outputModel,
+        };
+        for (const input of node.inputs || []) {
+            if (inputLabels[input.name]) setLocalizedSlotLabel(input, inputLabels[input.name]);
+        }
+        for (const [index, output] of (node.outputs || []).entries()) {
+            if (index === 0 || output.name === "setup" || output.name === "sample_setup") {
+                setLocalizedSlotLabel(output, TEXT.segmentSampleSetupPort);
+            }
+        }
+        return;
+    }
+    if (isSegmentCollectNode(node)) {
+        node.title = TEXT.segmentCollectTitle;
+        for (const input of node.inputs || []) {
+            if (input.name === "final_segment") setLocalizedSlotLabel(input, TEXT.segmentResult);
+        }
+        for (const output of node.outputs || []) {
+            if (output.name === "segments") setLocalizedSlotLabel(output, TEXT.segmentResult);
+        }
+        return;
+    }
     if (nodeMatchesClass(node, SEGMENT_REFINE_CLASS, TEXT.segmentRefineTitle, "__h3SegmentRefineInstalled")) {
         node.title = TEXT.segmentRefineTitle;
         const widgetLabels = {
@@ -765,6 +902,7 @@ function localizeNodeInstance(node) {
             tile_height: TEXT.tileHeight,
             tile_overlap: TEXT.tileOverlap,
             tile_fade: TEXT.tileFade,
+            segment_seeds: TEXT.segmentSeeds,
         };
         for (const widget of node.widgets || []) {
             if (widgetLabels[widget.name]) widget.label = widgetLabels[widget.name];
@@ -792,8 +930,42 @@ function localizeNodeInstance(node) {
         return;
     }
     if (!isTarget(node)) return;
-    node.title = isContextSegmentsNode(node) ? TEXT.contextSegmentsTitle : TEXT.mainTitle;
-    const labels = { mode: TEXT.mode, audio_mode: TEXT.audioMode, prompt: TEXT.prompt, resolution: TEXT.resolution, aspect_ratio: TEXT.aspectRatio, width: TEXT.width, height: TEXT.height, seconds: TEXT.seconds, advanced: TEXT.advanced, prompt_optimizer: TEXT.promptOptimizer, prompt_optimizer_api_format: TEXT.promptOptimizerApiFormat, prompt_optimizer_api_url: TEXT.promptOptimizerApiUrl, prompt_optimizer_api_key: TEXT.promptOptimizerApiKey, prompt_optimizer_model: TEXT.promptOptimizerModel, prompt_optimizer_scene_guide: TEXT.promptOptimizerSceneGuide, prompt_optimizer_read_media: TEXT.promptOptimizerReadMedia, prompt_optimizer_optimize_on_run: TEXT.promptOptimizerOptimizeOnRun, context_prompt_optimizer_mode: TEXT.contextPromptOptimizerMode, context_prompt_optimizer_concurrency: TEXT.contextPromptOptimizerConcurrency, fps: TEXT.fps, keyframe_role: TEXT.keyframeRole, ref_image_size: TEXT.refImageSize, reference_mention_mode: TEXT.referenceMentionMode, segment_seconds: TEXT.segmentSeconds, context_length: TEXT.contextLength, continuity_mode: TEXT.continuityMode };
+    node.title = isContextSegmentsNode(node)
+        ? TEXT.contextSegmentsTitle
+        : isSelectedVideoContextNode(node)
+            ? TEXT.selectedVideoContextTitle
+            : TEXT.mainTitle;
+    const labels = {
+        mode: TEXT.mode,
+        prompt: TEXT.prompt,
+        selected_video: TEXT.selectedVideoInput,
+        segment_mode: TEXT.selectedVideoSegmentMode,
+        segment_cuts: TEXT.selectedVideoTimeCuts,
+        audio_mode: TEXT.audioMode,
+        resolution: TEXT.resolution,
+        aspect_ratio: TEXT.aspectRatio,
+        width: TEXT.width,
+        height: TEXT.height,
+        seconds: TEXT.seconds,
+        advanced: TEXT.advanced,
+        prompt_optimizer: TEXT.promptOptimizer,
+        prompt_optimizer_api_format: TEXT.promptOptimizerApiFormat,
+        prompt_optimizer_api_url: TEXT.promptOptimizerApiUrl,
+        prompt_optimizer_api_key: TEXT.promptOptimizerApiKey,
+        prompt_optimizer_model: TEXT.promptOptimizerModel,
+        prompt_optimizer_scene_guide: TEXT.promptOptimizerSceneGuide,
+        prompt_optimizer_read_media: TEXT.promptOptimizerReadMedia,
+        prompt_optimizer_optimize_on_run: TEXT.promptOptimizerOptimizeOnRun,
+        context_prompt_optimizer_mode: TEXT.contextPromptOptimizerMode,
+        context_prompt_optimizer_concurrency: TEXT.contextPromptOptimizerConcurrency,
+        fps: TEXT.fps,
+        keyframe_role: TEXT.keyframeRole,
+        ref_image_size: TEXT.refImageSize,
+        reference_mention_mode: TEXT.referenceMentionMode,
+        segment_seconds: TEXT.segmentSeconds,
+        context_length: TEXT.contextLength,
+        continuity_mode: TEXT.continuityMode,
+    };
     for (const widget of node.widgets || []) {
         if (labels[widget.name]) widget.label = labels[widget.name];
         localizeComboWidget(widget, node);
@@ -802,6 +974,7 @@ function localizeNodeInstance(node) {
     for (const input of node.inputs || []) {
         if (input.name === "h3_bundle") setLocalizedSlotLabel(input, TEXT.bundle);
         if (input.name === "media") setLocalizedSlotLabel(input, TEXT.inputMedia);
+        if (input.name === "selected_video") setLocalizedSlotLabel(input, TEXT.selectedVideoInput);
     }
     const outputLabels = { model: TEXT.outputModel, h3_context: TEXT.outputContext };
     for (const output of node.outputs || []) {
@@ -811,7 +984,7 @@ function localizeNodeInstance(node) {
 }
 
 function localizeNodeDefinition(nodeData) {
-    if (!nodeData || ![NODE_CLASS, CONTEXT_SEGMENTS_CLASS, LOADER_CLASS, ADAPTER_CLASS, MEDIA_LOADER_CLASS, MEDIA_BRIDGE_CLASS, OUTPUT_CLASS, SEGMENT_RENDER_CLASS, SEGMENT_REFINE_CLASS, SEGMENT_DECODE_CLASS].includes(nodeData.name)) return;
+    if (!nodeData || ![NODE_CLASS, CONTEXT_SEGMENTS_CLASS, SELECTED_VIDEO_CONTEXT_CLASS, LOADER_CLASS, ADAPTER_CLASS, MEDIA_LOADER_CLASS, MEDIA_BRIDGE_CLASS, MEDIA_SPLITTER_CLASS, OUTPUT_CLASS, SEGMENT_RENDER_CLASS, SEGMENT_SAMPLE_SETUP_CLASS, SEGMENT_STEP_CLASS, SEGMENT_COLLECT_CLASS, SEGMENT_REFINE_CLASS, SEGMENT_DECODE_CLASS].includes(nodeData.name)) return;
     nodeData.display_name = nodeData.name === LOADER_CLASS
         ? TEXT.loaderTitle
         : nodeData.name === ADAPTER_CLASS
@@ -820,16 +993,26 @@ function localizeNodeDefinition(nodeData) {
                 ? TEXT.mediaLoaderTitle
             : nodeData.name === MEDIA_BRIDGE_CLASS
             ? TEXT.mediaBridgeTitle
+            : nodeData.name === MEDIA_SPLITTER_CLASS
+            ? TEXT.mediaSplitterTitle
             : nodeData.name === OUTPUT_CLASS
             ? TEXT.outputTitle
-            : nodeData.name === SEGMENT_RENDER_CLASS
-            ? TEXT.segmentRenderTitle
-            : nodeData.name === SEGMENT_REFINE_CLASS
+              : nodeData.name === SEGMENT_RENDER_CLASS
+              ? TEXT.segmentRenderTitle
+              : nodeData.name === SEGMENT_SAMPLE_SETUP_CLASS
+              ? TEXT.segmentSampleSetupTitle
+              : nodeData.name === SEGMENT_STEP_CLASS
+             ? TEXT.segmentStepTitle
+             : nodeData.name === SEGMENT_COLLECT_CLASS
+             ? TEXT.segmentCollectTitle
+             : nodeData.name === SEGMENT_REFINE_CLASS
             ? TEXT.segmentRefineTitle
             : nodeData.name === SEGMENT_DECODE_CLASS
             ? TEXT.segmentDecodeTitle
             : nodeData.name === CONTEXT_SEGMENTS_CLASS
             ? TEXT.contextSegmentsTitle
+            : nodeData.name === SELECTED_VIDEO_CONTEXT_CLASS
+            ? TEXT.selectedVideoContextTitle
             : TEXT.mainTitle;
     nodeData.category = TEXT.category;
 }
@@ -859,14 +1042,209 @@ function isReferenceMode(node) {
     return mode === MODE_REFERENCE || mode === MODE_DIGITAL_HUMAN;
 }
 
+function mediaSplitterGroupForOutput(name) {
+    const match = /^(image|video|audio)_(\d+)$/.exec(String(name || ""));
+    if (!match) return null;
+    return { type: match[1], index: Number(match[2]) };
+}
+
+function mediaSplitterCount(node, group) {
+    const raw = Number(getWidget(node, group.count)?.value);
+    if (!Number.isFinite(raw)) return 0;
+    return Math.max(0, Math.min(group.max, Math.floor(raw)));
+}
+
+function desiredMediaSplitterOutputNames(node) {
+    const names = [];
+    for (const group of MEDIA_SPLITTER_GROUPS) {
+        for (let index = 1; index <= mediaSplitterCount(node, group); index += 1) {
+            names.push(`${group.type}_${index}`);
+        }
+    }
+    return names;
+}
+
+function clampMediaSplitterWidgetValue(widget, group, value) {
+    if (!widget) return 0;
+    const parsed = Number.parseInt(value ?? widget.value ?? 0, 10);
+    const clamped = Number.isFinite(parsed) ? Math.max(0, Math.min(group.max, parsed)) : 0;
+    widget.value = clamped;
+    return clamped;
+}
+
+function mediaSplitterOutputLabel(name) {
+    const parsed = mediaSplitterGroupForOutput(name);
+    if (!parsed) return String(name || "");
+    const label = TEXT[parsed.type] || parsed.type;
+    return `${label} ${parsed.index}`;
+}
+
+function mediaSplitterOutputType(name) {
+    const parsed = mediaSplitterGroupForOutput(name);
+    return parsed ? (MEDIA_SPLITTER_OUTPUT_TYPES[parsed.type] || "*") : "*";
+}
+
+function trimMediaSplitterNodeDataOutputs(nodeData) {
+    if (!nodeData) return;
+    const managed = /^(image|video|audio)_\d+$/;
+    const names = Array.isArray(nodeData.output_name) ? nodeData.output_name : null;
+    const outputTypes = Array.isArray(nodeData.output) ? nodeData.output : null;
+    if (names && outputTypes) {
+        const keep = names
+            .map((name, index) => ({ name: String(name || ""), index }))
+            .filter(({ name }) => !managed.test(name))
+            .map(({ index }) => index);
+        const filterByKeep = (value) => Array.isArray(value) ? keep.map((index) => value[index]) : value;
+        nodeData.output = filterByKeep(outputTypes);
+        nodeData.output_name = filterByKeep(names);
+        if (Array.isArray(nodeData.output_is_list)) nodeData.output_is_list = filterByKeep(nodeData.output_is_list);
+        if (Array.isArray(nodeData.output_tooltips)) nodeData.output_tooltips = filterByKeep(nodeData.output_tooltips);
+        return;
+    }
+    // Older ComfyUI builds may expose a frontend `outputs` array instead of
+    // the object-info parallel arrays. Keep the same cleanup compatible there.
+    if (Array.isArray(nodeData.outputs)) {
+        nodeData.outputs = nodeData.outputs.filter((output) => !managed.test(String(output?.name || "")));
+    }
+}
+
+function updateMediaSplitterOutputLinkTargets(node) {
+    const graph = node?.graph || app.graph;
+    if (!graph || !Array.isArray(node?.outputs)) return;
+    node.outputs.forEach((output, index) => {
+        const rawLinks = Array.isArray(output?.links)
+            ? output.links
+            : output?.link == null ? [] : [output.link];
+        for (const linkId of rawLinks) {
+            const link = getNativeGraphLink(graph, linkId);
+            if (!link) continue;
+            // LiteGraph uses origin_slot. The aliases cover the current Vue
+            // graph adapter and older workflow snapshots without changing
+            // the link's identity.
+            link.origin_slot = index;
+            if ("originSlot" in link) link.originSlot = index;
+            if ("from_slot" in link) link.from_slot = index;
+            if ("fromSlot" in link) link.fromSlot = index;
+        }
+    });
+}
+
+function resizeMediaSplitterToContent(node) {
+    if (!node || typeof node.computeSize !== "function" || typeof node.setSize !== "function") return;
+    const measured = node.computeSize();
+    if (!Array.isArray(measured) || !Number.isFinite(Number(measured[1]))) return;
+    const currentWidth = Math.max(240, Number(node.size?.[0]) || 0, Number(measured[0]) || 0);
+    const currentHeight = Number(node.size?.[1]) || 0;
+    const targetHeight = Math.max(1, Math.ceil(Number(measured[1])));
+    // Splitter has no expandable content area, so keeping the height equal to
+    // its active output list avoids the giant 45-port box left by the static
+    // backend schema. Width is preserved when the user made it wider.
+    if (Math.abs(currentHeight - targetHeight) > 1) node.setSize([currentWidth, targetHeight]);
+}
+
+function removeMediaSplitterOutputAt(node, index) {
+    const output = node?.outputs?.[index];
+    const graph = node?.graph || app.graph;
+    const links = Array.isArray(output?.links)
+        ? [...output.links]
+        : output?.link == null ? [] : [output.link];
+    if (typeof node.removeOutput !== "function" && graph?.removeLink) {
+        for (const linkId of links) graph.removeLink(linkId);
+    }
+    if (typeof node.removeOutput === "function") {
+        node.removeOutput(index);
+        return;
+    }
+    node.outputs?.splice(index, 1);
+}
+
+function rebuildMediaSplitterOutputs(node, desiredNames) {
+    const desired = new Set(desiredNames);
+    const desiredOrder = new Map(desiredNames.map((name, index) => [name, index]));
+    const removeSlots = [];
+    const seen = new Set();
+    for (let index = 0; index < (node.outputs || []).length; index += 1) {
+        const output = node.outputs[index];
+        if (!mediaSplitterGroupForOutput(output?.name)) continue;
+        if (!desired.has(output.name) || seen.has(output.name)) removeSlots.push(index);
+        else seen.add(output.name);
+    }
+    for (const slot of removeSlots.reverse()) removeMediaSplitterOutputAt(node, slot);
+
+    let changed = removeSlots.length > 0;
+    for (const name of desiredNames) {
+        if (node.outputs?.some((output) => output?.name === name)) continue;
+        if (typeof node.addOutput === "function") node.addOutput(name, mediaSplitterOutputType(name));
+        else {
+            node.outputs ||= [];
+            node.outputs.push({ name, type: mediaSplitterOutputType(name), links: null });
+        }
+        changed = true;
+    }
+
+    const managed = [];
+    const unmanaged = [];
+    for (const output of node.outputs || []) {
+        if (!mediaSplitterGroupForOutput(output?.name)) {
+            unmanaged.push(output);
+            continue;
+        }
+        if (!desired.has(output.name)) continue;
+        output.type = mediaSplitterOutputType(output.name);
+        const label = mediaSplitterOutputLabel(output.name);
+        setLocalizedSlotLabel(output, label);
+        output.display_name = label;
+        managed.push(output);
+    }
+    managed.sort((a, b) => desiredOrder.get(a.name) - desiredOrder.get(b.name));
+    const sorted = [...managed, ...unmanaged];
+    const orderChanged = sorted.length !== (node.outputs || []).length
+        || sorted.some((output, index) => output !== node.outputs[index]);
+    if (changed || orderChanged) {
+        node.outputs ||= [];
+        node.outputs.splice(0, node.outputs.length, ...sorted);
+        updateMediaSplitterOutputLinkTargets(node);
+        node._widgetSlotsDirty = true;
+        node.setDirtyCanvas?.(true, true);
+        node.graph?.setDirtyCanvas?.(true, true);
+        app.graph?.setDirtyCanvas?.(true, true);
+        return true;
+    }
+    return false;
+}
+
+function mediaSplitterSignature(node) {
+    return MEDIA_SPLITTER_GROUPS.map((group) => mediaSplitterCount(node, group)).join(":");
+}
+
+function updateMediaSplitterWidgets(node, options = {}) {
+    if (!node || node.__h3MediaSplitterUpdating) return false;
+    node.__h3MediaSplitterUpdating = true;
+    try {
+        const signature = mediaSplitterSignature(node);
+        if (!options.force && node.__h3MediaSplitterSignature === signature) return false;
+        node.__h3MediaSplitterSignature = signature;
+        const changed = rebuildMediaSplitterOutputs(node, desiredMediaSplitterOutputNames(node));
+        localizeNodeInstance(node);
+        refreshVueNodeWidgets(node);
+        if (changed) {
+            resizeMediaSplitterToContent(node);
+            repairNodeLayout(node);
+        }
+        return changed;
+    } finally {
+        node.__h3MediaSplitterUpdating = false;
+    }
+}
+
 function mediaReferenceMode(node) {
-    return isReferenceMode(node) || isContextSegmentsNode(node);
+    return isReferenceMode(node) || isContextSegmentsNode(node) || isSelectedVideoContextNode(node);
 }
 
 // Context Segments uses the same media-mention editor as reference mode, but
 // remains a separate execution mode and does not inherit reference-only UI.
 function canUseMediaMentions(node) {
-    return isReferenceMode(node) || isContextSegmentsNode(node);
+    return isReferenceMode(node) || isContextSegmentsNode(node) || isSelectedVideoContextNode(node);
 }
 
 function isSegmentMode(node) {
@@ -970,6 +1348,9 @@ function mediaLimits(node) {
             audio: digitalAudio ? 1 : SEGMENT_MAX_AUDIOS,
             total: SEGMENT_MAX_MEDIA,
         };
+    }
+    if (isSelectedVideoContextNode(node)) {
+        return { image: MAX_IMAGES, video: MAX_VIDEOS, audio: MAX_AUDIOS, total: MAX_MEDIA };
     }
     if (canonicalOption("mode", getWidgetValue(node, "mode", MODE_IMAGE)) === MODE_DIGITAL_HUMAN) {
         return { image: MAX_IMAGES, video: MAX_VIDEOS, audio: 1, total: MAX_MEDIA };
@@ -2115,16 +2496,28 @@ function patchGraphToPrompt() {
                 if (originId != null) promptNode.inputs.prompt = [String(originId), Number(originSlot) || 0];
             }
             promptNode.inputs.mode = canonicalOption("mode", getWidgetValue(node, "mode", MODE_IMAGE));
-            promptNode.inputs.resolution = canonicalOption("resolution", getWidgetValue(node, "resolution", "480P"));
-            promptNode.inputs.aspect_ratio = canonicalOption("aspect_ratio", getWidgetValue(node, "aspect_ratio", "16:9"));
-            preserveLinkedPromptInput(promptNode, node, "width", Number(getWidgetValue(node, "width", 1344)));
-            preserveLinkedPromptInput(promptNode, node, "height", Number(getWidgetValue(node, "height", 768)));
-            preserveLinkedPromptInput(
-                promptNode,
-                node,
-                "seconds",
-                Math.min(MAX_SECONDS, Math.max(MIN_SECONDS, Number(getWidgetValue(node, "seconds", 5)) || 5)),
-            );
+            if (!isSelectedVideoContextNode(node)) {
+                promptNode.inputs.resolution = canonicalOption("resolution", getWidgetValue(node, "resolution", "480P"));
+                promptNode.inputs.aspect_ratio = canonicalOption("aspect_ratio", getWidgetValue(node, "aspect_ratio", "16:9"));
+                preserveLinkedPromptInput(promptNode, node, "width", Number(getWidgetValue(node, "width", 1344)));
+                preserveLinkedPromptInput(promptNode, node, "height", Number(getWidgetValue(node, "height", 768)));
+                preserveLinkedPromptInput(
+                    promptNode,
+                    node,
+                    "seconds",
+                    Math.min(MAX_SECONDS, Math.max(MIN_SECONDS, Number(getWidgetValue(node, "seconds", 5)) || 5)),
+                );
+            } else {
+                // The selected-video context derives canvas and duration from
+                // the connected candidate VIDEO; do not inject the legacy
+                // Easy resolution widgets into its prompt payload.
+                delete promptNode.inputs.resolution;
+                delete promptNode.inputs.aspect_ratio;
+                delete promptNode.inputs.width;
+                delete promptNode.inputs.height;
+                delete promptNode.inputs.seconds;
+                delete promptNode.inputs.fps;
+            }
             promptNode.inputs.advanced = asBoolean(getWidgetValue(node, "advanced", false));
             promptNode.inputs.prompt_optimizer = asBoolean(getWidgetValue(node, "prompt_optimizer", false));
             promptNode.inputs.prompt_optimizer_api_format = canonicalOption("prompt_optimizer_api_format", getWidgetValue(node, "prompt_optimizer_api_format", "openai"));
@@ -2137,7 +2530,9 @@ function patchGraphToPrompt() {
             promptNode.inputs.prompt_optimizer_resources = JSON.stringify(promptOptimizerResources(node));
             promptNode.inputs.prompt_optimizer_marker = JSON.stringify(node.properties?.[PROMPT_AUTO_MARKER_PROP] || {});
             promptNode.inputs.prompt_optimizer_prompt_connected = hasPromptConnection;
-            promptNode.inputs.fps = Number(getWidgetValue(node, "fps", 24));
+            if (!isSelectedVideoContextNode(node)) {
+                promptNode.inputs.fps = Number(getWidgetValue(node, "fps", 24));
+            }
             promptNode.inputs.keyframe_role = canonicalOption("keyframe_role", getWidgetValue(node, "keyframe_role", KEYFRAME_FIRST));
             promptNode.inputs.ref_image_size = canonicalOption("ref_image_size", getWidgetValue(node, "ref_image_size", REF_IMAGE_1K));
             promptNode.inputs.reference_mention_mode = canonicalOption("reference_mention_mode", getWidgetValue(node, "reference_mention_mode", "index"));
@@ -2147,6 +2542,25 @@ function patchGraphToPrompt() {
                     getWidgetValue(node, "audio_mode", CONTEXT_AUDIO_GENERATED),
                 );
                 promptNode.inputs.segment_seconds = String(getWidgetValue(node, "segment_seconds", "") || "");
+                promptNode.inputs.context_length = Number(getWidgetValue(node, "context_length", 5)) || 5;
+                promptNode.inputs.continuity_mode = canonicalOption(
+                    "continuity_mode",
+                    getWidgetValue(node, "continuity_mode", CONTINUITY_LATENT),
+                );
+                promptNode.inputs.context_prompt_optimizer_mode = canonicalOption(
+                    "context_prompt_optimizer_mode",
+                    getWidgetValue(node, "context_prompt_optimizer_mode", "whole_sequence"),
+                );
+                promptNode.inputs.context_prompt_optimizer_concurrency = Math.max(
+                    1,
+                    Math.min(20, Number(getWidgetValue(node, "context_prompt_optimizer_concurrency", 3)) || 3),
+                );
+            } else if (isSelectedVideoContextNode(node)) {
+                promptNode.inputs.segment_mode = canonicalOption(
+                    "selected_video_segment_mode",
+                    getWidgetValue(node, "segment_mode", SELECTED_VIDEO_SEGMENT_WHOLE),
+                );
+                promptNode.inputs.segment_cuts = String(getWidgetValue(node, "segment_cuts", "") || "");
                 promptNode.inputs.context_length = Number(getWidgetValue(node, "context_length", 5)) || 5;
                 promptNode.inputs.continuity_mode = canonicalOption(
                     "continuity_mode",
@@ -3988,7 +4402,7 @@ function contextFrameGrid(node) {
 
 function syncContextLengthWidget(node) {
     const widget = getWidget(node, "context_length");
-    if (!widget || !isSegmentMode(node)) return false;
+    if (!widget || (!isSegmentMode(node) && !isSelectedVideoContextSegmented(node))) return false;
     const grid = contextFrameGrid(node);
     widget.options ||= {};
     widget.options.min = grid[0];
@@ -4014,12 +4428,19 @@ function syncModeWidgets(node, { adjustHeight = true } = {}) {
         getWidgetValue(node, "context_prompt_optimizer_mode", "whole_sequence"),
     );
     const contextNode = isContextSegmentsNode(node);
+    const selectedVideoContext = isSelectedVideoContextNode(node);
+    const selectedSegmentMode = canonicalOption(
+        "selected_video_segment_mode",
+        getWidgetValue(node, "segment_mode", SELECTED_VIDEO_SEGMENT_WHOLE),
+    );
+    const selectedVideoSegmented = selectedVideoContext && selectedSegmentMode !== SELECTED_VIDEO_SEGMENT_WHOLE;
+    const segmentContextNode = contextNode || selectedVideoSegmented;
     const changed = [
         syncContextLengthWidget(node),
-        setConditionalWidgetVisible(node, getWidget(node, "mode"), !isContextSegmentsNode(node), { adjustHeight }),
-        setConditionalWidgetVisible(node, getWidget(node, "audio_mode"), isContextSegmentsNode(node), { adjustHeight }),
-        setConditionalWidgetVisible(node, getWidget(node, "fps"), advanced && !isContextSegmentsNode(node), { adjustHeight }),
-        setConditionalWidgetVisible(node, getWidget(node, "keyframe_role"), advanced && !isReferenceMode(node) && !isContextSegmentsNode(node), { adjustHeight }),
+        setConditionalWidgetVisible(node, getWidget(node, "mode"), !contextNode, { adjustHeight }),
+        setConditionalWidgetVisible(node, getWidget(node, "audio_mode"), contextNode, { adjustHeight }),
+        setConditionalWidgetVisible(node, getWidget(node, "fps"), advanced && !segmentContextNode, { adjustHeight }),
+        setConditionalWidgetVisible(node, getWidget(node, "keyframe_role"), advanced && !isReferenceMode(node) && !segmentContextNode, { adjustHeight }),
         setConditionalWidgetVisible(node, getWidget(node, "ref_image_size"), advanced, { adjustHeight }),
         setConditionalWidgetVisible(node, getWidget(node, "reference_mention_mode"), advanced && isReferenceMode(node), { adjustHeight }),
         setConditionalWidgetVisible(node, getWidget(node, "aspect_ratio"), !isCustomResolution(node), { adjustHeight }),
@@ -4033,17 +4454,25 @@ function syncModeWidgets(node, { adjustHeight = true } = {}) {
         setConditionalWidgetVisible(node, getWidget(node, "prompt_optimizer_scene_guide"), advanced && optimizerEnabled, { adjustHeight }),
         setConditionalWidgetVisible(node, getWidget(node, "prompt_optimizer_read_media"), advanced && optimizerEnabled, { adjustHeight }),
         setConditionalWidgetVisible(node, getWidget(node, "prompt_optimizer_optimize_on_run"), advanced && optimizerEnabled, { adjustHeight }),
-        setConditionalWidgetVisible(node, getWidget(node, "context_prompt_optimizer_mode"), contextNode && advanced && optimizerEnabled, { adjustHeight }),
-        setConditionalWidgetVisible(node, getWidget(node, "context_prompt_optimizer_concurrency"), contextNode && advanced && optimizerEnabled && contextOptimizerMode === "per_segment", { adjustHeight }),
+        setConditionalWidgetVisible(node, getWidget(node, "context_prompt_optimizer_mode"), segmentContextNode && advanced && optimizerEnabled, { adjustHeight }),
+        setConditionalWidgetVisible(node, getWidget(node, "context_prompt_optimizer_concurrency"), segmentContextNode && advanced && optimizerEnabled && contextOptimizerMode === "per_segment", { adjustHeight }),
         setConditionalWidgetVisible(node, getWidget(node, "segment_seconds"), isSegmentMode(node), { adjustHeight }),
-        setConditionalWidgetVisible(node, getWidget(node, "context_length"), isSegmentMode(node), { adjustHeight }),
-        setConditionalWidgetVisible(node, getWidget(node, "continuity_mode"), isSegmentMode(node), { adjustHeight }),
+        setConditionalWidgetVisible(node, getWidget(node, "context_length"), segmentContextNode, { adjustHeight }),
+        setConditionalWidgetVisible(node, getWidget(node, "continuity_mode"), segmentContextNode, { adjustHeight }),
+        setConditionalWidgetVisible(node, getWidget(node, "segment_mode"), selectedVideoContext, { adjustHeight }),
+        setConditionalWidgetVisible(node, getWidget(node, "segment_cuts"), selectedVideoContext && selectedSegmentMode !== SELECTED_VIDEO_SEGMENT_WHOLE, { adjustHeight }),
     ].some(Boolean);
     if (!isSegmentMode(node)) {
         const segmentSeconds = getWidget(node, "segment_seconds");
         if (segmentSeconds) segmentSeconds.label = TEXT.segmentSeconds;
     } else {
         syncSegmentSummary(node);
+    }
+    const cuts = getWidget(node, "segment_cuts");
+    if (cuts && selectedVideoContext) {
+        cuts.label = selectedSegmentMode === SELECTED_VIDEO_SEGMENT_FRAME_CUTS
+            ? TEXT.selectedVideoFrameCuts
+            : TEXT.selectedVideoTimeCuts;
     }
     if (changed) {
         refreshVueNodeWidgets(node);
@@ -5617,6 +6046,151 @@ function repairConfiguredWidgetValues(node, info) {
     const raw = Array.isArray(info?.widgets_values) ? [...info.widgets_values] : [];
     if (!raw.length) return;
 
+    // Selected-video context has its own prefix and keeps the API optimizer
+    // fields inline with the rest of the node. Normalize it before the
+    // generic Easy/context parser below so switching workflows cannot shift
+    // the segment controls into the wrong rows.
+    if (isSelectedVideoContextNode(node)) {
+        const named = info?.widgets_values_named && typeof info.widgets_values_named === "object"
+            ? info.widgets_values_named
+            : {};
+        const values = [...raw];
+        const segmentModeIsValid = (value) => Object.prototype.hasOwnProperty.call(
+            OPTION_DEFS.selected_video_segment_mode,
+            canonicalOption("selected_video_segment_mode", value),
+        );
+        if (values.length > 3 && (values[2] == null || String(values[2]).trim() === "") && segmentModeIsValid(values[3])) {
+            values.splice(2, 1);
+        }
+        const namedValue = (name) => named[name];
+        const optionValue = (name, optionName, positional, fallback) => {
+            const positionalValue = canonicalOption(optionName, positional);
+            if (Object.prototype.hasOwnProperty.call(OPTION_DEFS[optionName], positionalValue)) return positionalValue;
+            const namedValueNormalized = canonicalOption(optionName, namedValue(name));
+            if (Object.prototype.hasOwnProperty.call(OPTION_DEFS[optionName], namedValueNormalized)) return namedValueNormalized;
+            return fallback;
+        };
+        const stringValue = (name, positional, fallback) =>
+            typeof positional === "string" ? positional : (typeof namedValue(name) === "string" ? namedValue(name) : fallback);
+        const boolValue = (name, positional, fallback) => {
+            if (typeof positional === "boolean") return positional;
+            if (typeof positional === "number" && Number.isFinite(positional)) return positional !== 0;
+            const text = String(positional ?? "").trim().toLowerCase();
+            if (["1", "true", "on", "yes"].includes(text)) return true;
+            if (["0", "false", "off", "no", ""].includes(text)) {
+                const namedText = String(namedValue(name) ?? "").trim().toLowerCase();
+                if (["1", "true", "on", "yes"].includes(namedText)) return true;
+                return fallback;
+            }
+            return fallback;
+        };
+        const numberValue = (name, positional, fallback) => {
+            const value = Number(positional);
+            if (Number.isFinite(value)) return value;
+            const namedNumber = Number(namedValue(name));
+            return Number.isFinite(namedNumber) ? namedNumber : fallback;
+        };
+        const defaults = {
+            mode: MODE_IMAGE,
+            prompt: "",
+            segment_mode: SELECTED_VIDEO_SEGMENT_WHOLE,
+            segment_cuts: "",
+            context_length: GUIDE_CONTEXT_FRAME_GRID[0],
+            continuity_mode: CONTINUITY_LATENT,
+            advanced: false,
+            keyframe_role: KEYFRAME_FIRST,
+            ref_image_size: REF_IMAGE_1K,
+            reference_mention_mode: "index",
+            prompt_optimizer: false,
+            prompt_optimizer_api_format: "openai",
+            prompt_optimizer_api_url: "",
+            prompt_optimizer_api_key: "",
+            prompt_optimizer_model: "",
+            prompt_optimizer_scene_guide: "none",
+            prompt_optimizer_read_media: false,
+            prompt_optimizer_optimize_on_run: false,
+            context_prompt_optimizer_mode: "whole_sequence",
+            context_prompt_optimizer_concurrency: 3,
+        };
+        let suffix = values.slice(10);
+        let contextOptimizerMode = defaults.context_prompt_optimizer_mode;
+        let contextOptimizerConcurrency = defaults.context_prompt_optimizer_concurrency;
+        if (suffix.length >= 2) {
+            const candidate = canonicalOption("context_prompt_optimizer_mode", suffix[suffix.length - 2]);
+            const concurrency = Number(suffix[suffix.length - 1]);
+            if (Object.prototype.hasOwnProperty.call(OPTION_DEFS.context_prompt_optimizer_mode, candidate) && Number.isFinite(concurrency)) {
+                contextOptimizerMode = candidate;
+                contextOptimizerConcurrency = Math.max(1, Math.min(20, concurrency || 3));
+                suffix = suffix.slice(0, -2);
+            }
+        }
+        const apiFormat = canonicalOption("prompt_optimizer_api_format", suffix[1]);
+        const optimizer = {
+            prompt_optimizer: defaults.prompt_optimizer,
+            prompt_optimizer_api_format: defaults.prompt_optimizer_api_format,
+            prompt_optimizer_api_url: defaults.prompt_optimizer_api_url,
+            prompt_optimizer_api_key: defaults.prompt_optimizer_api_key,
+            prompt_optimizer_model: defaults.prompt_optimizer_model,
+            prompt_optimizer_scene_guide: defaults.prompt_optimizer_scene_guide,
+            prompt_optimizer_read_media: defaults.prompt_optimizer_read_media,
+            prompt_optimizer_optimize_on_run: defaults.prompt_optimizer_optimize_on_run,
+        };
+        if (suffix.length >= 8 && ["openai", "responses", "gemini"].includes(apiFormat)) {
+            optimizer.prompt_optimizer = boolValue("prompt_optimizer", suffix[0], false);
+            optimizer.prompt_optimizer_api_format = apiFormat;
+            optimizer.prompt_optimizer_api_url = String(suffix[2] ?? "");
+            optimizer.prompt_optimizer_api_key = String(suffix[3] ?? "");
+            optimizer.prompt_optimizer_model = String(suffix[4] ?? "");
+            optimizer.prompt_optimizer_scene_guide = canonicalPromptGuide(suffix[5] || "none");
+            optimizer.prompt_optimizer_read_media = boolValue("prompt_optimizer_read_media", suffix[6], false);
+            optimizer.prompt_optimizer_optimize_on_run = boolValue("prompt_optimizer_optimize_on_run", suffix[7], false);
+        } else if (suffix.length >= 2) {
+            // Read the old temporary-settings layout only to preserve its
+            // selected guide; the branch itself always writes inline API rows.
+            optimizer.prompt_optimizer_scene_guide = canonicalPromptGuide(suffix[1] || "none");
+        }
+        const continuityMode = optionValue("continuity_mode", "continuity_mode", values[5], defaults.continuity_mode);
+        const normalizedContinuityMode = Object.prototype.hasOwnProperty.call(OPTION_DEFS.continuity_mode, continuityMode)
+            ? continuityMode : defaults.continuity_mode;
+        const grid = AV_CONTINUITY_MODES.has(normalizedContinuityMode) ? AV_CONTEXT_FRAME_GRID : GUIDE_CONTEXT_FRAME_GRID;
+        const rawContextLength = numberValue("context_length", values[4], defaults.context_length);
+        const contextLength = grid.reduce((best, candidate) => Math.abs(candidate - rawContextLength) < Math.abs(best - rawContextLength) ? candidate : best, grid[0]);
+        const normalized = {
+            mode: optionValue("mode", "mode", values[0], defaults.mode),
+            prompt: stringValue("prompt", values[1], defaults.prompt),
+            segment_mode: optionValue("segment_mode", "selected_video_segment_mode", values[2], defaults.segment_mode),
+            segment_cuts: stringValue("segment_cuts", values[3], defaults.segment_cuts),
+            context_length: contextLength,
+            continuity_mode: normalizedContinuityMode,
+            advanced: boolValue("advanced", values[6], defaults.advanced),
+            keyframe_role: optionValue("keyframe_role", "keyframe_role", values[7], defaults.keyframe_role),
+            ref_image_size: optionValue("ref_image_size", "ref_image_size", values[8], defaults.ref_image_size),
+            reference_mention_mode: optionValue("reference_mention_mode", "reference_mention_mode", values[9], defaults.reference_mention_mode),
+            ...optimizer,
+            context_prompt_optimizer_mode: contextOptimizerMode,
+            context_prompt_optimizer_concurrency: contextOptimizerConcurrency,
+        };
+        if (normalized.segment_mode === SELECTED_VIDEO_SEGMENT_WHOLE || segmentModeIsValid(normalized.segment_cuts)) {
+            normalized.segment_cuts = defaults.segment_cuts;
+        }
+        for (const name of Object.keys(normalized)) setConfiguredWidgetValue(node, name, normalized[name]);
+        info.widgets_values = [
+            normalized.mode, normalized.prompt, normalized.segment_mode, normalized.segment_cuts,
+            normalized.context_length, normalized.continuity_mode, normalized.advanced,
+            normalized.keyframe_role, normalized.ref_image_size, normalized.reference_mention_mode,
+            normalized.prompt_optimizer, normalized.prompt_optimizer_api_format,
+            normalized.prompt_optimizer_api_url, normalized.prompt_optimizer_api_key,
+            normalized.prompt_optimizer_model, normalized.prompt_optimizer_scene_guide,
+            normalized.prompt_optimizer_read_media, normalized.prompt_optimizer_optimize_on_run,
+            normalized.context_prompt_optimizer_mode, normalized.context_prompt_optimizer_concurrency,
+        ];
+        info.widgets_values_named = {
+            ...(info.widgets_values_named && typeof info.widgets_values_named === "object" ? info.widgets_values_named : {}),
+            ...normalized,
+        };
+        return;
+    }
+
     const contextSegments = isContextSegmentsNode(node);
     const values = raw;
     if (contextSegments && !Object.prototype.hasOwnProperty.call(OPTION_DEFS.audio_mode, canonicalOption("audio_mode", values[1]))) {
@@ -5689,6 +6263,187 @@ function repairConfiguredWidgetValues(node, info) {
             contextOptimizerConcurrency = Math.max(1, Math.min(20, concurrencyCandidate || 3));
             suffix = suffix.slice(0, -2);
         }
+/*
+    const names = Object.keys(defaults);
+    const contextSegments = isContextSegmentsNode(node);
+    if (isSelectedVideoContextNode(node)) {
+        const selectedDefaults = {
+            mode: MODE_IMAGE,
+            prompt: "",
+            advanced: false,
+            keyframe_role: KEYFRAME_FIRST,
+            ref_image_size: REF_IMAGE_1K,
+            reference_mention_mode: "index",
+            prompt_optimizer_settings: false,
+            prompt_optimizer_scene_guide: "none",
+            segment_mode: SELECTED_VIDEO_SEGMENT_WHOLE,
+            segment_cuts: "",
+            context_length: GUIDE_CONTEXT_FRAME_GRID[0],
+            continuity_mode: CONTINUITY_LATENT,
+            context_prompt_optimizer_mode: "whole_sequence",
+            context_prompt_optimizer_concurrency: 3,
+        };
+
+        // Current selected-video schema is:
+        // mode, prompt, segment_mode, segment_cuts, context_length,
+        // continuity_mode, advanced, then the advanced controls.
+        //
+        // Some ComfyUI workflow snapshots contain an extra null placeholder
+        // after the prompt, producing:
+        // mode, prompt, null, segment_mode, segment_cuts, ...
+        // The generic Easy/context migration handles this case, but the
+        // selected-video node used to read raw positions directly. That made
+        // every field after the placeholder shift, with segment_mode falling
+        // back to whole_video and the stale mode label landing in segment_cuts.
+        const values = [...raw];
+        if (values.length < 14) return;
+
+        const named = info?.widgets_values_named && typeof info.widgets_values_named === "object"
+            ? info.widgets_values_named
+            : {};
+
+        const isSelectedSegmentMode = (value) => Object.prototype.hasOwnProperty.call(
+            OPTION_DEFS.selected_video_segment_mode,
+            canonicalOption("selected_video_segment_mode", value),
+        );
+        const placeholderAfterPrompt = values.length > 3
+            && (values[2] == null || String(values[2]).trim() === "")
+            && isSelectedSegmentMode(values[3]);
+        if (placeholderAfterPrompt) values.splice(2, 1);
+
+        const namedValue = (name) => named[name];
+        const optionValue = (widgetName, optionName, positional, fallback) => {
+            const normalize = (value) => canonicalOption(optionName, value);
+            const positionalValue = normalize(positional);
+            if (Object.prototype.hasOwnProperty.call(OPTION_DEFS[optionName], positionalValue)) {
+                return positionalValue;
+            }
+            const namedNormalized = normalize(namedValue(widgetName));
+            if (Object.prototype.hasOwnProperty.call(OPTION_DEFS[optionName], namedNormalized)) {
+                return namedNormalized;
+            }
+            return fallback;
+        };
+        const stringValue = (name, positional, fallback) => {
+            if (typeof positional === "string") return positional;
+            return typeof namedValue(name) === "string" ? namedValue(name) : fallback;
+        };
+        const strictBoolean = (value) => {
+            if (typeof value === "boolean") return value;
+            if (typeof value === "number" && Number.isFinite(value)) return value !== 0;
+            if (typeof value !== "string") return null;
+            const normalized = value.trim().toLowerCase();
+            if (["1", "true", "on", "yes"].includes(normalized)) return true;
+            if (["0", "false", "off", "no", ""].includes(normalized)) return false;
+            return null;
+        };
+        const booleanValue = (name, positional, fallback) => {
+            const parsed = strictBoolean(positional);
+            if (parsed !== null) return parsed;
+            const namedParsed = strictBoolean(namedValue(name));
+            return namedParsed === null ? fallback : namedParsed;
+        };
+        const numberValue = (name, positional, fallback) => {
+            const parsed = Number(positional);
+            if (Number.isFinite(parsed)) return parsed;
+            const namedParsed = Number(namedValue(name));
+            return Number.isFinite(namedParsed) ? namedParsed : fallback;
+        };
+
+        const selectedMode = optionValue("mode", "mode", values[0], selectedDefaults.mode);
+        const selectedSegmentMode = optionValue(
+            "segment_mode",
+            "selected_video_segment_mode",
+            values[2],
+            selectedDefaults.segment_mode,
+        );
+        const selectedContinuityMode = optionValue(
+            "continuity_mode",
+            "continuity_mode",
+            values[5],
+            selectedDefaults.continuity_mode,
+        );
+        const normalizedContinuityMode = Object.prototype.hasOwnProperty.call(OPTION_DEFS.continuity_mode, selectedContinuityMode)
+            ? selectedContinuityMode
+            : selectedDefaults.continuity_mode;
+        const selectedContextGrid = AV_CONTINUITY_MODES.has(normalizedContinuityMode)
+            ? AV_CONTEXT_FRAME_GRID
+            : GUIDE_CONTEXT_FRAME_GRID;
+        const rawContextLength = numberValue("context_length", values[4], selectedDefaults.context_length);
+        const normalizedContextLength = Number.isFinite(rawContextLength)
+            ? selectedContextGrid.reduce(
+                (best, candidate) => Math.abs(candidate - rawContextLength) < Math.abs(best - rawContextLength) ? candidate : best,
+                selectedContextGrid[0],
+            )
+            : selectedContextGrid[0];
+        const selectedValues = {
+            mode: Object.prototype.hasOwnProperty.call(OPTION_DEFS.mode, selectedMode)
+                ? selectedMode : selectedDefaults.mode,
+            prompt: stringValue("prompt", values[1], selectedDefaults.prompt),
+            keyframe_role: optionValue("keyframe_role", "keyframe_role", values[7], selectedDefaults.keyframe_role),
+            ref_image_size: optionValue("ref_image_size", "ref_image_size", values[8], selectedDefaults.ref_image_size),
+            reference_mention_mode: optionValue("reference_mention_mode", "reference_mention_mode", values[9], selectedDefaults.reference_mention_mode),
+            prompt_optimizer_settings: false,
+            prompt_optimizer_scene_guide: canonicalPromptGuide(
+                stringValue("prompt_optimizer_scene_guide", values[11], selectedDefaults.prompt_optimizer_scene_guide),
+            ),
+            segment_mode: selectedSegmentMode,
+            segment_cuts: stringValue("segment_cuts", values[3], selectedDefaults.segment_cuts),
+            context_length: normalizedContextLength,
+            continuity_mode: normalizedContinuityMode,
+            context_prompt_optimizer_mode: optionValue(
+                "context_prompt_optimizer_mode",
+                "context_prompt_optimizer_mode",
+                values[12],
+                selectedDefaults.context_prompt_optimizer_mode,
+            ),
+            context_prompt_optimizer_concurrency: Math.max(
+                1,
+                Math.min(20, numberValue(
+                    "context_prompt_optimizer_concurrency",
+                    values[13],
+                    selectedDefaults.context_prompt_optimizer_concurrency,
+                )),
+            ),
+            advanced: booleanValue("advanced", values[6], selectedDefaults.advanced),
+        };
+        // A whole-video snapshot can carry the old localized mode label in
+        // the cut-point slot. It is not a valid cut list and must not reappear
+        // when the user later switches to time/frame splitting.
+        if (selectedValues.segment_mode === SELECTED_VIDEO_SEGMENT_WHOLE
+            || isSelectedSegmentMode(selectedValues.segment_cuts)) {
+            selectedValues.segment_cuts = selectedDefaults.segment_cuts;
+        }
+        for (const name of Object.keys(selectedDefaults)) setConfiguredWidgetValue(node, name, selectedValues[name]);
+        info.widgets_values = [
+            selectedValues.mode,
+            selectedValues.prompt,
+            selectedValues.segment_mode,
+            selectedValues.segment_cuts,
+            selectedValues.context_length,
+            selectedValues.continuity_mode,
+            selectedValues.advanced,
+            selectedValues.keyframe_role,
+            selectedValues.ref_image_size,
+            selectedValues.reference_mention_mode,
+            selectedValues.prompt_optimizer_settings,
+            selectedValues.prompt_optimizer_scene_guide,
+            selectedValues.context_prompt_optimizer_mode,
+            selectedValues.context_prompt_optimizer_concurrency,
+        ];
+        info.widgets_values_named = {
+            ...(info.widgets_values_named && typeof info.widgets_values_named === "object" ? info.widgets_values_named : {}),
+            ...selectedValues,
+        };
+        return;
+    }
+    const values = raw;
+    // Context workflows saved before the audio-mode row existed have the
+    // prompt directly after mode. Normalize that in-memory before restoring
+    // the named widgets so the current workflow files remain usable.
+    if (contextSegments && !Object.prototype.hasOwnProperty.call(OPTION_DEFS.audio_mode, canonicalOption("audio_mode", values[1]))) {
+        values.splice(1, 0, CONTEXT_AUDIO_GENERATED);
+*/
     }
 
     const optimizer = {
@@ -5787,7 +6542,7 @@ function repairConfiguredWidgetValues(node, info) {
     }
 }
 function installNode(nodeType, nodeData) {
-    if (![NODE_CLASS, CONTEXT_SEGMENTS_CLASS].includes(nodeData?.name)) return;
+    if (![NODE_CLASS, CONTEXT_SEGMENTS_CLASS, SELECTED_VIDEO_CONTEXT_CLASS].includes(nodeData?.name)) return;
     // Strip the virtual-wire transport fields from every frontend definition
     // before a node instance can be constructed. Execution still receives
     // them through the prompt patch and the Python INPUT_TYPES declaration.
@@ -5798,7 +6553,9 @@ function installNode(nodeType, nodeData) {
     }
     const installedMarker = nodeData?.name === CONTEXT_SEGMENTS_CLASS
         ? "__h3ContextSegmentsNodeInstalled"
-        : "__h3EasyNodeInstalled";
+        : nodeData?.name === SELECTED_VIDEO_CONTEXT_CLASS
+            ? "__h3SelectedVideoContextNodeInstalled"
+            : "__h3EasyNodeInstalled";
     if (nodeType.prototype[installedMarker]) return;
     nodeType.prototype[installedMarker] = true;
     const originalCreated = nodeType.prototype.onNodeCreated;
@@ -5848,6 +6605,18 @@ function installNode(nodeType, nodeData) {
                 syncModeWidgets(this);
                 repairNodeLayout(this);
                 this.setDirtyCanvas?.(true, true);
+            };
+        }
+        const selectedSegmentModeWidget = getWidget(this, "segment_mode");
+        if (selectedSegmentModeWidget && !selectedSegmentModeWidget.__h3ConditionalCallbackBound) {
+            selectedSegmentModeWidget.__h3ConditionalCallbackBound = true;
+            const originalCallback = selectedSegmentModeWidget.callback;
+            selectedSegmentModeWidget.callback = (value) => {
+                originalCallback?.call(selectedSegmentModeWidget, value);
+                syncModeWidgets(this);
+                repairNodeLayout(this);
+                this.setDirtyCanvas?.(true, true);
+                app.graph?.change?.();
             };
         }
         const resolutionWidget = getWidget(this, "resolution");
@@ -6107,8 +6876,9 @@ function installOutputNode(nodeType, nodeData) {
 
 function installSegmentRefineNode(nodeType, nodeData) {
     if (nodeData?.name !== SEGMENT_REFINE_CLASS) return;
-    if (nodeType.prototype.__h3SegmentRefineInstalled) return;
-    nodeType.prototype.__h3SegmentRefineInstalled = true;
+    const installedMarker = "__h3SegmentRefineInstalled";
+    if (nodeType.prototype[installedMarker]) return;
+    nodeType.prototype[installedMarker] = true;
 
     const setup = (node, adjustHeight = true) => {
         if (!node) return;
@@ -6152,6 +6922,102 @@ function installSegmentRefineNode(nodeType, nodeData) {
     nodeType.prototype.onConfigure = function onConfigureH3SegmentRefine(info) {
         const result = originalConfigure?.apply(this, arguments);
         setup(this, false);
+        return result;
+    };
+}
+
+function installSegmentStepNode(nodeType, nodeData) {
+    if (nodeData?.name !== SEGMENT_STEP_CLASS) return;
+    const installedMarker = "__h3SegmentStepInstalled";
+    if (nodeType.prototype[installedMarker]) return;
+    nodeType.prototype[installedMarker] = true;
+
+    const setup = (node) => {
+        if (!node) return;
+        localizeNodeInstance(node);
+    };
+
+    const originalCreated = nodeType.prototype.onNodeCreated;
+    nodeType.prototype.onNodeCreated = function onNodeCreatedH3SegmentStep() {
+        const result = originalCreated?.apply(this, arguments);
+        setup(this);
+        return result;
+    };
+    const originalAdded = nodeType.prototype.onAdded;
+    nodeType.prototype.onAdded = function onAddedH3SegmentStep(graph) {
+        const result = originalAdded?.apply(this, arguments);
+        setup(this);
+        return result;
+    };
+    const originalConfigure = nodeType.prototype.onConfigure;
+    nodeType.prototype.onConfigure = function onConfigureH3SegmentStep(info) {
+        const result = originalConfigure?.apply(this, arguments);
+        setup(this);
+        return result;
+    };
+}
+
+function installSegmentSampleSetupNode(nodeType, nodeData) {
+    if (nodeData?.name !== SEGMENT_SAMPLE_SETUP_CLASS) return;
+    const installedMarker = "__h3SegmentSampleSetupInstalled";
+    if (nodeType.prototype[installedMarker]) return;
+    nodeType.prototype[installedMarker] = true;
+    const setup = (node) => {
+        if (!node) return;
+        localizeNodeInstance(node);
+    };
+    const originalCreated = nodeType.prototype.onNodeCreated;
+    nodeType.prototype.onNodeCreated = function onNodeCreatedH3SegmentSampleSetup() {
+        const result = originalCreated?.apply(this, arguments);
+        setup(this);
+        return result;
+    };
+    const originalAdded = nodeType.prototype.onAdded;
+    nodeType.prototype.onAdded = function onAddedH3SegmentSampleSetup(graph) {
+        const result = originalAdded?.apply(this, arguments);
+        setup(this);
+        return result;
+    };
+    const originalConfigure = nodeType.prototype.onConfigure;
+    nodeType.prototype.onConfigure = function onConfigureH3SegmentSampleSetup(info) {
+        const result = originalConfigure?.apply(this, arguments);
+        setup(this);
+        return result;
+    };
+}
+
+function installSegmentCollectNode(nodeType, nodeData) {
+    if (nodeData?.name !== SEGMENT_COLLECT_CLASS) return;
+    const installedMarker = "__h3SegmentCollectInstalled";
+    if (nodeType.prototype[installedMarker]) return;
+    nodeType.prototype[installedMarker] = true;
+
+    const setup = (node) => {
+        if (!node) return;
+        localizeNodeInstance(node);
+    };
+    const originalCreated = nodeType.prototype.onNodeCreated;
+    nodeType.prototype.onNodeCreated = function onNodeCreatedH3SegmentCollect() {
+        const result = originalCreated?.apply(this, arguments);
+        setup(this);
+        return result;
+    };
+    const originalAdded = nodeType.prototype.onAdded;
+    nodeType.prototype.onAdded = function onAddedH3SegmentCollect(graph) {
+        const result = originalAdded?.apply(this, arguments);
+        setup(this);
+        return result;
+    };
+    const originalConfigure = nodeType.prototype.onConfigure;
+    nodeType.prototype.onConfigure = function onConfigureH3SegmentCollect(info) {
+        const result = originalConfigure?.apply(this, arguments);
+        setup(this);
+        return result;
+    };
+    const originalConnectionsChange = nodeType.prototype.onConnectionsChange;
+    nodeType.prototype.onConnectionsChange = function onConnectionsChangeH3SegmentCollect() {
+        const result = originalConnectionsChange?.apply(this, arguments);
+        localizeNodeInstance(this);
         return result;
     };
 }
@@ -6728,6 +7594,56 @@ function installMediaBridgeNode(nodeType, nodeData) {
     };
 }
 
+function installMediaSplitterNode(nodeType, nodeData) {
+    if (nodeData?.name !== MEDIA_SPLITTER_CLASS) return;
+    trimMediaSplitterNodeDataOutputs(nodeData);
+    if (nodeType?.nodeData && nodeType.nodeData !== nodeData) trimMediaSplitterNodeDataOutputs(nodeType.nodeData);
+    if (nodeType?.prototype?.constructor?.nodeData && nodeType.prototype.constructor.nodeData !== nodeData) {
+        trimMediaSplitterNodeDataOutputs(nodeType.prototype.constructor.nodeData);
+    }
+    if (nodeType.prototype.__h3EasyMediaSplitterInstalled) return;
+    nodeType.prototype.__h3EasyMediaSplitterInstalled = true;
+
+    const setup = (node) => {
+        if (!node || node.__h3MediaSplitterSetup) return;
+        node.__h3MediaSplitterSetup = true;
+        localizeNodeInstance(node);
+        for (const group of MEDIA_SPLITTER_GROUPS) {
+            const widget = getWidget(node, group.count);
+            if (!widget) continue;
+            clampMediaSplitterWidgetValue(widget, group, widget.value);
+            const original = widget.callback;
+            widget.callback = function onMediaSplitterCountChanged(value) {
+                original?.apply(this, arguments);
+                clampMediaSplitterWidgetValue(widget, group, value);
+                updateMediaSplitterWidgets(node);
+            };
+        }
+        updateMediaSplitterWidgets(node, { force: true });
+    };
+
+    const originalCreated = nodeType.prototype.onNodeCreated;
+    nodeType.prototype.onNodeCreated = function onNodeCreatedH3EasyMediaSplitter() {
+        const result = originalCreated?.apply(this, arguments);
+        setup(this);
+        return result;
+    };
+    const originalAdded = nodeType.prototype.onAdded;
+    nodeType.prototype.onAdded = function onAddedH3EasyMediaSplitter(graph) {
+        const result = originalAdded?.apply(this, arguments);
+        setup(this);
+        updateMediaSplitterWidgets(this);
+        return result;
+    };
+    const originalConfigure = nodeType.prototype.onConfigure;
+    nodeType.prototype.onConfigure = function onConfigureH3EasyMediaSplitter(info) {
+        const result = originalConfigure?.apply(this, arguments);
+        setup(this);
+        updateMediaSplitterWidgets(this, { force: true });
+        return result;
+    };
+}
+
 function install() {
     if (installed) return;
     installed = true;
@@ -6867,8 +7783,12 @@ app.registerExtension({
         installAdapterNode(nodeType, nodeData);
         installMediaLoaderNode(nodeType, nodeData);
         installMediaBridgeNode(nodeType, nodeData);
+        installMediaSplitterNode(nodeType, nodeData);
         installOutputNode(nodeType, nodeData);
         installSegmentRefineNode(nodeType, nodeData);
+        installSegmentSampleSetupNode(nodeType, nodeData);
+        installSegmentStepNode(nodeType, nodeData);
+        installSegmentCollectNode(nodeType, nodeData);
         installNode(nodeType, nodeData);
     },
 });

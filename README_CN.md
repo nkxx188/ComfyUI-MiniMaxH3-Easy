@@ -47,7 +47,7 @@ Easy Loader 可以直接选择 FL2VA、Ref2VA、文本编码器和两个 VAE。�
 
 ## 快速开始
 
-最快的方式是导入 [`workflow/MiniMax_H3_Easy.json`](workflow/MiniMax_H3_Easy.json)，然后：
+最快的方式是导入 [`workflow/1.MiniMax_H3_Easy.json`](workflow/1.MiniMax_H3_Easy.json)，然后：
 
 1. 在 **MiniMax H3 Easy Loader** 中选择模型；
 2. 在 **MiniMax H3 Easy** 中选择模式；
@@ -89,15 +89,18 @@ Easy Loader → MiniMax H3 Easy → Easy Output → 采样 / 解码 / 保存
 
 ## 媒体与提示词
 
-### 三种媒体输入方式
+### 四种媒体输入方式
 
 | 方式 | 适合场景 |
 |---|---|
 | **Media Loader** | 推荐的日常用法；集中管理素材，并支持视频参考解码缓存 |
 | **直接连接 Media 口** | 从普通图片、视频、音频节点直接连接；同一个可见端口支持多条虚拟连线 |
 | **Media Bridge** | 工作流 API、无头运行或需要显式输入口的工作流 |
+| **Media Splitter** | 将 Media Bundle 拆成可接入其他工作流的独立图片、视频和音频输出 |
 
-Media Loader 本身可以保存较大的素材库，实际数量限制由使用它的 Easy 或 Context Segments 节点检查。**三种输入方式中，只有 Media Loader 会缓存视频参考的解码结果**：同一个视频首次解码后，后续生成可通过 ComfyUI 的节点缓存直接复用，从而减少重复使用视频参考时的加载和解码时间。更换文件或文件内容变化后缓存会自动失效。直接连接 Media 口和 Media Bridge 不提供这项视频解码缓存；它节省的是生成前的视频处理时间，不会缩短模型本身的采样时间。
+Media Loader 本身可以保存较大的素材库，实际数量限制由使用它的 Easy 或 Context Segments 节点检查。**四种方式中，只有 Media Loader 会缓存视频参考的解码结果**：同一个视频首次解码后，后续生成可通过 ComfyUI 的节点缓存直接复用，从而减少重复使用视频参考时的加载和解码时间。更换文件或文件内容变化后缓存会自动失效。直接连接 Media 口、Media Bridge 和 Media Splitter 不提供这项视频解码缓存；它节省的是生成前的视频处理时间，不会缩短模型本身的采样时间。
+
+`Media Splitter` 是 Media Loader / Media Bridge 的反向工具：把一个 `Media Bundle` 拆成标准的 `IMAGE`、`VIDEO`、`AUDIO` 输出。设置三类数量后，节点只显示对应数量的输出口；不需要的输出不会占用画布空间，适合把同一套素材分给其他 ComfyUI 工作流。
 
 直接连接 Media 口时，可以从端口拖到空白画布快速创建媒体节点，也可以点击虚拟连线编号删除对应素材。
 
@@ -147,7 +150,13 @@ Context Segments → Segment Sample → Segment Decode → 第一采视频
 
 普通第一采工作流：
 
-- [`MiniMax_H3_Easy_Context_Segments.json`](workflow/MiniMax_H3_Easy_Context_Segments.json)
+- [`4.MiniMax_H3_Easy_Context_Segments.json`](workflow/4.MiniMax_H3_Easy_Context_Segments.json)
+
+### 逐段控制（可选）
+
+如果只想一条链完成所有分段，直接使用 **Segment Sample** 即可。需要逐段调整 Seed、临时替换某段提示词，或以后只重跑受影响的分段时，可使用 [`7.MiniMax_H3_Easy_Context_Segments_Control.json`](workflow/7.MiniMax_H3_Easy_Context_Segments_Control.json)。它用 **MiniMax H3 Easy Sample Setup** 接收一次公共的 Context、Model、SAMPLER 和 SIGMAS，再把多个 **Segment Step** 串联起来；第一次运行仍会完整生成，局部重跑只是额外能力。
+
+第一个 Step 接 Setup，后续 Step 只连接 `Previous segment`，分段顺序由连线自动确定。每个 Step 都有自己的 Seed，`Prompt override` 是可选输入；不连接时继续使用 Context Segments 中的分段提示词和 `@` 素材。示例工作流放了 3 个 Step，可按需要增加或减少。
 
 ### 分段提示词与参考媒体
 
@@ -182,8 +191,8 @@ Context Segments 也支持数字人音频模式：连接且仅连接一条音频
 
 对应示例：
 
-- [`MiniMax_H3_Easy_Context_Segments_Pixel_Refine.json`](workflow/MiniMax_H3_Easy_Context_Segments_Pixel_Refine.json)
-- [`MiniMax_H3_Easy_Context_Segments_Latent_Refine.json`](workflow/MiniMax_H3_Easy_Context_Segments_Latent_Refine.json)
+- [`6.MiniMax_H3_Easy_Context_Segments_Pixel_Refine.json`](workflow/6.MiniMax_H3_Easy_Context_Segments_Pixel_Refine.json)
+- [`5.MiniMax_H3_Easy_Context_Segments_Latent_Refine.json`](workflow/5.MiniMax_H3_Easy_Context_Segments_Latent_Refine.json)
 
 Segment Decode 会逐段解码并写入临时视频文件，最终输出带音频的完整 ComfyUI `VIDEO`，因此不需要在内存中保留整条 RGB 视频。
 
@@ -229,10 +238,14 @@ API 设置随各自节点保存在工作流中，复制工作流时不需要重�
 | MiniMax H3 Easy Model Adapter | 接入外部 MODEL、CLIP 和 VAE 加载器 |
 | MiniMax H3 Easy Media Loader | 可视化管理图片、音频和视频 |
 | MiniMax H3 Easy Media Bridge | 为 API 或无头工作流提供显式媒体输入 |
+| MiniMax H3 Easy Media Splitter | 将 Media Bundle 拆成独立的 IMAGE、VIDEO 和 AUDIO 输出；最多 27 张图片、9 个视频和 9 个音频 |
 | MiniMax H3 Easy | 普通生成、参考生成与数字人 |
 | MiniMax H3 Easy Output | 将 H3 Context 展开为标准 Conditioning、Latent、VAE、FPS 和驱动音频 |
 | MiniMax H3 Easy Context Segments | 创建长视频分段计划 |
 | MiniMax H3 Easy Segment Sample | 执行分段第一采 |
+| MiniMax H3 Easy Sample Setup | 为逐段控制工作流提供一次公共采样设置 |
+| MiniMax H3 Easy Segment Step | 处理单个分段；可独立设置 Seed 和提示词覆盖 |
+| MiniMax H3 Easy Segment Collect | 汇总串联后的分段结果 |
 | MiniMax H3 Easy Segment Refine | 执行 Pixel 或 Latent 分段二采 |
 | MiniMax H3 Easy Segment Decode | 流式解码并输出完整 VIDEO |
 | MiniMax H3 Easy Aspect Ratio | 将一采宽高比传给下游分辨率节点 |
@@ -245,7 +258,7 @@ API 设置随各自节点保存在工作流中，复制工作流时不需要重�
 - Context Segments 的共享媒体库最多支持 27 张图片、9 个视频和 9 条音频；每个片段仍遵守普通单次参考限制。
 - 数字人模式只能使用一条驱动音频。
 - Media Loader 缓存的是解码后的帧；长时间、高分辨率参考视频可能占用较多系统内存。
-- 上下文的 Segment Sample 和 Segment Refine 当前每次 Queue 都会重新执行，即使 seed 和输入没有变化。
+- 常规的 Segment Sample 和 Segment Refine 当前每次 Queue 都会重新执行，即使 Seed 和输入没有变化；逐段控制工作流中的 Segment Step 可以利用 ComfyUI 原生缓存复用未改变的前置分段。
 - Segment Decode 需要可用的 FFmpeg；项目会优先使用 `imageio-ffmpeg`，也支持系统 PATH 中的 FFmpeg。
 - 提示词优化是可选工具，不影响节点在未配置 API 时正常生成。
 
