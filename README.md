@@ -11,7 +11,7 @@ A practical MiniMax H3 node suite for ComfyUI. It reduces the setup needed for t
 ## Why use it?
 
 - **One main node for common generation modes**: text, image, first/last frame, full reference, and digital human.
-- **Unified image, video, and audio management**: upload, preview, reorder, replace, and remove media in one visual Media Loader. Video cards show their duration.
+- **Unified image, video, and audio management**: upload, drag, paste, preview, reorder, replace, and remove media in one visual Media Loader. Video cards show their duration.
 - **Reference media directly in the prompt**: type `@` to insert an image, video, or audio reference without manually writing `<Picture N>` tags.
 - **Generate longer videos as connected segments**: every segment keeps its own prompt and references while receiving visual or AV context from the previous segment.
 - **Built-in segment refinement**: Pixel Resize, 3D Latent Upscale, and a Low VRAM Tile option.
@@ -97,6 +97,8 @@ Digital Human mode locks the single Media audio item into the generated result a
 | **Direct Media-port links** | Connect ordinary image, video, and audio nodes; one visible port accepts multiple virtual links |
 | **Media Bridge** | Workflow API, headless execution, or workflows that need explicit numbered inputs |
 | **Media Splitter** | Split one Media Bundle into standalone image, video, and audio outputs for other workflows |
+
+Media Loader accepts images, videos, and audio dragged directly from the system file manager. You can also select only the Media Loader node and press `Ctrl+V` to paste supported media from the clipboard. Dragged or pasted files are placed into the appropriate media category automatically.
 
 Media Loader can hold a large shared library; the consuming Easy or Context Segments node applies the actual media limits. **Of the four methods, only Media Loader caches decoded video references.** After a video is decoded once, later generations can reuse it through ComfyUI's node cache, reducing the loading and decoding time when the same reference video is used repeatedly. Replacing or modifying the file invalidates the cache automatically. Direct Media-port links, Media Bridge, and Media Splitter do not provide this decoded-video cache. It saves video preparation time, not the model's sampling time.
 
