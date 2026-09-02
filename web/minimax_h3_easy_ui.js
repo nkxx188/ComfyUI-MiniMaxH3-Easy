@@ -89,6 +89,8 @@ const MEDIA_LOADER_GROUPS = Object.freeze([
     { type: "audio", key: "audios" },
     { type: "video", key: "videos" },
 ]);
+const MEDIA_LOADER_INTERNAL_DRAG_TYPE = "application/x-h3-media-loader-type";
+let mediaLoaderInternalDrag = null;
 const MIN_SECONDS = 0.2;
 const MAX_SECONDS = 30;
 const PROMPT_HISTORY_LIMIT = 120;
@@ -135,6 +137,7 @@ const TEXT = {
     mediaLoaderAudio: ZH_BROWSER ? "\u97f3\u9891" : "Audio",
     mediaLoaderVideos: ZH_BROWSER ? "\u89c6\u9891" : "Videos",
     mediaLoaderUpload: ZH_BROWSER ? "\u4e0a\u4f20\u5a92\u4f53" : "Upload media",
+    mediaLoaderDrop: ZH_BROWSER ? "\u91ca\u653e\u4ee5\u6dfb\u52a0\u5a92\u4f53" : "Drop to add media",
     mediaLoaderReplace: ZH_BROWSER ? "\u66ff\u6362" : "Replace",
     mediaLoaderRemove: ZH_BROWSER ? "\u5220\u9664" : "Remove",
     mediaLoaderEmpty: ZH_BROWSER ? "\u6682\u65e0\u5a92\u4f53" : "No media",
@@ -7150,7 +7153,11 @@ function mediaLoaderTypeForFile(file) {
 async function mediaLoaderUploadOne(file) {
     if (!file) return "";
     const form = new FormData();
-    form.append("image", file, file.name);
+    const mime = String(file.type || "").toLowerCase();
+    const fallbackExtension = mime.includes("/") ? mime.split("/").pop().replace(/[^a-z0-9]+/g, "") : "";
+    const fallbackId = globalThis.crypto?.randomUUID?.().slice(0, 8) || Math.random().toString(36).slice(2, 10);
+    const fallbackName = `pasted-media-${Date.now()}-${fallbackId}${fallbackExtension ? `.${fallbackExtension}` : ""}`;
+    form.append("image", file, String(file.name || "").trim() || fallbackName);
     form.append("type", "input");
     const response = await api.fetchApi("/upload/image", { method: "POST", body: form });
     const data = await response.json().catch(() => ({}));
@@ -7160,8 +7167,8 @@ async function mediaLoaderUploadOne(file) {
     return filename;
 }
 
-async function mediaLoaderUpload(node, input) {
-    const files = Array.from(input?.files || []);
+async function mediaLoaderUploadFilesNow(node, fileList) {
+    const files = Array.from(fileList || []);
     if (!files.length) return;
     const state = mediaLoaderReadState(node);
     const pending = new Map(MEDIA_LOADER_GROUPS.map((group) => [group.type, state[group.key].length]));
@@ -7169,45 +7176,163 @@ async function mediaLoaderUpload(node, input) {
     let unsupported = 0;
     let skippedFull = 0;
     let changed = false;
-    try {
-        for (const file of files) {
-            const type = mediaLoaderTypeForFile(file);
-            if (!type) {
-                unsupported += 1;
-                continue;
-            }
-            const group = MEDIA_LOADER_GROUPS.find((entry) => entry.type === type);
-            if (!group) {
-                unsupported += 1;
-                continue;
-            }
-            if (Number.isFinite(group.max) && (pending.get(type) || 0) >= group.max) {
-                skippedFull += 1;
-                continue;
-            }
-            try {
-                const filename = await mediaLoaderUploadOne(file);
-                if (!state[group.key].includes(filename)) {
-                    state[group.key].push(filename);
-                    pending.set(type, (pending.get(type) || 0) + 1);
-                    changed = true;
-                }
-            } catch (error) {
-                errors.push(String(file.name || type) + ": " + (error?.message || error));
-            }
+    for (const file of files) {
+        const type = mediaLoaderTypeForFile(file);
+        if (!type) {
+            unsupported += 1;
+            continue;
         }
-        if (changed) {
-            mediaLoaderWriteState(node, state);
-            mediaLoaderRender(node);
+        const group = MEDIA_LOADER_GROUPS.find((entry) => entry.type === type);
+        if (!group) {
+            unsupported += 1;
+            continue;
         }
-    } finally {
-        input.value = "";
+        if (Number.isFinite(group.max) && (pending.get(type) || 0) >= group.max) {
+            skippedFull += 1;
+            continue;
+        }
+        try {
+            const filename = await mediaLoaderUploadOne(file);
+            if (!state[group.key].includes(filename)) {
+                state[group.key].push(filename);
+                pending.set(type, (pending.get(type) || 0) + 1);
+                changed = true;
+            }
+        } catch (error) {
+            errors.push(String(file.name || type) + ": " + (error?.message || error));
+        }
+    }
+    if (changed) {
+        mediaLoaderWriteState(node, state);
+        mediaLoaderRender(node);
     }
     const notices = [];
     if (unsupported) notices.push(TEXT.mediaLoaderUnsupported + " (" + unsupported + ")");
     if (skippedFull) notices.push(TEXT.mediaLoaderLimit + " (" + skippedFull + ")");
     if (errors.length) notices.push(TEXT.mediaLoaderUpload + ": " + errors.join("; "));
     if (notices.length) globalThis.alert?.(notices.join("\n"));
+}
+
+function mediaLoaderUploadFiles(node, fileList) {
+    const files = Array.from(fileList || []);
+    if (!node || !files.length) return Promise.resolve();
+    // Clipboard, file-picker, and drag/drop uploads may arrive almost together.
+    // Serialize them per node so a later batch cannot overwrite an earlier
+    // batch's media_state snapshot while the files are still uploading.
+    const previous = node.__h3MediaLoaderUploadQueue || Promise.resolve();
+    const queued = Promise.resolve(previous)
+        .catch(() => {})
+        .then(() => mediaLoaderUploadFilesNow(node, files));
+    node.__h3MediaLoaderUploadQueue = queued;
+    const clear = () => {
+        if (node.__h3MediaLoaderUploadQueue === queued) delete node.__h3MediaLoaderUploadQueue;
+    };
+    queued.then(clear, clear);
+    return queued;
+}
+
+async function mediaLoaderUpload(node, input) {
+    try {
+        await mediaLoaderUploadFiles(node, input?.files || []);
+    } finally {
+        if (input) input.value = "";
+    }
+}
+
+function mediaLoaderDataTransferHasFiles(dataTransfer) {
+    if (!dataTransfer) return false;
+    if (Array.from(dataTransfer.types || []).some((type) => String(type).toLowerCase() === "files")) return true;
+    if (Array.from(dataTransfer.items || []).some((item) => item?.kind === "file")) return true;
+    return Boolean(dataTransfer.files?.length);
+}
+
+function mediaLoaderFilesFromDataTransfer(dataTransfer) {
+    const direct = Array.from(dataTransfer?.files || []).filter(Boolean);
+    if (direct.length) return direct;
+    return Array.from(dataTransfer?.items || [])
+        .filter((item) => item?.kind === "file")
+        .map((item) => item.getAsFile?.())
+        .filter(Boolean);
+}
+
+function mediaLoaderClipboardImageFiles(dataTransfer) {
+    return mediaLoaderFilesFromDataTransfer(dataTransfer)
+        .filter((file) => mediaLoaderTypeForFile(file) === "image");
+}
+
+function mediaLoaderSelectedNode() {
+    const canvas = app.canvas;
+    const graph = canvas?.graph || app.graph;
+    const selected = (graph?._nodes || []).filter((node) => Boolean(
+        node?.selected === true
+        || node?.is_selected === true
+        || canvas?.selectedItems?.has?.(node)
+        || canvas?.selected_nodes?.[node?.id]
+    ));
+    const current = canvas?.current_node;
+    if (!selected.length && current?.is_selected) selected.push(current);
+    if (selected.length !== 1 || !isMediaLoader(selected[0])) return null;
+    return selected[0];
+}
+
+function mediaLoaderPasteTargetsEditor(event) {
+    const path = typeof event?.composedPath === "function" ? event.composedPath() : [event?.target];
+    return path.some((target) => {
+        if (!(target instanceof Element)) return false;
+        if (target.matches?.("input, textarea, select, [contenteditable], [role='textbox']")) return true;
+        return Boolean(target.closest?.("input, textarea, select, [contenteditable], [role='textbox']"));
+    });
+}
+
+function installMediaLoaderClipboardPaste() {
+    if (document.__h3MediaLoaderClipboardPasteInstalled) return;
+    document.__h3MediaLoaderClipboardPasteInstalled = true;
+    document.addEventListener("paste", (event) => {
+        if (event.defaultPrevented || event.shiftKey || mediaLoaderPasteTargetsEditor(event)) return;
+        const selectedText = String(globalThis.getSelection?.()?.toString?.() || "").trim();
+        if (selectedText) return;
+        const files = mediaLoaderClipboardImageFiles(event.clipboardData);
+        if (!files.length) return;
+        const node = mediaLoaderSelectedNode();
+        if (!node) return;
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation?.();
+        mediaLoaderUploadFiles(node, files).catch((error) => console.error("Media Loader clipboard paste failed", error));
+    }, true);
+}
+
+function installMediaLoaderFileDrop(node, panel) {
+    const stopExternalFileEvent = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation?.();
+        if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+    };
+    panel.addEventListener("dragenter", (event) => {
+        if (!mediaLoaderDataTransferHasFiles(event.dataTransfer)) return;
+        mediaLoaderInternalDrag = null;
+        stopExternalFileEvent(event);
+        panel.classList.add("is-file-drop-target");
+    });
+    panel.addEventListener("dragover", (event) => {
+        if (!mediaLoaderDataTransferHasFiles(event.dataTransfer)) return;
+        stopExternalFileEvent(event);
+        panel.classList.add("is-file-drop-target");
+    });
+    panel.addEventListener("dragleave", (event) => {
+        if (!panel.classList.contains("is-file-drop-target")) return;
+        const related = event.relatedTarget;
+        if (related instanceof Node && panel.contains(related)) return;
+        panel.classList.remove("is-file-drop-target");
+    });
+    panel.addEventListener("drop", (event) => {
+        if (!mediaLoaderDataTransferHasFiles(event.dataTransfer)) return;
+        stopExternalFileEvent(event);
+        panel.classList.remove("is-file-drop-target");
+        const files = mediaLoaderFilesFromDataTransfer(event.dataTransfer);
+        mediaLoaderUploadFiles(node, files).catch((error) => console.error("Media Loader file drop failed", error));
+    });
 }
 
 function mediaLoaderUpdateCard(card, group, filename, index) {
@@ -7253,30 +7378,38 @@ function mediaLoaderCreateCard(node, group, filename) {
     card.append(tag, label, remove);
 
     card.addEventListener("dragstart", (event) => {
-        event.dataTransfer?.setData("application/x-h3-media-loader-type", group.type);
+        mediaLoaderInternalDrag = { node, groupType: group.type, card };
+        event.dataTransfer?.setData(MEDIA_LOADER_INTERNAL_DRAG_TYPE, group.type);
         event.dataTransfer?.setData("text/plain", String(card.dataset.index));
         if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
         card.classList.add("is-dragging");
     });
     card.addEventListener("dragend", () => {
+        if (mediaLoaderInternalDrag?.card === card) mediaLoaderInternalDrag = null;
         card.classList.remove("is-dragging");
         card.parentElement?.querySelectorAll(".is-drop-target").forEach((item) => item.classList.remove("is-drop-target"));
     });
     card.addEventListener("dragover", (event) => {
-        const draggedType = event.dataTransfer?.getData("application/x-h3-media-loader-type");
-        if (draggedType && draggedType !== group.type) return;
+        if (mediaLoaderDataTransferHasFiles(event.dataTransfer)) return;
+        const drag = mediaLoaderInternalDrag;
+        if (!drag || drag.node !== node || drag.groupType !== group.type) return;
         event.preventDefault();
+        event.stopPropagation();
         if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
         card.classList.add("is-drop-target");
     });
     card.addEventListener("dragleave", () => card.classList.remove("is-drop-target"));
     card.addEventListener("drop", (event) => {
-        const draggedType = event.dataTransfer?.getData("application/x-h3-media-loader-type");
-        if (draggedType && draggedType !== group.type) return;
+        if (mediaLoaderDataTransferHasFiles(event.dataTransfer)) return;
+        const drag = mediaLoaderInternalDrag;
+        if (!drag || drag.node !== node || drag.groupType !== group.type) return;
         event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation?.();
         card.classList.remove("is-drop-target");
-        const from = Number(event.dataTransfer?.getData("text/plain"));
+        const from = Number(drag.card?.dataset?.index);
         const index = Number(card.dataset.index);
+        mediaLoaderInternalDrag = null;
         if (!Number.isInteger(from) || !Number.isInteger(index) || from === index) return;
         const next = mediaLoaderReadState(node);
         // The entire target card is the hit area. Swap cards directly instead
@@ -7413,7 +7546,9 @@ function installMediaLoaderStyles() {
         document.head.append(style);
     }
     style.textContent = `
-      .h3-media-loader-panel { display:flex; flex-direction:column; gap:8px; width:100%; height:100%; min-height:0; max-height:100%; flex:1 1 auto; align-self:stretch; box-sizing:border-box; padding:8px; border:1px solid #111; border-radius:6px; background:#222; color:var(--h3-native-widget-text,#ddd); font-size:12px; overflow:hidden; }
+      .h3-media-loader-panel { position:relative; display:flex; flex-direction:column; gap:8px; width:100%; height:100%; min-height:0; max-height:100%; flex:1 1 auto; align-self:stretch; box-sizing:border-box; padding:8px; border:1px solid #111; border-radius:6px; background:#222; color:var(--h3-native-widget-text,#ddd); font-size:12px; overflow:hidden; transition:border-color .14s ease, box-shadow .14s ease; }
+      .h3-media-loader-panel.is-file-drop-target { border-color:#718ca6; box-shadow:inset 0 0 0 1px rgba(113,140,166,.34); }
+      .h3-media-loader-panel.is-file-drop-target::after { content:attr(data-drop-label); position:absolute; inset:8px; z-index:20; display:flex; align-items:center; justify-content:center; box-sizing:border-box; border:1px dashed rgba(146,177,207,.62); border-radius:5px; background:rgba(25,28,32,.9); color:#d7e2ec; font-size:12px; font-weight:600; letter-spacing:.01em; pointer-events:none; }
       .h3-media-loader-toolbar { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:28px; padding-bottom:1px; }
       .h3-media-loader-heading { display:flex; align-items:baseline; gap:7px; min-width:0; }
       .h3-media-loader-title { font-weight:650; color:#eee; }
@@ -7453,6 +7588,12 @@ function installMediaLoaderNode(nodeType, nodeData) {
     if (nodeType.prototype.__h3EasyMediaLoaderInstalled) return;
     nodeType.prototype.__h3EasyMediaLoaderInstalled = true;
     installMediaLoaderStyles();
+    const originalPasteFiles = nodeType.prototype.pasteFiles;
+    nodeType.prototype.pasteFiles = function pasteFilesH3MediaLoader(files) {
+        const list = Array.from(files || []);
+        if (!list.length && typeof originalPasteFiles === "function") return originalPasteFiles.apply(this, arguments);
+        return mediaLoaderUploadFiles(this, list);
+    };
     const setup = (node) => {
         if (!node || node.__h3MediaLoaderSetup || typeof node.addDOMWidget !== "function") return;
         node.__h3MediaLoaderSetup = true;
@@ -7461,6 +7602,8 @@ function installMediaLoaderNode(nodeType, nodeData) {
         mediaLoaderHideStateWidget(stateWidget);
         const panel = document.createElement("div");
         panel.className = "h3-media-loader-panel";
+        panel.dataset.dropLabel = TEXT.mediaLoaderDrop;
+        installMediaLoaderFileDrop(node, panel);
         panel.addEventListener("pointerdown", (event) => event.stopPropagation());
         panel.addEventListener("wheel", (event) => {
             // This node has no wheel-scrolling surface. Forward every wheel event
@@ -7490,7 +7633,9 @@ function installMediaLoaderNode(nodeType, nodeData) {
             input.type = "file";
             input.accept = "image/*,audio/*,video/*";
             input.multiple = true;
-            input.addEventListener("change", () => mediaLoaderUpload(node, input), { once: true });
+            input.addEventListener("change", () => {
+                mediaLoaderUpload(node, input).catch((error) => console.error("Media Loader upload failed", error));
+            }, { once: true });
             input.click();
         });
         toolbar.append(heading, upload);
@@ -7651,6 +7796,7 @@ function install() {
     patchGraphToPrompt();
     patchEditorKeyHandling();
     installNativeThemeWatcher();
+    installMediaLoaderClipboardPaste();
     for (const delay of [0, 100, 500, 1200]) setTimeout(() => patchCanvas(), delay);
     setTimeout(() => installQuickCreateCapture(app.canvas), 0);
     setTimeout(() => installQuickCreateCapture(app.canvas), 250);
