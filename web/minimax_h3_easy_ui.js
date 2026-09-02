@@ -7255,9 +7255,22 @@ function mediaLoaderFilesFromDataTransfer(dataTransfer) {
         .filter(Boolean);
 }
 
-function mediaLoaderClipboardImageFiles(dataTransfer) {
+function mediaLoaderClipboardMediaFiles(dataTransfer) {
     return mediaLoaderFilesFromDataTransfer(dataTransfer)
-        .filter((file) => mediaLoaderTypeForFile(file) === "image");
+        .filter((file) => Boolean(mediaLoaderTypeForFile(file)));
+}
+
+function isStrictMediaLoaderNode(node) {
+    if (!node) return false;
+    if (node.constructor?.prototype?.__h3EasyMediaLoaderInstalled === true) return true;
+    const candidates = [
+        node.comfyClass,
+        node.type,
+        node.constructor?.comfyClass,
+        node.constructor?.type,
+        node.constructor?.nodeData?.name,
+    ];
+    return candidates.some((value) => value != null && String(value) === MEDIA_LOADER_CLASS);
 }
 
 function mediaLoaderSelectedNode() {
@@ -7271,7 +7284,7 @@ function mediaLoaderSelectedNode() {
     ));
     const current = canvas?.current_node;
     if (!selected.length && current?.is_selected) selected.push(current);
-    if (selected.length !== 1 || !isMediaLoader(selected[0])) return null;
+    if (selected.length !== 1 || !isStrictMediaLoaderNode(selected[0])) return null;
     return selected[0];
 }
 
@@ -7284,6 +7297,20 @@ function mediaLoaderPasteTargetsEditor(event) {
     });
 }
 
+function mediaLoaderOwnsPasteFocus(node, event) {
+    const panel = node?.__h3MediaLoaderPanel;
+    const canvas = app.canvas?.canvas;
+    const owns = (target) => Boolean(
+        !target
+        || target === document
+        || target === document.body
+        || target === document.documentElement
+        || target === canvas
+        || (target instanceof Node && panel?.contains?.(target))
+    );
+    return owns(event?.target) && owns(document.activeElement);
+}
+
 function installMediaLoaderClipboardPaste() {
     if (document.__h3MediaLoaderClipboardPasteInstalled) return;
     document.__h3MediaLoaderClipboardPasteInstalled = true;
@@ -7291,10 +7318,10 @@ function installMediaLoaderClipboardPaste() {
         if (event.defaultPrevented || event.shiftKey || mediaLoaderPasteTargetsEditor(event)) return;
         const selectedText = String(globalThis.getSelection?.()?.toString?.() || "").trim();
         if (selectedText) return;
-        const files = mediaLoaderClipboardImageFiles(event.clipboardData);
-        if (!files.length) return;
         const node = mediaLoaderSelectedNode();
-        if (!node) return;
+        if (!node || !mediaLoaderOwnsPasteFocus(node, event)) return;
+        const files = mediaLoaderClipboardMediaFiles(event.clipboardData);
+        if (!files.length) return;
         event.preventDefault();
         event.stopPropagation();
         event.stopImmediatePropagation?.();
