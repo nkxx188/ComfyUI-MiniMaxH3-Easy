@@ -139,9 +139,9 @@ MAX_AUDIOS = 3
 MEDIA_SPLITTER_MAX_IMAGES = 27
 MEDIA_SPLITTER_MAX_VIDEOS = 9
 MEDIA_SPLITTER_MAX_AUDIOS = 9
-# How Media Splitter handles a requested output for which the bundle does not
-# contain a corresponding resource.  The original blocked-branch behavior is
-# kept as the default; returning None is opt-in for optional aggregate inputs.
+# How Media Splitter should handle a requested output for which the bundle
+# does not contain a corresponding resource.  The original block behavior is
+# kept as the default for existing workflows; returning None is opt-in.
 MEDIA_SPLITTER_EMPTY_OUTPUT_ORIGINAL = "block_missing"
 MEDIA_SPLITTER_EMPTY_OUTPUT_ALLOW_NONE = "allow_none"
 MEDIA_SPLITTER_EMPTY_OUTPUT_MODES = (
@@ -2243,7 +2243,7 @@ class MiniMaxH3EasyMediaSplitter:
     DESCRIPTION = (
         "Split one Media Bundle into standard IMAGE, VIDEO, and AUDIO outputs. "
         "Set the counts to expose the resources you want to use downstream; "
-        "choose whether missing requested outputs keep the original blocked-branch behavior or return None."
+        "choose whether missing requested outputs should keep the original blocked-branch behavior or return None."
     )
 
     @classmethod
@@ -2314,9 +2314,17 @@ class MiniMaxH3EasyMediaSplitter:
 
     @staticmethod
     def _empty_output_mode(value: Any) -> str:
-        """Normalize canonical and localized empty-output mode labels."""
+        """Normalize the UI value while accepting localized display labels."""
         raw = str(value or MEDIA_SPLITTER_EMPTY_OUTPUT_ORIGINAL).strip().casefold()
-        compact = raw.replace(" ", "").replace("（", "(").replace("）", ")")
+        # The translated frontend label can arrive with either ASCII or
+        # full-width parentheses, and some ComfyUI builds preserve a space
+        # before the parentheses.  Normalize those harmless presentation
+        # differences before matching the canonical choices.
+        compact = (
+            raw.replace(" ", "")
+            .replace("（", "(")
+            .replace("）", ")")
+        )
         if "允许空输出" in compact and "none" in compact:
             return MEDIA_SPLITTER_EMPTY_OUTPUT_ALLOW_NONE
         if compact in {
@@ -2325,9 +2333,11 @@ class MiniMaxH3EasyMediaSplitter:
             "原有模式(空端口不报错)",
             "原有模式(阻断空端口分支)",
             "原有模式(空端口阻断)",
-            "original(missingoutputsdo noterror)",
-            "original(blockmissing-outputbranches)",
         }:
+            return MEDIA_SPLITTER_EMPTY_OUTPUT_ORIGINAL
+        if compact == "original(missingoutputsdo noterror)":
+            return MEDIA_SPLITTER_EMPTY_OUTPUT_ORIGINAL
+        if compact == "original(blockmissing-outputbranches)":
             return MEDIA_SPLITTER_EMPTY_OUTPUT_ORIGINAL
         # These labels belonged to a short-lived development option.  Map
         # them to the preserved original behavior for local test workflows.
@@ -2377,6 +2387,12 @@ class MiniMaxH3EasyMediaSplitter:
 
     @classmethod
     def VALIDATE_INPUTS(cls, empty_output_mode=MEDIA_SPLITTER_EMPTY_OUTPUT_ORIGINAL):
+        """Accept the localized combo label sent by the frontend.
+
+        The web UI replaces combo values with translated display labels.  A
+        custom validator lets ComfyUI validate the canonical value after that
+        localization instead of rejecting the translated label first.
+        """
         try:
             cls._empty_output_mode(empty_output_mode)
         except ValueError as exc:
@@ -2411,21 +2427,18 @@ class MiniMaxH3EasyMediaSplitter:
             ("audio", MEDIA_SPLITTER_MAX_AUDIOS, counts["audio"]),
         ):
             values = by_type[kind]
-            # The count widgets control how many ports are visible, not how
-            # many resources the bundle must contain. This lets a workflow
-            # expose spare ports in advance without failing when only the
-            # first few resources are currently present.
             for index in range(count):
                 value = values[index] if index < len(values) else None
                 if value is None:
                     if empty_mode == MEDIA_SPLITTER_EMPTY_OUTPUT_ORIGINAL:
                         # Preserve the original behavior: ComfyUI blocks only
                         # the branch connected to this missing output without
-                        # raising a Splitter validation error.
+                        # raising a Media Splitter validation error.
                         outputs.append(ExecutionBlocker(None))
                     else:
-                        # Optional aggregate nodes may accept None, but many
-                        # ordinary media nodes cannot consume it safely.
+                        # ``None`` is intentionally opt-in: some aggregating
+                        # nodes treat it as an absent optional input, while
+                        # many ordinary media nodes cannot consume it safely.
                         outputs.append(None)
                     continue
                 if kind == "video":

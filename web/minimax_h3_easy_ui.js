@@ -385,10 +385,13 @@ const OPTION_ALIASES = {
         "原有模式": "block_missing",
         "原有模式（空端口不报错）": "block_missing",
         "原有模式（阻断空端口分支）": "block_missing",
+        "Original (missing outputs do not error)": "block_missing",
+        "Original (block missing-output branches)": "block_missing",
         original: "block_missing",
         "original mode": "block_missing",
         // Development builds briefly exposed a separate strict/count-check
-        // choice.  Map those saved values to the preserved original mode.
+        // choice.  Map those saved values to the preserved original mode so
+        // old local test workflows remain displayable after its removal.
         strict: "block_missing",
         "媒体数量校验": "block_missing",
         "Media Count Check": "block_missing",
