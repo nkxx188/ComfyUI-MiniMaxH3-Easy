@@ -194,6 +194,7 @@ const TEXT = {
     imageCount: ZH_BROWSER ? "\u56fe\u7247\u6570\u91cf" : "Image count",
     videoCount: ZH_BROWSER ? "\u89c6\u9891\u6570\u91cf" : "Video count",
     audioCount: ZH_BROWSER ? "\u97f3\u9891\u6570\u91cf" : "Audio count",
+    mediaSplitterEmptyOutputMode: ZH_BROWSER ? "\u7a7a\u7aef\u53e3\u5904\u7406" : "Empty output handling",
     seedLabel: "Seed",
     segmentSeeds: ZH_BROWSER ? "\u5206\u6bb5 Seed\uff08\u53ef\u9009\uff09" : "Segment seeds (optional)",
     segmentRenderTitle: ZH_BROWSER ? "MiniMax H3 Easy \u5206\u6bb5\u91c7\u6837" : "MiniMax H3 Easy Segment Sample",
@@ -276,6 +277,10 @@ const OPTION_DEFS = {
         [SELECTED_VIDEO_SEGMENT_WHOLE]: ZH_BROWSER ? "整段视频" : "Whole video",
         [SELECTED_VIDEO_SEGMENT_TIME_CUTS]: ZH_BROWSER ? "按时间切分" : "Split by time",
         [SELECTED_VIDEO_SEGMENT_FRAME_CUTS]: ZH_BROWSER ? "按帧切分" : "Split by frame",
+    },
+    empty_output_mode: {
+        block_missing: ZH_BROWSER ? "默认（跳过缺失输出）" : "Default (Skip Missing Outputs)",
+        allow_none: ZH_BROWSER ? "允许空输出（None）" : "Allow empty outputs (None)",
     },
     resolution: {
         "360P": "360P",
@@ -370,6 +375,34 @@ const OPTION_ALIASES = {
         per_segment: "per_segment",
         "\u9010\u6bb5\u4f18\u5316": "per_segment",
         "Per segment": "per_segment",
+    },
+    empty_output_mode: {
+        block_missing: "block_missing",
+        "默认（跳过缺失输出）": "block_missing",
+        "Default (Skip Missing Outputs)": "block_missing",
+        "跳过缺失输出": "block_missing",
+        "Skip Missing Outputs": "block_missing",
+        "原有模式": "block_missing",
+        "原有模式（空端口不报错）": "block_missing",
+        "原有模式（阻断空端口分支）": "block_missing",
+        original: "block_missing",
+        "original mode": "block_missing",
+        // Development builds briefly exposed a separate strict/count-check
+        // choice.  Map those saved values to the preserved original mode.
+        strict: "block_missing",
+        "媒体数量校验": "block_missing",
+        "Media Count Check": "block_missing",
+        "严格模式": "block_missing",
+        "严格模式（媒体不足时报错）": "block_missing",
+        "Strict (error if media is missing)": "block_missing",
+        "strict mode": "block_missing",
+        error: "block_missing",
+        allow_none: "allow_none",
+        none: "allow_none",
+        "允许空输出": "allow_none",
+        "允许空输出（None）": "allow_none",
+        "Allow empty outputs (None)": "allow_none",
+        "allow empty outputs": "allow_none",
     },
 };
 const COLOR_IMAGE = "#5aa9f0";
@@ -764,9 +797,11 @@ function localizeNodeInstance(node) {
             image_count: TEXT.imageCount,
             video_count: TEXT.videoCount,
             audio_count: TEXT.audioCount,
+            empty_output_mode: TEXT.mediaSplitterEmptyOutputMode,
         };
         for (const widget of node.widgets || []) {
             if (countLabels[widget.name]) widget.label = countLabels[widget.name];
+            localizeComboWidget(widget, node);
         }
         for (const input of node.inputs || []) {
             if (input.name === "media_bundle") setLocalizedSlotLabel(input, TEXT.mediaBundle);

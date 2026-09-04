@@ -139,6 +139,15 @@ MAX_AUDIOS = 3
 MEDIA_SPLITTER_MAX_IMAGES = 27
 MEDIA_SPLITTER_MAX_VIDEOS = 9
 MEDIA_SPLITTER_MAX_AUDIOS = 9
+# How Media Splitter handles a requested output for which the bundle does not
+# contain a corresponding resource.  The original blocked-branch behavior is
+# kept as the default; returning None is opt-in for optional aggregate inputs.
+MEDIA_SPLITTER_EMPTY_OUTPUT_ORIGINAL = "block_missing"
+MEDIA_SPLITTER_EMPTY_OUTPUT_ALLOW_NONE = "allow_none"
+MEDIA_SPLITTER_EMPTY_OUTPUT_MODES = (
+    MEDIA_SPLITTER_EMPTY_OUTPUT_ORIGINAL,
+    MEDIA_SPLITTER_EMPTY_OUTPUT_ALLOW_NONE,
+)
 MEDIA_BUNDLE_TYPE = "MINIMAX_H3_MEDIA_BUNDLE"
 SEGMENT_RESULT_TYPE = "MINIMAX_H3_SEGMENTS"
 SEGMENT_STEP_TYPE = "MINIMAX_H3_SEGMENT_STEP"
@@ -2233,7 +2242,8 @@ class MiniMaxH3EasyMediaSplitter:
     )
     DESCRIPTION = (
         "Split one Media Bundle into standard IMAGE, VIDEO, and AUDIO outputs. "
-        "Set the counts to expose the resources you want to use downstream."
+        "Set the counts to expose the resources you want to use downstream; "
+        "choose whether missing requested outputs keep the original blocked-branch behavior or return None."
     )
 
     @classmethod
@@ -2252,6 +2262,10 @@ class MiniMaxH3EasyMediaSplitter:
                 "audio_count": (
                     "INT",
                     {"default": 0, "min": 0, "max": MEDIA_SPLITTER_MAX_AUDIOS, "step": 1},
+                ),
+                "empty_output_mode": (
+                    list(MEDIA_SPLITTER_EMPTY_OUTPUT_MODES),
+                    {"default": MEDIA_SPLITTER_EMPTY_OUTPUT_ORIGINAL},
                 ),
             }
         }
@@ -2298,9 +2312,88 @@ class MiniMaxH3EasyMediaSplitter:
             "sample_rate": _audio_sample_rate(value),
         }
 
-    def split(self, media_bundle, image_count=1, video_count=0, audio_count=0):
+    @staticmethod
+    def _empty_output_mode(value: Any) -> str:
+        """Normalize canonical and localized empty-output mode labels."""
+        raw = str(value or MEDIA_SPLITTER_EMPTY_OUTPUT_ORIGINAL).strip().casefold()
+        compact = raw.replace(" ", "").replace("（", "(").replace("）", ")")
+        if "允许空输出" in compact and "none" in compact:
+            return MEDIA_SPLITTER_EMPTY_OUTPUT_ALLOW_NONE
+        if compact in {
+            "默认(跳过缺失输出)",
+            "跳过缺失输出",
+            "原有模式(空端口不报错)",
+            "原有模式(阻断空端口分支)",
+            "原有模式(空端口阻断)",
+            "original(missingoutputsdo noterror)",
+            "original(blockmissing-outputbranches)",
+        }:
+            return MEDIA_SPLITTER_EMPTY_OUTPUT_ORIGINAL
+        # These labels belonged to a short-lived development option.  Map
+        # them to the preserved original behavior for local test workflows.
+        if compact in {
+            "媒体数量校验",
+            "mediacountcheck",
+            "严格模式(媒体不足时报错)",
+            "strict(errorifmediaismissing)",
+        }:
+            return MEDIA_SPLITTER_EMPTY_OUTPUT_ORIGINAL
+        if raw in {
+            MEDIA_SPLITTER_EMPTY_OUTPUT_ORIGINAL,
+            "original",
+            "original mode",
+            "默认（跳过缺失输出）",
+            "default (skip missing outputs)",
+            "跳过缺失输出",
+            "skip missing outputs",
+            "原有模式",
+            "原有模式（空端口不报错）",
+            "原有模式（阻断空端口分支）",
+            "原有模式（空端口阻断）",
+            "strict",
+            "error",
+            "strict mode",
+            "strict (error if media is missing)",
+            "媒体数量校验",
+            "media count check",
+            "严格模式",
+            "严格模式（媒体不足时报错）",
+        }:
+            return MEDIA_SPLITTER_EMPTY_OUTPUT_ORIGINAL
+        if raw in {
+            MEDIA_SPLITTER_EMPTY_OUTPUT_ALLOW_NONE,
+            "none",
+            "allow empty outputs",
+            "allow empty outputs (none)",
+            "allow empty output (none)",
+            "允许空输出",
+            "允许空输出（none）",
+            "允许空输出(None)",
+        }:
+            return MEDIA_SPLITTER_EMPTY_OUTPUT_ALLOW_NONE
+        raise ValueError(
+            "Media Splitter empty_output_mode must be 'block_missing' or 'allow_none'"
+        )
+
+    @classmethod
+    def VALIDATE_INPUTS(cls, empty_output_mode=MEDIA_SPLITTER_EMPTY_OUTPUT_ORIGINAL):
+        try:
+            cls._empty_output_mode(empty_output_mode)
+        except ValueError as exc:
+            return str(exc)
+        return True
+
+    def split(
+        self,
+        media_bundle,
+        image_count=1,
+        video_count=0,
+        audio_count=0,
+        empty_output_mode=MEDIA_SPLITTER_EMPTY_OUTPUT_ORIGINAL,
+    ):
         if not isinstance(media_bundle, MiniMaxH3MediaBundle):
             raise ValueError("Connect a Media Bundle from Media Loader or Media Bridge")
+        empty_mode = self._empty_output_mode(empty_output_mode)
         counts = {
             "image": max(0, min(MEDIA_SPLITTER_MAX_IMAGES, int(image_count))),
             "video": max(0, min(MEDIA_SPLITTER_MAX_VIDEOS, int(video_count))),
@@ -2325,10 +2418,15 @@ class MiniMaxH3EasyMediaSplitter:
             for index in range(count):
                 value = values[index] if index < len(values) else None
                 if value is None:
-                    # Silently skip every downstream branch connected to an
-                    # unpopulated spare port. Populated sibling outputs remain
-                    # executable, including Save Image/Video/Audio nodes.
-                    outputs.append(ExecutionBlocker(None))
+                    if empty_mode == MEDIA_SPLITTER_EMPTY_OUTPUT_ORIGINAL:
+                        # Preserve the original behavior: ComfyUI blocks only
+                        # the branch connected to this missing output without
+                        # raising a Splitter validation error.
+                        outputs.append(ExecutionBlocker(None))
+                    else:
+                        # Optional aggregate nodes may accept None, but many
+                        # ordinary media nodes cannot consume it safely.
+                        outputs.append(None)
                     continue
                 if kind == "video":
                     value = self._standard_video(value)
