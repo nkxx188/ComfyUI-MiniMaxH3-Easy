@@ -4216,7 +4216,7 @@ class MiniMaxH3EasySelectedVideoContext(MiniMaxH3Easy):
         optimization = _optimize_prompt_on_run(
             prompt,
             optimizer_mode,
-            min(MAX_SECONDS, max(MIN_SECONDS, source_frame_count / float(h3.FPS))),
+            max(MIN_SECONDS, source_frame_count / float(h3.FPS)),
             items,
             settings,
             kwargs.get("prompt_optimizer_resources"),
