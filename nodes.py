@@ -2849,8 +2849,16 @@ def _selected_video_segment_boundaries(
 
 
 def _selected_video_prompt_parts(prompt: str, segment_count: int) -> list[str]:
-    """Match a selected-video prompt to its cut count without forcing optimization."""
+    """Match a selected-video prompt to its cut count without forcing optimization.
+
+    Whole-video mode has one source segment, so its prompt is always treated as
+    one complete block.  In particular, standalone ``---`` lines are ordinary
+    prompt text there; divider validation only applies after the candidate video
+    has been explicitly split into multiple segments.
+    """
     count = max(1, int(segment_count))
+    if count == 1:
+        return [str(prompt or "").strip()]
     parts = split_prompt_segments(str(prompt or ""))
     if not parts:
         parts = [""]
