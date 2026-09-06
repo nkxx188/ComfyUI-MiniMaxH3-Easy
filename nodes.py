@@ -4190,11 +4190,6 @@ class MiniMaxH3EasySelectedVideoContext(MiniMaxH3Easy):
         frames = _normalize_video_frames(frames)
         frames = _resample_video_frames(frames, float(source_fps or h3.FPS))
         source_frame_count = max(5, int(frames.shape[0]))
-        max_frames = _frame_length(MAX_SECONDS, h3.FPS)
-        if source_frame_count > max_frames:
-            raise ValueError(
-                f"Selected Video Context supports candidate videos up to {MAX_SECONDS:g} seconds"
-            )
         boundaries = _selected_video_segment_boundaries(
             source_frame_count,
             str(segment_mode or SELECTED_VIDEO_SEGMENT_WHOLE),
