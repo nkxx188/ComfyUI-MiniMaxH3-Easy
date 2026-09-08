@@ -91,6 +91,7 @@ const MEDIA_LOADER_GROUPS = Object.freeze([
 ]);
 const MEDIA_LOADER_INTERNAL_DRAG_TYPE = "application/x-h3-media-loader-type";
 let mediaLoaderInternalDrag = null;
+let mediaLoaderActiveAudio = null;
 const MIN_SECONDS = 0.2;
 const MAX_SECONDS = 30;
 const PROMPT_HISTORY_LIMIT = 120;
@@ -140,6 +141,8 @@ const TEXT = {
     mediaLoaderDrop: ZH_BROWSER ? "\u91ca\u653e\u4ee5\u6dfb\u52a0\u5a92\u4f53" : "Drop to add media",
     mediaLoaderReplace: ZH_BROWSER ? "\u66ff\u6362" : "Replace",
     mediaLoaderRemove: ZH_BROWSER ? "\u5220\u9664" : "Remove",
+    mediaLoaderPlay: ZH_BROWSER ? "\u64ad\u653e" : "Play",
+    mediaLoaderPause: ZH_BROWSER ? "\u6682\u505c" : "Pause",
     mediaLoaderEmpty: ZH_BROWSER ? "\u6682\u65e0\u5a92\u4f53" : "No media",
     mediaLoaderLimit: ZH_BROWSER ? "\u5df2\u8fbe\u8be5\u5206\u533a\u4e0a\u9650" : "This section is full",
     mediaLoaderUnsupported: ZH_BROWSER ? "\u53ea\u652f\u6301\u56fe\u7247\u3001\u97f3\u9891\u6216\u89c6\u9891\u6587\u4ef6" : "Only image, audio, and video files are supported",
@@ -2698,7 +2701,7 @@ function mediaLoaderState(node) {
 }
 
 function mediaLoaderEntryUrl(filename, type) {
-    if (!filename || type === "audio") return "";
+    if (!filename) return "";
     const params = new URLSearchParams({ filename: String(filename), type: "input" });
     return `/view?${params.toString()}`;
 }
@@ -7118,6 +7121,19 @@ function formatMediaDuration(seconds) {
     return `${minutes}:${String(remainder).padStart(2, "0")}`;
 }
 
+function formatAudioDurationLabel(seconds) {
+    const value = Number(seconds);
+    if (!Number.isFinite(value) || value < 0) return "";
+    const rounded = Math.round(value * 10) / 10;
+    const text = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+    return `${text}s`;
+}
+
+function mediaLoaderCardTitle(card, filename) {
+    const duration = String(card?.__h3MediaLoaderDurationLabel || "").trim();
+    return duration ? `${duration}\u00b7${filename}` : filename;
+}
+
 function mediaLoaderItemPreview(filename, type) {
     const thumb = document.createElement("div");
     thumb.className = `h3-media-loader-thumb is-${type}`;
@@ -7130,7 +7146,13 @@ function mediaLoaderItemPreview(filename, type) {
             bar.style.setProperty("--h3-audio-bar-height", `${height}%`);
             wave.append(bar);
         }
-        thumb.append(wave);
+        const audio = document.createElement("audio");
+        audio.className = "h3-media-loader-audio-player";
+        audio.preload = "none";
+        audio.src = mediaLoaderEntryUrl(filename, type);
+        audio.setAttribute("aria-hidden", "true");
+        thumb.__h3MediaLoaderAudio = audio;
+        thumb.append(wave, audio);
         return thumb;
     }
 
@@ -7404,7 +7426,7 @@ function mediaLoaderUpdateCard(card, group, filename, index) {
     card.dataset.index = String(index);
     card.dataset.filename = filename;
     card.dataset.mediaType = group.type;
-    card.title = filename;
+    card.title = mediaLoaderCardTitle(card, filename);
     card.querySelector(".h3-media-loader-tag").textContent = String(index + 1);
     const label = card.querySelector(".h3-media-loader-label");
     label.textContent = filename.split(/[\\/]/).pop() || filename;
@@ -7416,7 +7438,73 @@ function mediaLoaderCreateCard(node, group, filename) {
     card.className = `h3-media-loader-card is-${group.type}`;
     card.draggable = true;
     card.tabIndex = 0;
-    card.append(mediaLoaderItemPreview(filename, group.type));
+    const preview = mediaLoaderItemPreview(filename, group.type);
+    card.append(preview);
+
+    if (group.type === "audio") {
+        const audio = preview.__h3MediaLoaderAudio;
+        const play = document.createElement("button");
+        play.type = "button";
+        play.className = "h3-media-loader-play";
+        const playState = document.createElement("span");
+        playState.className = "h3-media-loader-play-state";
+        play.append(playState);
+        play.title = TEXT.mediaLoaderPlay;
+        play.setAttribute("aria-label", TEXT.mediaLoaderPlay);
+        card.__h3MediaLoaderAudio = audio;
+        card.__h3MediaLoaderPlay = play;
+        if (audio) {
+            audio.__h3MediaLoaderPlayButton = play;
+            audio.preload = "metadata";
+            const syncAudioDuration = () => {
+                const duration = formatAudioDurationLabel(audio.duration);
+                if (!duration) return;
+                card.__h3MediaLoaderDurationLabel = duration;
+                card.title = mediaLoaderCardTitle(card, card.dataset.filename || filename);
+            };
+            audio.addEventListener("loadedmetadata", syncAudioDuration, { once: true });
+            if (audio.readyState >= 1) syncAudioDuration();
+            const syncAudioButton = () => {
+                const playing = !audio.paused && !audio.ended;
+                playState.textContent = playing ? "\u2161" : "";
+                play.title = playing ? TEXT.mediaLoaderPause : TEXT.mediaLoaderPlay;
+                play.setAttribute("aria-label", play.title);
+                card.classList.toggle("is-playing", playing);
+            };
+            audio.addEventListener("play", syncAudioButton);
+            audio.addEventListener("pause", () => {
+                syncAudioButton();
+                if (mediaLoaderActiveAudio === audio) mediaLoaderActiveAudio = null;
+            });
+            audio.addEventListener("ended", syncAudioButton);
+            play.addEventListener("pointerdown", (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+            });
+            play.addEventListener("mousedown", (event) => event.stopPropagation());
+            play.addEventListener("click", async (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (!audio.paused && !audio.ended) {
+                    audio.pause();
+                    return;
+                }
+                if (audio.ended) audio.currentTime = 0;
+                if (mediaLoaderActiveAudio && mediaLoaderActiveAudio !== audio) {
+                    mediaLoaderActiveAudio.pause();
+                }
+                mediaLoaderActiveAudio = audio;
+                try {
+                    await audio.play();
+                } catch (error) {
+                    if (mediaLoaderActiveAudio === audio) mediaLoaderActiveAudio = null;
+                    syncAudioButton();
+                    console.warn("Media Loader audio preview could not play", error);
+                }
+            });
+        }
+        card.append(play);
+    }
 
     const tag = document.createElement("span");
     tag.className = "h3-media-loader-tag";
@@ -7432,6 +7520,10 @@ function mediaLoaderCreateCard(node, group, filename) {
     remove.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
+        if (card.__h3MediaLoaderAudio === mediaLoaderActiveAudio) {
+            card.__h3MediaLoaderAudio.pause();
+            mediaLoaderActiveAudio = null;
+        }
         const index = Number(card.dataset.index);
         if (!Number.isInteger(index)) return;
         const next = mediaLoaderReadState(node);
@@ -7499,7 +7591,13 @@ function mediaLoaderSyncGroup(node, group, state = mediaLoaderReadState(node)) {
     list.querySelectorAll(".h3-media-loader-empty").forEach((empty) => empty.remove());
 
     for (const [filename, card] of cards) {
-        if (!entries.includes(filename)) card.remove();
+        if (!entries.includes(filename)) {
+            if (card.__h3MediaLoaderAudio === mediaLoaderActiveAudio) {
+                card.__h3MediaLoaderAudio.pause();
+                mediaLoaderActiveAudio = null;
+            }
+            card.remove();
+        }
     }
     if (!entries.length) {
         const empty = document.createElement("div");
@@ -7634,6 +7732,7 @@ function installMediaLoaderStyles() {
       .h3-media-loader-thumb.is-audio { background:#10201d; }
       .h3-media-loader-thumb.is-audio::before { content:""; position:absolute; inset:7px; border:1px solid rgba(70,206,182,.18); border-radius:3px; pointer-events:none; }
       .h3-media-loader-thumb > img, .h3-media-loader-thumb > video { position:relative; z-index:1; width:100%; height:100%; display:block; object-fit:contain; object-position:center; }
+      .h3-media-loader-audio-player { display:none; }
       .h3-media-loader-audio-wave { position:relative; z-index:1; display:flex; align-items:center; justify-content:center; gap:4px; width:48%; height:42%; }
       .h3-media-loader-audio-wave i { display:block; width:4px; height:var(--h3-audio-bar-height); border-radius:3px; background:#35cdb9; box-shadow:0 0 0 1px rgba(0,0,0,.08); }
       .h3-media-loader-preview-fallback { color:#777; font-size:10px; }
@@ -7642,6 +7741,13 @@ function installMediaLoaderStyles() {
       .h3-media-loader-duration { position:absolute; right:4px; bottom:4px; z-index:2; padding:2px 4px; border-radius:3px; background:rgba(8,8,8,.35); color:#f1f1f1; font-size:9px; line-height:1.15; font-variant-numeric:tabular-nums; text-shadow:0 1px 2px rgba(0,0,0,.45); pointer-events:none; }
       .h3-media-loader-label { position:absolute; right:4px; bottom:4px; left:25px; z-index:1; overflow:hidden; color:#eee; font-size:9px; line-height:1.2; text-overflow:ellipsis; white-space:nowrap; pointer-events:none; }
       .h3-media-loader-card.is-image .h3-media-loader-label, .h3-media-loader-card.is-video .h3-media-loader-label { display:none; }
+      .h3-media-loader-play { position:absolute; right:4px; bottom:4px; z-index:4; width:17px; height:17px; padding:0; border:2px solid #222; border-radius:50%; background:#3b434a; color:#f1f1f1; cursor:pointer; display:flex; align-items:center; justify-content:center; font-family:Arial,sans-serif; font-size:10px; font-weight:700; line-height:1; opacity:0; visibility:hidden; transform:scale(.82); transition:opacity .15s ease, visibility .15s ease, transform .15s ease, background .15s ease; }
+      .h3-media-loader-play-state { display:block; transform:translateY(1px); }
+      .h3-media-loader-play::before { content:""; display:block; width:0; height:0; margin-left:1px; border-top:4px solid transparent; border-bottom:4px solid transparent; border-left:6px solid currentColor; }
+      .h3-media-loader-card.is-playing .h3-media-loader-play::before { display:none; }
+      .h3-media-loader-card:hover .h3-media-loader-play, .h3-media-loader-card:focus-within .h3-media-loader-play, .h3-media-loader-card.is-playing .h3-media-loader-play { opacity:1; visibility:visible; transform:scale(1); }
+      .h3-media-loader-play:hover { background:#59636b; color:#fff; }
+      .h3-media-loader-play:focus-visible { outline:1px solid #9aa6ae; outline-offset:1px; opacity:1; visibility:visible; }
       .h3-media-loader-remove { position:absolute; top:-7px; right:-7px; z-index:3; width:17px; height:17px; padding:0; border:2px solid #222; border-radius:50%; background:#3b434a; color:#f1f1f1; cursor:pointer; display:flex; align-items:center; justify-content:center; font-family:Arial,sans-serif; font-size:15px; font-weight:400; line-height:1; opacity:0; visibility:hidden; transform:scale(.82); transition:opacity .15s ease, visibility .15s ease, transform .15s ease, background .15s ease; }
       .h3-media-loader-card:hover .h3-media-loader-remove, .h3-media-loader-card:focus-within .h3-media-loader-remove { opacity:1; visibility:visible; transform:scale(1); }
       .h3-media-loader-remove:hover { background:#8b4242; color:#fff; }
