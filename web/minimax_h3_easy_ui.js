@@ -1070,6 +1070,31 @@ function getWidgetValue(node, name, fallback = "") {
     return widget?.value ?? fallback;
 }
 
+function linkedInputValue(node, inputName) {
+    const input = node?.inputs?.find((candidate) => String(candidate?.name || "") === String(inputName || ""));
+    if (!input || input.link == null) return { found: false, value: undefined };
+    const graph = node?.graph || app.graph;
+    const link = getNativeGraphLink(graph, input.link);
+    if (!link) return { found: false, value: undefined };
+    const sourceId = link.origin_id ?? link.originId ?? link.from_id ?? link.fromId;
+    const sourceNode = link.origin_node || link.originNode || link.fromNode || link.sourceNode
+        || graph?.getNodeById?.(Number(sourceId));
+    if (!sourceNode) return { found: false, value: undefined };
+    const sourceSlot = Number(link.origin_slot ?? link.originSlot ?? link.from_slot ?? link.fromSlot ?? 0);
+    const output = sourceNode.outputs?.[Number.isFinite(sourceSlot) ? sourceSlot : 0];
+    const widgetName = output?.widget?.name || output?.widget?.widgetName || null;
+    const sourceWidget = widgetName
+        ? getWidget(sourceNode, widgetName)
+        : sourceNode.widgets?.length === 1 ? sourceNode.widgets[0] : null;
+    if (sourceWidget && sourceWidget.value !== undefined) {
+        return { found: true, value: sourceWidget.value };
+    }
+    if (sourceNode.value !== undefined && typeof sourceNode.value !== "object") {
+        return { found: true, value: sourceNode.value };
+    }
+    return { found: false, value: undefined };
+}
+
 function asBoolean(value, fallback = false) {
     if (typeof value === "boolean") return value;
     if (typeof value === "number") return value !== 0;
@@ -1582,16 +1607,110 @@ function removeVirtualLink(node, index) {
 
 function getNativeGraphLink(graph, linkId) {
     if (!graph || linkId == null) return null;
+    const normalizedId = typeof linkId === "string" ? linkId.trim() : linkId;
+    if (normalizedId === "") return null;
+    const numericId = Number(normalizedId);
+    const candidates = [normalizedId, String(normalizedId)];
+    if (Number.isFinite(numericId)) candidates.push(numericId);
     for (const links of [graph.links, graph._links]) {
         if (!links) continue;
         if (typeof links.get === "function") {
-            const link = links.get(linkId) ?? links.get(String(linkId));
+            for (const candidate of candidates) {
+                const link = links.get(candidate);
+                if (link) return link;
+            }
+        }
+        for (const candidate of candidates) {
+            const link = links[candidate];
             if (link) return link;
         }
-        const link = links[linkId] ?? links[String(linkId)];
-        if (link) return link;
     }
     return null;
+}
+
+function setNativeLinkTargetSlot(link, index) {
+    if (!link || !Number.isFinite(Number(index))) return false;
+    const next = Number(index);
+    let changed = Number(link.target_slot) !== next;
+    link.target_slot = next;
+    if ("targetSlot" in link) {
+        changed = changed || Number(link.targetSlot) !== next;
+        link.targetSlot = next;
+    }
+    return changed;
+}
+
+function nodeInputDefinition(node, name) {
+    const nodeData = node?.constructor?.nodeData || node?.nodeData;
+    if (!nodeData || !name) return null;
+    for (const section of [nodeData.input?.required, nodeData.input?.optional]) {
+        if (section && Object.prototype.hasOwnProperty.call(section, name)) return section[name];
+    }
+    return null;
+}
+
+function nodeInputTypeFromDefinition(definition) {
+    if (Array.isArray(definition)) {
+        const rawType = definition[0];
+        return Array.isArray(rawType) ? "COMBO" : String(rawType || "");
+    }
+    if (definition && typeof definition === "object") {
+        const rawType = definition.type;
+        return Array.isArray(rawType) ? "COMBO" : String(rawType || "");
+    }
+    return "";
+}
+
+function restoreWidgetInputContracts(node) {
+    if (!node || !Array.isArray(node.inputs)) return false;
+    let changed = false;
+    for (const input of node.inputs) {
+        const definition = nodeInputDefinition(node, String(input?.name || ""));
+        const expectedType = nodeInputTypeFromDefinition(definition);
+        if (!input || !expectedType) continue;
+        if (String(input.type || "") !== expectedType) {
+            input.type = expectedType;
+            changed = true;
+        }
+        if (input.widget && !input.widget.name) {
+            input.widget.name = input.name;
+            changed = true;
+        }
+    }
+    if (changed) {
+        node._widgetSlotsDirty = true;
+        node.setDirtyCanvas?.(true, true);
+        node.graph?.setDirtyCanvas?.(true, true);
+        if (app.graph === node.graph) app.graph.setDirtyCanvas?.(true, true);
+    }
+    return changed;
+}
+
+function reindexNativeInputLinks(node) {
+    const graph = node?.graph;
+    if (!node || !graph || !Array.isArray(node.inputs)) return false;
+    let changed = false;
+    node.inputs.forEach((input, index) => {
+        if (input?.link == null) return;
+        const link = getNativeGraphLink(graph, input.link);
+        if (link) changed = setNativeLinkTargetSlot(link, index) || changed;
+    });
+    if (changed) {
+        node.setDirtyCanvas?.(true, true);
+        graph.setDirtyCanvas?.(true, true);
+        if (app.graph === graph) app.graph.setDirtyCanvas?.(true, true);
+    }
+    return changed;
+}
+
+function scheduleNativeInputLinkReindex(node) {
+    if (!node) return;
+    const run = () => reindexNativeInputLinks(node);
+    if (typeof requestAnimationFrame === "function") {
+        requestAnimationFrame(() => requestAnimationFrame(run));
+    } else {
+        setTimeout(run, 0);
+    }
 }
 
 function getNativeMediaBridgeLink(node) {
@@ -2585,7 +2704,12 @@ function patchGraphToPrompt() {
                     "audio_mode",
                     getWidgetValue(node, "audio_mode", CONTEXT_AUDIO_GENERATED),
                 );
-                promptNode.inputs.segment_seconds = String(getWidgetValue(node, "segment_seconds", "") || "");
+                preserveLinkedPromptInput(
+                    promptNode,
+                    node,
+                    "segment_seconds",
+                    String(getWidgetValue(node, "segment_seconds", "") || ""),
+                );
                 promptNode.inputs.context_length = Number(getWidgetValue(node, "context_length", 5)) || 5;
                 promptNode.inputs.continuity_mode = canonicalOption(
                     "continuity_mode",
@@ -4409,20 +4533,26 @@ function setConditionalWidgetVisible(node, widget, visible, { adjustHeight = tru
         adjustNodeHeight(node, visible ? layoutDelta : -layoutDelta);
     }
     refreshVueNodeWidgets(node);
+    restoreWidgetInputContracts(node);
     node._widgetSlotsDirty = true;
     return true;
 }
 
 function syncSegmentSummary(node) {
     if (!isSegmentMode(node)) return false;
-    const secondsSpec = String(getWidgetValue(node, "segment_seconds", "") || "");
+    const localSecondsSpec = String(getWidgetValue(node, "segment_seconds", "") || "");
+    const linkedSeconds = linkedInputValue(node, "segment_seconds");
+    const secondsSpec = String(linkedSeconds.found ? linkedSeconds.value ?? "" : localSecondsSpec);
     const parts = secondsSpec.replace(/\uff0c/g, ",").split(",").map((item) => item.trim()).filter(Boolean);
     const total = parts.reduce((sum, item) => {
         const value = Number.parseFloat(item);
         return Number.isFinite(value) ? sum + value : sum;
     }, 0);
     const seconds = getWidget(node, "seconds");
-    if (seconds && total > 0) {
+    const segmentSecondsInput = node?.inputs?.find((input) => String(input?.name || "") === "segment_seconds");
+    const totalSecondsInput = node?.inputs?.find((input) => String(input?.name || "") === "seconds");
+    const canSyncFromLinkedSpec = segmentSecondsInput?.link == null || linkedSeconds.found;
+    if (seconds && total > 0 && canSyncFromLinkedSpec && totalSecondsInput?.link == null) {
         seconds.value = Math.round(total * 10) / 10;
         if (seconds._state) seconds._state.value = seconds.value;
     }
@@ -4518,6 +4648,7 @@ function syncModeWidgets(node, { adjustHeight = true } = {}) {
             ? TEXT.selectedVideoFrameCuts
             : TEXT.selectedVideoTimeCuts;
     }
+    restoreWidgetInputContracts(node);
     if (changed) {
         refreshVueNodeWidgets(node);
         node._widgetSlotsDirty = true;
@@ -4558,7 +4689,9 @@ function syncSegmentRefineWidgets(node, { adjustHeight = true } = {}) {
 function repairNodeLayout(node) {
     if (!node) return;
     const run = () => {
+        restoreWidgetInputContracts(node);
         refreshVueNodeWidgets(node);
+        restoreWidgetInputContracts(node);
         node._widgetSlotsDirty = true;
         node.setDirtyCanvas?.(true, true);
         app.graph?.setDirtyCanvas?.(true, true);
@@ -5990,6 +6123,14 @@ function pruneTransportInputs(nodeData) {
             changed = true;
         }
     }
+    for (const section of [nodeData?.input_order?.required, nodeData?.input_order?.optional]) {
+        if (!Array.isArray(section)) continue;
+        const filtered = section.filter((name) => !isTransportInputName(name));
+        if (filtered.length !== section.length) {
+            section.splice(0, section.length, ...filtered);
+            changed = true;
+        }
+    }
     if (Array.isArray(nodeData?.inputs)) {
         const nextInputs = nodeData.inputs.filter((input) => !isTransportInputName(input?.name));
         if (nextInputs.length !== nodeData.inputs.length) {
@@ -6029,6 +6170,7 @@ function pruneTransportInputsFromNode(node, { requestLayout = true, force = fals
             changed = true;
         }
     }
+    reindexNativeInputLinks(node);
     if (changed) {
         node._widgetSlotsDirty = true;
         app.graph?.change?.();
@@ -6774,6 +6916,8 @@ function installNode(nodeType, nodeData) {
         normalizeLinks(this);
         pruneTransportInputsFromNode(this, { force: true });
         normalizeLinks(this);
+        reindexNativeInputLinks(this);
+        scheduleNativeInputLinkReindex(this);
         localizeNodeInstance(this);
         bindPromptOptimizerWidgetCallbacks(this);
         syncModeWidgets(this, { adjustHeight: false });

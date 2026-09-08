@@ -4386,9 +4386,11 @@ class MiniMaxH3EasyContextSegments:
         settings = _workflow_prompt_optimizer_settings(kwargs)
         if settings["enabled"] and settings["optimize_on_run"]:
             return float("nan")
+        # The comma-separated segment_seconds input is the authoritative
+        # duration plan; seconds is only its UI summary.
         return repr(tuple(kwargs.get(key) for key in (
             "mode", "audio_mode", "prompt", "resolution", "aspect_ratio",
-            "width", "height", "seconds", "segment_seconds", "context_length",
+            "width", "height", "segment_seconds", "context_length",
             "continuity_mode", "advanced", "fps", "keyframe_role", "ref_image_size",
             "reference_mention_mode", "prompt_optimizer",
             "prompt_optimizer_api_format", "prompt_optimizer_api_url",
