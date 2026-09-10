@@ -365,6 +365,17 @@ def _model_tokens(name: str) -> set[str]:
     return set(_normalise_model_name(name).split())
 
 
+def _qwen3_vl_size(name: str) -> int | None:
+    """Return the declared Qwen3-VL parameter size, ignoring quantization numbers."""
+    normalised = _normalise_model_name(name)
+    tokens = set(normalised.split())
+    compact = normalised.replace(" ", "")
+    if "qwen3vl" not in compact and not ({"qwen3", "vl"} <= tokens):
+        return None
+    match = re.search(r"(?:^|\s)(32|8|4)\s+b(?:\s|$)", normalised)
+    return int(match.group(1)) if match else None
+
+
 def _is_minimax_h3_name(normalised: str, compact: str, tokens: set[str]) -> bool:
     """Require an explicit MiniMax H3 identity before matching shared roles."""
     return "minimaxh3" in compact or ("minimax" in tokens and "h3" in compact)
@@ -462,9 +473,7 @@ def _has_role(name: str, role: str) -> bool:
             return False
         return "ref2va" in compact or "ref2v" in compact
     if role == "text_encoder":
-        if ("qwen3vl" in compact or ("qwen3" in tokens and "vl" in tokens)) and (
-            "32b" in tokens or "32" in tokens
-        ):
+        if _qwen3_vl_size(name) in {4, 8, 32}:
             return True
         # Some community H3 exports omit "minimax_h3" from the encoder
         # filename but retain the characteristic INT8/ConvRot or NVFP4/AWQ
@@ -1890,6 +1899,16 @@ def _clip_choices() -> list[str]:
     )
 
 
+def _clip_projection_choices() -> list[str]:
+    """List optional ClipProj matrices without requiring ClipProj to be installed."""
+    try:
+        matrices = folder_paths.get_filename_list("clip_projections")
+    except Exception:
+        matrices = []
+    matrices = [name for name in matrices if name.lower().endswith((".safetensors", ".pt"))]
+    return ["none", *_sort_model_names(matrices)]
+
+
 def _vae_choices(needles: tuple[str, ...], fallback: str) -> list[str]:
     return _all_weight_choices(("vae",), fallback)
 
@@ -1942,9 +1961,23 @@ def _load_gguf_unet(model_name: str):
     return loader.load_unet(model_name)[0]
 
 
+def _clip_type_for_text_encoder(text_encoder: str) -> str:
+    """Choose the ComfyUI loader type for supported Qwen3-VL encoder sizes."""
+    size = _qwen3_vl_size(text_encoder)
+    if size == 4:
+        return "krea2"
+    if size == 8:
+        return "boogu"
+    return "minimax"
+
+
 def _load_text_encoder(text_encoder: str):
     if not _is_gguf_file(text_encoder):
-        return nodes.CLIPLoader().load_clip(text_encoder, "minimax", "default")[0]
+        return nodes.CLIPLoader().load_clip(
+            text_encoder,
+            _clip_type_for_text_encoder(text_encoder),
+            "default",
+        )[0]
 
     loader_class = _registered_node_class("CLIPLoaderGGUF", "CLIPLoaderGGUFAdvanced")
     if loader_class is None:
@@ -1957,6 +1990,24 @@ def _load_text_encoder(text_encoder: str):
         return loader.load_clip(text_encoder, "minimax")[0]
     except TypeError:
         return loader.load_clip(text_encoder, type="minimax")[0]
+
+
+def _apply_clip_projection(clip, text_encoder: str, clip_projection: str):
+    """Wrap a lightweight Qwen3-VL encoder with the selected ClipProj matrix."""
+    if clip_projection == "none":
+        return clip
+    if _clip_type_for_text_encoder(text_encoder) == "minimax":
+        raise ValueError(
+            "ClipProj needs a Qwen3-VL 4B or 8B text encoder. Select the 4B/8B encoder, "
+            "or set ClipProj matrix to none when using the original 32B H3 encoder."
+        )
+    apply_class = _registered_node_class("ClipProjApply")
+    if apply_class is None:
+        raise RuntimeError(
+            "A ClipProj matrix was selected, but ComfyUI-ClipProj is not installed or did not load. "
+            "Install it in custom_nodes and restart ComfyUI."
+        )
+    return apply_class().apply(clip, clip_projection)[0]
 
 
 @dataclass
@@ -2559,7 +2610,7 @@ class MiniMaxH3EasyLoader:
     FUNCTION = "load"
     RETURN_TYPES = ("MINIMAX_H3_BUNDLE",)
     RETURN_NAMES = ("h3_bundle",)
-    DESCRIPTION = "Load either or both MiniMax H3 transformers, plus the text encoder and both AV VAEs."
+    DESCRIPTION = "Load either or both MiniMax H3 transformers, plus the text encoder, both AV VAEs, and an optional ClipProj matrix for a lighter 4B/8B encoder."
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -2571,23 +2622,29 @@ class MiniMaxH3EasyLoader:
                 "video_vae": (_vae_choices(("minimax_h3_video_vae",), "minimax_h3_video_vae_fp16.safetensors"),),
                 "audio_vae": (_vae_choices(("minimax_h3_audio_vae",), "minimax_h3_audio_vae_fp32.safetensors"),),
             },
+            "optional": {
+                # Keep this after the original five widgets so existing saved
+                # workflows retain their positional widget values.
+                "clip_projection": (_clip_projection_choices(), {"default": "none"}),
+            },
         }
 
     @classmethod
     def IS_CHANGED(cls, **kwargs):
-        return "|".join(str(kwargs.get(key, "")) for key in ("fl2va_model", "ref2va_model", "text_encoder", "video_vae", "audio_vae"))
+        return "|".join(str(kwargs.get(key, "")) for key in ("fl2va_model", "ref2va_model", "text_encoder", "clip_projection", "video_vae", "audio_vae"))
 
-    def load(self, fl2va_model, ref2va_model, text_encoder, video_vae, audio_vae):
+    def load(self, fl2va_model, ref2va_model, text_encoder, video_vae, audio_vae, clip_projection="none"):
         if _is_none_model(fl2va_model) and _is_none_model(ref2va_model):
             raise ValueError("Select at least one MiniMax H3 transformer: FL2VA or REF2VA.")
         clip = _load_text_encoder(text_encoder)
+        clip = _apply_clip_projection(clip, text_encoder, clip_projection)
         video_vae_obj, = nodes.VAELoader().load_vae(video_vae)
         audio_vae_obj, = nodes.VAELoader().load_vae(audio_vae)
         _validate_h3_vae_roles(video_vae_obj, audio_vae_obj, video_vae, audio_vae)
         return (MiniMaxH3Bundle(
             fl2va_model_name=fl2va_model,
             ref2va_model_name=ref2va_model,
-            clip_name=text_encoder,
+            clip_name=text_encoder if clip_projection == "none" else f"{text_encoder} + {clip_projection}",
             video_vae_name=video_vae,
             audio_vae_name=audio_vae,
             clip=clip,
