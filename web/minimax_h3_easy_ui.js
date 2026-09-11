@@ -6307,6 +6307,22 @@ function pruneTransportInputsFromNode(node, { requestLayout = true, force = fals
     return changed;
 }
 
+function pruneTransportInputsFromExistingNodes() {
+    let changed = false;
+    for (const node of app.graph?._nodes || []) {
+        if (!isTarget(node)) continue;
+        changed = pruneTransportInputsFromNode(node, {
+            requestLayout: false,
+            force: true,
+        }) || changed;
+    }
+    if (changed) {
+        app.graph?.setDirtyCanvas?.(true, true);
+        app.graph?.change?.();
+    }
+    return changed;
+}
+
 function setConfiguredWidgetValue(node, name, value) {
     const widget = getWidget(node, name);
     if (!widget || value === undefined) return;
@@ -8255,6 +8271,12 @@ function install() {
     installNativeThemeWatcher();
     installMediaLoaderClipboardPaste();
     for (const delay of [0, 100, 500, 1200]) setTimeout(() => patchCanvas(), delay);
+    // Existing workflow nodes can be restored after the extension setup hook,
+    // especially with the newer frontend.  Sweep a few times so the hidden
+    // transport sockets never remain visible on a restored node.
+    for (const delay of [0, 100, 500, 1200, 2500, 5000]) {
+        setTimeout(() => pruneTransportInputsFromExistingNodes(), delay);
+    }
     setTimeout(() => installQuickCreateCapture(app.canvas), 0);
     setTimeout(() => installQuickCreateCapture(app.canvas), 250);
     document.addEventListener("pointerdown", (event) => {
@@ -8395,5 +8417,13 @@ app.registerExtension({
         installSegmentStepNode(nodeType, nodeData);
         installSegmentCollectNode(nodeType, nodeData);
         installNode(nodeType, nodeData);
+    },
+    loadedGraphNode(node) {
+        if (!isTarget(node)) return;
+        pruneTransportInputsFromNode(node, { force: true });
+    },
+    nodeCreated(node) {
+        if (!isTarget(node)) return;
+        setTimeout(() => pruneTransportInputsFromNode(node, { force: true }), 0);
     },
 });
