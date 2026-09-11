@@ -16,6 +16,8 @@ const SEGMENT_STEP_CLASS = "MiniMaxH3EasySegmentStep";
 const SEGMENT_COLLECT_CLASS = "MiniMaxH3EasySegmentCollect";
 const SEGMENT_DECODE_CLASS = "MiniMaxH3EasySegmentDecode";
 const OUTPUT_CLASS = "MiniMaxH3EasyOutput";
+const EASY_SAMPLER_CLASS = "MiniMaxH3EasySampler";
+const SELFLIFT_STRATEGY_CLASS = "MiniMaxH3EasySelfLiftStrategy";
 const LINKS_PROP = "minimax_h3_virtual_media_links";
 const PROMPT_DOC_PROP = "minimax_h3_prompt_reference_doc";
 const PROMPT_VIEW_PROP = "minimax_h3_prompt_view_mode";
@@ -27,15 +29,18 @@ const DIALOGUE_CLASS = "h3-dialogue-block";
 const PROMPT_VIEW_STRUCTURED = "structured";
 const PROMPT_VIEW_RAW = "raw";
 const PROMPT_GUIDES = [
-    { value: "none", zh: "\u4ec5\u901a\u7528\u65b9\u6848", en: "General only" },
-    { value: "3d_animation_short", zh: "3D \u52a8\u753b\u77ed\u7247", en: "3D Animation Short" },
-    { value: "brand_promo", zh: "\u54c1\u724c\u5ba3\u4f20\u7247", en: "Brand Promo Video" },
-    { value: "coop_game_intro", zh: "\u5408\u4f5c\u6e38\u620f\u5f00\u573a", en: "Co-op Game Intro" },
-    { value: "handdrawn_live", zh: "\u624b\u7ed8\u5b9e\u62cd\u878d\u5408", en: "Hand-drawn Live-action" },
-    { value: "minimalist_product_ad", zh: "\u6781\u7b80\u4ea7\u54c1\u5e7f\u544a", en: "Minimalist Product Ad" },
-    { value: "music_video_subtitle", zh: "\u97f3\u4e50\u89c6\u9891\u5b57\u5e55", en: "Music Video Subtitle" },
-    { value: "paper_collage", zh: "\u7eb8\u5f20\u62fc\u8d34\u89e3\u8bf4", en: "Paper Collage Explainer" },
-    { value: "papercraft_stop_motion", zh: "\u7eb8\u827a\u5b9a\u683c\u89e3\u8bf4", en: "Papercraft Stop-motion" },
+    { value: "none", zh: "\u901a\u7528", en: "General only", languages: ["en", "zh"] },
+    { value: "3d_animation_short", zh: "3D \u52a8\u753b\u77ed\u7247", en: "3D Animation Short", languages: ["en"] },
+    { value: "brand_promo", zh: "\u54c1\u724c\u5ba3\u4f20\u7247", en: "Brand Promo Video", languages: ["en"] },
+    { value: "coop_game_intro", zh: "\u5408\u4f5c\u6e38\u620f\u5f00\u573a", en: "Co-op Game Intro", languages: ["en"] },
+    { value: "handdrawn_live", zh: "\u624b\u7ed8\u5b9e\u62cd\u878d\u5408", en: "Hand-drawn Live-action", languages: ["en"] },
+    { value: "minimalist_product_ad", zh: "\u6781\u7b80\u4ea7\u54c1\u5e7f\u544a", en: "Minimalist Product Ad", languages: ["en"] },
+    { value: "music_video_subtitle", zh: "\u97f3\u4e50\u89c6\u9891\u5b57\u5e55", en: "Music Video Subtitle", languages: ["en"] },
+    { value: "paper_collage", zh: "\u7eb8\u5f20\u62fc\u8d34\u89e3\u8bf4", en: "Paper Collage Explainer", languages: ["en"] },
+    { value: "papercraft_stop_motion", zh: "\u7eb8\u827a\u5b9a\u683c\u89e3\u8bf4", en: "Papercraft Stop-motion", languages: ["en"] },
+    { value: "zh_dialogue", zh: "\u6587\u620f", en: "Dialogue and Performance", languages: ["zh"] },
+    { value: "zh_action", zh: "\u52a8\u4f5c", en: "Action", languages: ["zh"] },
+    { value: "zh_advertisement", zh: "\u5e7f\u544a", en: "Advertisement", languages: ["zh"] },
 ];
 const MODE_IMAGE = "image";
 const MODE_REFERENCE = "reference";
@@ -147,6 +152,20 @@ const TEXT = {
     mediaLoaderLimit: ZH_BROWSER ? "\u5df2\u8fbe\u8be5\u5206\u533a\u4e0a\u9650" : "This section is full",
     mediaLoaderUnsupported: ZH_BROWSER ? "\u53ea\u652f\u6301\u56fe\u7247\u3001\u97f3\u9891\u6216\u89c6\u9891\u6587\u4ef6" : "Only image, audio, and video files are supported",
     outputTitle: ZH_BROWSER ? "MiniMax H3 Easy \u8f93\u51fa" : "MiniMax H3 Easy Output",
+    samplerTitle: ZH_BROWSER ? "MiniMax H3 Easy \u91c7\u6837" : "MiniMax H3 Easy Sample",
+    selfLiftTitle: "MiniMax H3 Easy SelfLift",
+    samplingPlan: ZH_BROWSER ? "\u91c7\u6837\u65b9\u6848" : "Sampling plan",
+    sampledLatent: ZH_BROWSER ? "\u91c7\u6837 Latent" : "Sampled latent",
+    transitionStep: ZH_BROWSER ? "\u4f4e\u5206\u8fa8\u7387\u6b65\u6570" : "Low-resolution steps",
+    lowresScale: ZH_BROWSER ? "\u4f4e\u5206\u8fa8\u7387\u6bd4\u4f8b" : "Low-resolution scale",
+    upscalerModel: ZH_BROWSER ? "Latent \u653e\u5927\u6a21\u578b" : "Latent upscaler model",
+    cfg: "CFG",
+    rho: "Rho",
+    wMin: "W Min",
+    wMax: "W Max",
+    upscalerDevice: ZH_BROWSER ? "\u653e\u5927\u8bbe\u5907" : "Upscaler device",
+    upscalerPrecision: ZH_BROWSER ? "\u653e\u5927\u7cbe\u5ea6" : "Upscaler precision",
+    upscalerChunking: ZH_BROWSER ? "\u65f6\u95f4\u5206\u5757\u653e\u5927" : "Temporal chunked upscale",
     category: "MiniMax H3 Easy",
     mode: ZH_BROWSER ? "\u6a21\u5f0f" : "Mode",
     audioMode: ZH_BROWSER ? "\u97f3\u9891\u6a21\u5f0f" : "Audio mode",
@@ -259,7 +278,7 @@ const OPTION_DEFS = {
         latent_upscale: "Latent Upscale",
     },
     continuity_mode: {
-        [CONTINUITY_LATENT]: "Latent Guide",
+        [CONTINUITY_LATENT]: "Motion Context",
         [CONTINUITY_GUIDE]: "RGB Guide",
         [CONTINUITY_SOFT_AV]: "Soft AV Prefix",
         [CONTINUITY_HARD_AV]: "Hard AV Prefix",
@@ -270,7 +289,11 @@ const OPTION_DEFS = {
         gemini: ZH_BROWSER ? "Gemini \u539f\u751f" : "Gemini Native",
     },
     prompt_optimizer_scene_guide: {
-        none: ZH_BROWSER ? "\u4ec5\u901a\u7528\u65b9\u6848" : "General only",
+        none: ZH_BROWSER ? "\u901a\u7528" : "General only",
+    },
+    prompt_optimizer_language: {
+        en: ZH_BROWSER ? "English" : "English",
+        zh: ZH_BROWSER ? "\u4e2d\u6587" : "Chinese",
     },
     context_prompt_optimizer_mode: {
         whole_sequence: ZH_BROWSER ? "\u6574\u4f53\u4f18\u5316" : "Whole sequence",
@@ -378,6 +401,17 @@ const OPTION_ALIASES = {
         per_segment: "per_segment",
         "\u9010\u6bb5\u4f18\u5316": "per_segment",
         "Per segment": "per_segment",
+    },
+    continuity_mode: {
+        [CONTINUITY_LATENT]: CONTINUITY_LATENT,
+        "Motion Context": CONTINUITY_LATENT,
+        "Latent Guide": CONTINUITY_LATENT,
+        [CONTINUITY_GUIDE]: CONTINUITY_GUIDE,
+        "RGB Guide": CONTINUITY_GUIDE,
+        [CONTINUITY_SOFT_AV]: CONTINUITY_SOFT_AV,
+        "Soft AV Prefix": CONTINUITY_SOFT_AV,
+        [CONTINUITY_HARD_AV]: CONTINUITY_HARD_AV,
+        "Hard AV Prefix": CONTINUITY_HARD_AV,
     },
     empty_output_mode: {
         block_missing: "block_missing",
@@ -707,6 +741,29 @@ function canonicalPromptGuide(value) {
     return found?.value || "none";
 }
 
+function promptGuideLanguage(value) {
+    return String(value || "en").toLowerCase() === "zh" ? "zh" : "en";
+}
+
+function promptGuidesForLanguage(language) {
+    const normalized = promptGuideLanguage(language);
+    return PROMPT_GUIDES.filter((item) => !Array.isArray(item.languages) || item.languages.includes(normalized));
+}
+
+function promptGuideOptionsForLanguage(language) {
+    return Object.fromEntries(
+        promptGuidesForLanguage(language).map((item) => [item.value, ZH_BROWSER ? item.zh : item.en]),
+    );
+}
+
+function canonicalPromptGuideForLanguage(value, language) {
+    const raw = String(value ?? "");
+    const found = promptGuidesForLanguage(language).find(
+        (item) => raw === item.value || raw === item.zh || raw === item.en,
+    );
+    return found?.value || "none";
+}
+
 function localizeComboWidget(widget, node = null) {
     const name = String(widget?.name || "");
     if (name === "prompt_optimizer_scene_guide") {
@@ -821,8 +878,10 @@ function localizeNodeInstance(node) {
     }
     if (isMediaLoader(node)) {
         node.title = TEXT.mediaLoaderTitle;
+        const outputLabels = { media_bundle: TEXT.mediaBundle };
         for (const output of node.outputs || []) {
-            if (String(output.name || "").toLowerCase() === "media_bundle") setLocalizedSlotLabel(output, TEXT.mediaBundle);
+            const key = String(output.name || "").toLowerCase();
+            if (outputLabels[key]) setLocalizedSlotLabel(output, outputLabels[key]);
         }
         return;
     }
@@ -866,10 +925,52 @@ function localizeNodeInstance(node) {
         for (const input of node.inputs || []) {
             if (input.name === "h3_context") setLocalizedSlotLabel(input, TEXT.outputContext);
         }
-        const outputLabels = { positive: TEXT.outputConditioning, latent: TEXT.outputLatent, video_vae: TEXT.outputVideoVae, audio_vae: TEXT.outputAudioVae, fps: TEXT.outputFps, driving_audio: TEXT.drivingAudio };
+        const outputLabels = { positive: TEXT.outputConditioning, latent: TEXT.outputLatent, video_vae: TEXT.outputVideoVae, audio_vae: TEXT.outputAudioVae, fps: TEXT.outputFps };
         for (const output of node.outputs || []) {
             const key = String(output.name || "").toLowerCase();
             if (outputLabels[key]) setLocalizedSlotLabel(output, outputLabels[key]);
+        }
+        return;
+    }
+    if (nodeMatchesClass(node, EASY_SAMPLER_CLASS, TEXT.samplerTitle, "__h3EasySamplerInstalled")) {
+        node.title = TEXT.samplerTitle;
+        for (const widget of node.widgets || []) {
+            if (widget.name === "seed") widget.label = TEXT.seedLabel;
+        }
+        const inputLabels = {
+            h3_context: TEXT.outputContext,
+            model: TEXT.outputModel,
+            sampling_plan: TEXT.samplingPlan,
+        };
+        for (const input of node.inputs || []) {
+            if (inputLabels[input.name]) setLocalizedSlotLabel(input, inputLabels[input.name]);
+        }
+        for (const output of node.outputs || []) {
+            if (output.name === "sampled_latent") setLocalizedSlotLabel(output, TEXT.sampledLatent);
+        }
+        return;
+    }
+    if (nodeMatchesClass(node, SELFLIFT_STRATEGY_CLASS, TEXT.selfLiftTitle, "__h3SelfLiftStrategyInstalled")) {
+        node.title = TEXT.selfLiftTitle;
+        const labels = {
+            transition_step: TEXT.transitionStep,
+            lowres_scale: TEXT.lowresScale,
+            upscaler_model: TEXT.upscalerModel,
+            advanced: TEXT.advanced,
+            cfg: TEXT.cfg,
+            rho: TEXT.rho,
+            w_min: TEXT.wMin,
+            w_max: TEXT.wMax,
+            upscaler_device: TEXT.upscalerDevice,
+            upscaler_precision: TEXT.upscalerPrecision,
+            upscaler_chunking: TEXT.upscalerChunking,
+        };
+        for (const widget of node.widgets || []) {
+            if (labels[widget.name]) widget.label = labels[widget.name];
+            if (widget.name === "upscaler_model") localizeOptionalModelWidget(widget);
+        }
+        for (const output of node.outputs || []) {
+            if (output.name === "sampling_plan") setLocalizedSlotLabel(output, TEXT.samplingPlan);
         }
         return;
     }
@@ -879,7 +980,7 @@ function localizeNodeInstance(node) {
         for (const widget of node.widgets || []) {
             if (widgetLabels[widget.name]) widget.label = widgetLabels[widget.name];
         }
-        const inputLabels = { h3_context: TEXT.outputContext, model: TEXT.outputModel };
+        const inputLabels = { h3_context: TEXT.outputContext, model: TEXT.outputModel, sampling_plan: TEXT.samplingPlan };
         for (const input of node.inputs || []) {
             if (inputLabels[input.name]) setLocalizedSlotLabel(input, inputLabels[input.name]);
         }
@@ -916,6 +1017,7 @@ function localizeNodeInstance(node) {
         const inputLabels = {
             h3_context: TEXT.outputContext,
             model: TEXT.outputModel,
+            sampling_plan: TEXT.samplingPlan,
         };
         for (const input of node.inputs || []) {
             if (inputLabels[input.name]) setLocalizedSlotLabel(input, inputLabels[input.name]);
@@ -1028,7 +1130,7 @@ function localizeNodeInstance(node) {
 }
 
 function localizeNodeDefinition(nodeData) {
-    if (!nodeData || ![NODE_CLASS, CONTEXT_SEGMENTS_CLASS, SELECTED_VIDEO_CONTEXT_CLASS, LOADER_CLASS, ADAPTER_CLASS, MEDIA_LOADER_CLASS, MEDIA_BRIDGE_CLASS, MEDIA_SPLITTER_CLASS, OUTPUT_CLASS, SEGMENT_RENDER_CLASS, SEGMENT_SAMPLE_SETUP_CLASS, SEGMENT_STEP_CLASS, SEGMENT_COLLECT_CLASS, SEGMENT_REFINE_CLASS, SEGMENT_DECODE_CLASS].includes(nodeData.name)) return;
+    if (!nodeData || ![NODE_CLASS, CONTEXT_SEGMENTS_CLASS, SELECTED_VIDEO_CONTEXT_CLASS, LOADER_CLASS, ADAPTER_CLASS, MEDIA_LOADER_CLASS, MEDIA_BRIDGE_CLASS, MEDIA_SPLITTER_CLASS, OUTPUT_CLASS, EASY_SAMPLER_CLASS, SELFLIFT_STRATEGY_CLASS, SEGMENT_RENDER_CLASS, SEGMENT_SAMPLE_SETUP_CLASS, SEGMENT_STEP_CLASS, SEGMENT_COLLECT_CLASS, SEGMENT_REFINE_CLASS, SEGMENT_DECODE_CLASS].includes(nodeData.name)) return;
     nodeData.display_name = nodeData.name === LOADER_CLASS
         ? TEXT.loaderTitle
         : nodeData.name === ADAPTER_CLASS
@@ -1041,6 +1143,10 @@ function localizeNodeDefinition(nodeData) {
             ? TEXT.mediaSplitterTitle
             : nodeData.name === OUTPUT_CLASS
             ? TEXT.outputTitle
+            : nodeData.name === EASY_SAMPLER_CLASS
+            ? TEXT.samplerTitle
+            : nodeData.name === SELFLIFT_STRATEGY_CLASS
+            ? TEXT.selfLiftTitle
               : nodeData.name === SEGMENT_RENDER_CLASS
               ? TEXT.segmentRenderTitle
               : nodeData.name === SEGMENT_SAMPLE_SETUP_CLASS
@@ -4686,6 +4792,26 @@ function syncSegmentRefineWidgets(node, { adjustHeight = true } = {}) {
     return changed;
 }
 
+function syncSelfLiftWidgets(node, { adjustHeight = true } = {}) {
+    const advanced = asBoolean(getWidgetValue(node, "advanced", false));
+    const changed = [
+        setConditionalWidgetVisible(node, getWidget(node, "cfg"), advanced, { adjustHeight }),
+        setConditionalWidgetVisible(node, getWidget(node, "rho"), advanced, { adjustHeight }),
+        setConditionalWidgetVisible(node, getWidget(node, "w_min"), advanced, { adjustHeight }),
+        setConditionalWidgetVisible(node, getWidget(node, "w_max"), advanced, { adjustHeight }),
+        setConditionalWidgetVisible(node, getWidget(node, "upscaler_device"), advanced, { adjustHeight }),
+        setConditionalWidgetVisible(node, getWidget(node, "upscaler_precision"), advanced, { adjustHeight }),
+        setConditionalWidgetVisible(node, getWidget(node, "upscaler_chunking"), advanced, { adjustHeight }),
+    ].some(Boolean);
+    if (changed) {
+        refreshVueNodeWidgets(node);
+        node._widgetSlotsDirty = true;
+        node.setDirtyCanvas?.(true, true);
+        app.graph?.setDirtyCanvas?.(true, true);
+    }
+    return changed;
+}
+
 function repairNodeLayout(node) {
     if (!node) return;
     const run = () => {
@@ -7912,7 +8038,6 @@ function installMediaLoaderNode(nodeType, nodeData) {
     const setup = (node) => {
         if (!node || node.__h3MediaLoaderSetup || typeof node.addDOMWidget !== "function") return;
         node.__h3MediaLoaderSetup = true;
-        localizeNodeInstance(node);
         const stateWidget = getWidget(node, "media_state");
         mediaLoaderHideStateWidget(stateWidget);
         const panel = document.createElement("div");
@@ -7989,11 +8114,28 @@ function installMediaLoaderNode(nodeType, nodeData) {
         repairNodeLayout(node);
     };
     const originalCreated = nodeType.prototype.onNodeCreated;
-    nodeType.prototype.onNodeCreated = function onNodeCreatedH3MediaLoader() { const result = originalCreated?.apply(this, arguments); setup(this); return result; };
+    nodeType.prototype.onNodeCreated = function onNodeCreatedH3MediaLoader() {
+        const result = originalCreated?.apply(this, arguments);
+        localizeNodeInstance(this);
+        setup(this);
+        return result;
+    };
     const originalAdded = nodeType.prototype.onAdded;
-    nodeType.prototype.onAdded = function onAddedH3MediaLoader(graph) { const result = originalAdded?.apply(this, arguments); setup(this); mediaLoaderRender(this); return result; };
+    nodeType.prototype.onAdded = function onAddedH3MediaLoader(graph) {
+        const result = originalAdded?.apply(this, arguments);
+        localizeNodeInstance(this);
+        setup(this);
+        mediaLoaderRender(this);
+        return result;
+    };
     const originalConfigure = nodeType.prototype.onConfigure;
-    nodeType.prototype.onConfigure = function onConfigureH3MediaLoader(info) { const result = originalConfigure?.apply(this, arguments); setup(this); mediaLoaderRender(this); return result; };
+    nodeType.prototype.onConfigure = function onConfigureH3MediaLoader(info) {
+        const result = originalConfigure?.apply(this, arguments);
+        localizeNodeInstance(this);
+        setup(this);
+        mediaLoaderRender(this);
+        return result;
+    };
     const originalResize = nodeType.prototype.onResize;
     nodeType.prototype.onResize = function onResizeH3MediaLoader(size) {
         const result = originalResize?.apply(this, arguments);
@@ -8246,6 +8388,8 @@ app.registerExtension({
         installMediaBridgeNode(nodeType, nodeData);
         installMediaSplitterNode(nodeType, nodeData);
         installOutputNode(nodeType, nodeData);
+        installEasySamplerNode(nodeType, nodeData);
+        installSelfLiftStrategyNode(nodeType, nodeData);
         installSegmentRefineNode(nodeType, nodeData);
         installSegmentSampleSetupNode(nodeType, nodeData);
         installSegmentStepNode(nodeType, nodeData);

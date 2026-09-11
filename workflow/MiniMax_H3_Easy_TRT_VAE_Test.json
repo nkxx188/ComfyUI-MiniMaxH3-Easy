@@ -1,0 +1,1756 @@
+{
+  "id": "594552d6-9e64-44e3-b347-f225aa52dab3",
+  "revision": 0,
+  "last_node_id": 73,
+  "last_link_id": 94,
+  "nodes": [
+    {
+      "id": 8,
+      "type": "SamplerCustomAdvanced",
+      "pos": [
+        1317.694089151259,
+        -399.07143794829506
+      ],
+      "size": [
+        257.375,
+        114
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "噪波",
+          "name": "noise",
+          "type": "NOISE",
+          "link": 7
+        },
+        {
+          "localized_name": "引导器",
+          "name": "guider",
+          "type": "GUIDER",
+          "link": 8
+        },
+        {
+          "localized_name": "采样器",
+          "name": "sampler",
+          "type": "SAMPLER",
+          "link": 9
+        },
+        {
+          "localized_name": "西格玛",
+          "name": "sigmas",
+          "type": "SIGMAS",
+          "link": 10
+        },
+        {
+          "localized_name": "Latent图像",
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 6
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "Latent",
+          "name": "output",
+          "type": "LATENT",
+          "links": [
+            11
+          ]
+        },
+        {
+          "localized_name": "降噪Latent",
+          "name": "denoised_output",
+          "type": "LATENT",
+          "links": [
+            12
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.30.0",
+        "Node name for S&R": "SamplerCustomAdvanced"
+      }
+    },
+    {
+      "id": 10,
+      "type": "VAEDecodeAudio",
+      "pos": [
+        1615.7852593738862,
+        -433.88337637748145
+      ],
+      "size": [
+        225,
+        60.75
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "Latent",
+          "name": "samples",
+          "type": "LATENT",
+          "link": 12
+        },
+        {
+          "localized_name": "vae",
+          "name": "vae",
+          "type": "VAE",
+          "link": 14
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "音频",
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [
+            16
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.30.0",
+        "Node name for S&R": "VAEDecodeAudio"
+      }
+    },
+    {
+      "id": 9,
+      "type": "VAEDecode",
+      "pos": [
+        1615.6750646482865,
+        -330.97161248450425
+      ],
+      "size": [
+        225,
+        55.5
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "Latent",
+          "name": "samples",
+          "type": "LATENT",
+          "link": 11
+        },
+        {
+          "localized_name": "vae",
+          "name": "vae",
+          "type": "VAE",
+          "link": 89
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "图像",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            15
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.30.0",
+        "Node name for S&R": "VAEDecode"
+      }
+    },
+    {
+      "id": 7,
+      "type": "KSamplerSelect",
+      "pos": [
+        1339.0886569013,
+        -505.15910868695187
+      ],
+      "size": [
+        225,
+        62
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "采样器名称",
+          "name": "sampler_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "sampler_name"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "采样器",
+          "name": "SAMPLER",
+          "type": "SAMPLER",
+          "links": [
+            9
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.30.0",
+        "Node name for S&R": "KSamplerSelect"
+      },
+      "widgets_values": [
+        "euler"
+      ],
+      "widgets_values_named": {
+        "sampler_name": "euler"
+      }
+    },
+    {
+      "id": 4,
+      "type": "BasicGuider",
+      "pos": [
+        1068.6885600251321,
+        -480.5332819402054
+      ],
+      "size": [
+        226.90625,
+        61.875
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "模型",
+          "name": "model",
+          "type": "MODEL",
+          "link": 37
+        },
+        {
+          "localized_name": "条件",
+          "name": "conditioning",
+          "type": "CONDITIONING",
+          "link": 5
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "引导器",
+          "name": "GUIDER",
+          "type": "GUIDER",
+          "links": [
+            8
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.30.0",
+        "Node name for S&R": "BasicGuider"
+      }
+    },
+    {
+      "id": 13,
+      "type": "MiniMaxH3EasyOutput",
+      "pos": [
+        1069.4651268226344,
+        -653.3395429947946
+      ],
+      "size": [
+        225,
+        158
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "H3 Context",
+          "localized_name": "H3 Context",
+          "name": "h3_context",
+          "type": "MINIMAX_H3_CONTEXT",
+          "link": 51
+        }
+      ],
+      "outputs": [
+        {
+          "label": "Conditioning",
+          "localized_name": "Conditioning",
+          "name": "positive",
+          "type": "CONDITIONING",
+          "links": [
+            5
+          ]
+        },
+        {
+          "label": "Latent",
+          "localized_name": "Latent",
+          "name": "latent",
+          "type": "LATENT",
+          "links": [
+            6
+          ]
+        },
+        {
+          "label": "Video VAE",
+          "localized_name": "Video VAE",
+          "name": "video_vae",
+          "type": "VAE",
+          "links": []
+        },
+        {
+          "label": "Audio VAE",
+          "localized_name": "Audio VAE",
+          "name": "audio_vae",
+          "type": "VAE",
+          "links": [
+            14
+          ]
+        },
+        {
+          "label": "FPS",
+          "localized_name": "FPS",
+          "name": "fps",
+          "type": "FLOAT",
+          "links": [
+            18
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-minimaxh3-easy",
+        "ver": "1658798be6a8ac004aa3a3973b29a41d3e036abc",
+        "Node name for S&R": "MiniMaxH3EasyOutput"
+      }
+    },
+    {
+      "id": 34,
+      "type": "ModelAttentionBackend",
+      "pos": [
+        700.4653442027225,
+        -346.2634792023769
+      ],
+      "size": [
+        270,
+        62
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "MODEL",
+          "link": 36
+        },
+        {
+          "localized_name": "attention",
+          "name": "attention",
+          "type": "COMBO",
+          "widget": {
+            "name": "attention"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "模型",
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            37,
+            38
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.32.0",
+        "Node name for S&R": "ModelAttentionBackend"
+      },
+      "widgets_values": [
+        "comfy kitchen attention"
+      ],
+      "widgets_values_named": {
+        "attention": "comfy kitchen attention"
+      }
+    },
+    {
+      "id": 5,
+      "type": "BasicScheduler",
+      "pos": [
+        1052.3691987121597,
+        -384.2105038067817
+      ],
+      "size": [
+        225,
+        118
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "模型",
+          "name": "model",
+          "type": "MODEL",
+          "link": 38
+        },
+        {
+          "localized_name": "调度器",
+          "name": "scheduler",
+          "type": "COMBO",
+          "widget": {
+            "name": "scheduler"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "步数",
+          "name": "steps",
+          "type": "INT",
+          "widget": {
+            "name": "steps"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "降噪",
+          "name": "denoise",
+          "type": "FLOAT",
+          "widget": {
+            "name": "denoise"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "Sigmas",
+          "name": "SIGMAS",
+          "type": "SIGMAS",
+          "links": [
+            10
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.30.0",
+        "Node name for S&R": "BasicScheduler"
+      },
+      "widgets_values": [
+        "simple",
+        4,
+        1
+      ],
+      "widgets_values_named": {
+        "scheduler": "simple",
+        "steps": 4,
+        "denoise": 1
+      }
+    },
+    {
+      "id": 12,
+      "type": "SaveVideo",
+      "pos": [
+        643.7774868153882,
+        -150.71278595367426
+      ],
+      "size": [
+        508,
+        106
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "视频",
+          "name": "video",
+          "type": "VIDEO",
+          "link": 17
+        },
+        {
+          "localized_name": "文件名前缀",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "格式",
+          "name": "format",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "codec",
+          "name": "format.codec",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "format.codec"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "编码器",
+          "name": "codec",
+          "shape": 7,
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "codec"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "video",
+          "name": "video",
+          "type": "VIDEO",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.30.0",
+        "Node name for S&R": "SaveVideo"
+      },
+      "widgets_values": [
+        "video/MiniMaxH3_Easy_TRT_VAE",
+        "auto",
+        "auto",
+        "auto"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "video/MiniMaxH3_Easy_TRT_VAE",
+        "format": "auto",
+        "format.codec": "auto",
+        "codec": "auto"
+      }
+    },
+    {
+      "id": 6,
+      "type": "RandomNoise",
+      "pos": [
+        1309.2342579242245,
+        -649.4176664218621
+      ],
+      "size": [
+        260,
+        82
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "噪波随机种",
+          "name": "noise_seed",
+          "type": "INT",
+          "widget": {
+            "name": "noise_seed"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "噪波",
+          "name": "NOISE",
+          "type": "NOISE",
+          "links": [
+            7
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.30.0",
+        "Node name for S&R": "RandomNoise"
+      },
+      "widgets_values": [
+        861171782936591,
+        "fixed"
+      ],
+      "widgets_values_named": {
+        "noise_seed": 861171782936591,
+        "control_after_generate": "fixed"
+      }
+    },
+    {
+      "id": 11,
+      "type": "CreateVideo",
+      "pos": [
+        1831.0140950018085,
+        -412.88721252233904
+      ],
+      "size": [
+        225,
+        138
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "图像",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 15
+        },
+        {
+          "localized_name": "音频",
+          "name": "audio",
+          "shape": 7,
+          "type": "AUDIO",
+          "link": 16
+        },
+        {
+          "localized_name": "帧率",
+          "name": "fps",
+          "type": "FLOAT",
+          "widget": {
+            "name": "fps"
+          },
+          "link": 18
+        },
+        {
+          "localized_name": "bit_depth",
+          "name": "bit_depth",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "bit_depth"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "color_space",
+          "name": "color_space",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "color_space"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "视频",
+          "name": "VIDEO",
+          "type": "VIDEO",
+          "links": [
+            17,
+            40
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.30.0",
+        "Node name for S&R": "CreateVideo"
+      },
+      "widgets_values": [
+        24,
+        8,
+        "sRGB"
+      ],
+      "widgets_values_named": {
+        "fps": 24,
+        "bit_depth": 8,
+        "color_space": "sRGB"
+      }
+    },
+    {
+      "id": 25,
+      "type": "RAMCleanup",
+      "pos": [
+        2158.7136162105235,
+        -440.75206794020323
+      ],
+      "size": [
+        270,
+        170
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "anything",
+          "name": "anything",
+          "shape": 7,
+          "type": "*",
+          "link": 40
+        },
+        {
+          "localized_name": "clean_file_cache",
+          "name": "clean_file_cache",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "clean_file_cache"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "clean_processes",
+          "name": "clean_processes",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "clean_processes"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "clean_dlls",
+          "name": "clean_dlls",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "clean_dlls"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "retry_times",
+          "name": "retry_times",
+          "type": "INT",
+          "widget": {
+            "name": "retry_times"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "output",
+          "name": "output",
+          "type": "*",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui_memory_cleanup",
+        "ver": "1.1.1",
+        "Node name for S&R": "RAMCleanup",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.2"
+        }
+      },
+      "widgets_values": [
+        true,
+        true,
+        true,
+        3
+      ],
+      "widgets_values_named": {
+        "clean_file_cache": true,
+        "clean_processes": true,
+        "clean_dlls": true,
+        "retry_times": 3
+      }
+    },
+    {
+      "id": 24,
+      "type": "LoraLoaderModelOnly",
+      "pos": [
+        590.9728805496358,
+        -503.5475115469852
+      ],
+      "size": [
+        443.015625,
+        90
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "模型",
+          "name": "model",
+          "type": "MODEL",
+          "link": 27
+        },
+        {
+          "localized_name": "LoRA名称",
+          "name": "lora_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "lora_name"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "模型强度",
+          "name": "strength_model",
+          "type": "FLOAT",
+          "widget": {
+            "name": "strength_model"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "模型",
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            36
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.30.0",
+        "Node name for S&R": "LoraLoaderModelOnly"
+      },
+      "widgets_values": [
+        "minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors",
+        1
+      ],
+      "widgets_values_named": {
+        "lora_name": "minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors",
+        "strength_model": 1
+      }
+    },
+    {
+      "id": 2,
+      "type": "MiniMaxH3Easy",
+      "pos": [
+        -231.14311366908922,
+        -615.9270817108586
+      ],
+      "size": [
+        548.2601167032541,
+        539.1727906649136
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "H3 模型组合",
+          "localized_name": "H3 模型组合",
+          "name": "h3_bundle",
+          "type": "MINIMAX_H3_BUNDLE",
+          "link": 90
+        },
+        {
+          "label": "Media",
+          "localized_name": "Media",
+          "name": "media",
+          "shape": 7,
+          "type": "*",
+          "link": 74
+        },
+        {
+          "localized_name": "mode",
+          "name": "mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "mode"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "resolution",
+          "name": "resolution",
+          "type": "COMBO",
+          "widget": {
+            "name": "resolution"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "aspect_ratio",
+          "name": "aspect_ratio",
+          "type": "COMBO",
+          "widget": {
+            "name": "aspect_ratio"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "width",
+          "name": "width",
+          "type": "INT",
+          "widget": {
+            "name": "width"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "height",
+          "name": "height",
+          "type": "INT",
+          "widget": {
+            "name": "height"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "seconds",
+          "name": "seconds",
+          "type": "FLOAT",
+          "widget": {
+            "name": "seconds"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "advanced",
+          "name": "advanced",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "advanced"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "fps",
+          "name": "fps",
+          "type": "FLOAT",
+          "widget": {
+            "name": "fps"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "keyframe_role",
+          "name": "keyframe_role",
+          "type": "COMBO",
+          "widget": {
+            "name": "keyframe_role"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "ref_image_size",
+          "name": "ref_image_size",
+          "type": "COMBO",
+          "widget": {
+            "name": "ref_image_size"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "reference_mention_mode",
+          "name": "reference_mention_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "reference_mention_mode"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "prompt_optimizer_settings",
+          "name": "prompt_optimizer_settings",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "prompt_optimizer_settings"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "prompt_optimizer_scene_guide",
+          "name": "prompt_optimizer_scene_guide",
+          "type": "COMBO",
+          "widget": {
+            "name": "prompt_optimizer_scene_guide"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "label": "Model",
+          "localized_name": "Model",
+          "name": "model",
+          "type": "MODEL",
+          "links": [
+            27
+          ]
+        },
+        {
+          "label": "H3 Context",
+          "localized_name": "H3 Context",
+          "name": "h3_context",
+          "type": "MINIMAX_H3_CONTEXT",
+          "links": [
+            51
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-minimaxh3-easy",
+        "ver": "1658798be6a8ac004aa3a3973b29a41d3e036abc",
+        "Node name for S&R": "MiniMaxH3Easy",
+        "minimax_h3_virtual_media_links": [],
+        "minimax_h3_prompt_reference_doc": {
+          "version": 1,
+          "text": "subject_definitions:\n<Subject 1> 是 <Picture 1> 中的女孩，具有浅蓝色齐刘海短发、白色猫耳连帽外套、领口粉色蝴蝶结、胸前金色小铃铛、棕色大眼睛和粉色脸颊，头顶带有白色小圆脸装饰（配粉色蝴蝶结和绿色叶片）。\n<Subject 2> 是 <Picture 2> 中的女孩，具有深蓝色渐变波浪长发、蓝色眼睛、头戴白色荷叶边发带配蓝色蝴蝶结、头部两侧有蓝色鲸鱼鳍状装饰、身穿深蓝色女仆装（白色蕾丝领口和袖口）、系白色围裙（印有鲸鱼图案）、裙摆为多层蓝白花边、身后有蓝色鲸鱼尾巴。\n\nsummary:\n[reference generation] 目标视频是一段游轮度假 vlog，<Subject 1> 和 <Subject 2> 在游轮甲板上度假：两人站在栏杆旁向镜头挥手、手拉手沿甲板漫步、靠在船头栏杆看海，最后一起向镜头挥手结束。\n\nretention_analysis:\n<Subject 1>（出现在 [Shot 1]、[Shot 2]、[Shot 3]、[Shot 4]）：fully_preserved - 浅蓝色齐刘海短发、白色猫耳连帽外套、粉色蝴蝶结和金色铃铛完整保留。\n<Subject 2>（出现在 [Shot 1]、[Shot 2]、[Shot 3]、[Shot 4]）：fully_preserved - 深蓝色渐变波浪长发、白色荷叶边发带、蓝色鲸鱼鳍装饰、深蓝色鲸鱼主题女仆装和鲸鱼围裙完整保留。\n\ndetailed_description:\n目标视频采用明亮清新的 Q 版动漫风格，手持旅行 vlog 镜头略带自然晃动，全片在游轮甲板上进行，阳光充足。\n[Shot 1] 中景建立 <Subject 1> 和 <Subject 2>，两人站在游轮白色栏杆旁，背景是蔚蓝海面、白色船体和晴朗天空。午后阳光从右上方照射。<Subject 1> 保持 <Picture 1> 中的浅蓝色短发、白色猫耳连帽外套、粉色蝴蝶结和金色铃铛，头顶白色小圆脸装饰随她动作轻轻晃动。<Subject 2> 保持 <Picture 2> 中的深蓝色波浪长发、白色荷叶边发带和鲸鱼主题深蓝色女仆装。两人面向镜头开心挥手，海风吹动她们的头发和裙摆。\n[Shot 2] At 00:03.000, 镜头横移跟拍，<Subject 2> 拉着 <Subject 1> 的手沿甲板从右向左快步走，<Subject 2> 抬起左手指向远处海面并回头看向 <Subject 1>，两人都面带笑容，裙摆和发丝随风摆动，白色栏杆在背景中后退。\n[Shot 3] At 00:07.000, 镜头切到两人并排靠在船头栏杆上，身体侧对镜头面向大海。<Subject 1> 双手搭在栏杆上，转头看向 <Subject 2> 露出笑容；<Subject 2> 也转过头与她对视，阳光在两人脸上形成明亮光斑，海面在背景中伸展，天空飘着白云。\n[Shot 4] At 00:11.000, 镜头切到两人正面近景并缓慢推近，<Subject 1> 和 <Subject 2> 一起面向镜头灿烂微笑挥手，<Subject 2> 微微偏头，<Subject 1> 眨了一下眼睛，两人在挥手动作中结束视频。\n\noverall_soundscape:\n游轮甲板上的海风声、海浪声、远处海鸥叫声、游轮汽笛声、脚步踏在木甲板上的声音，以及两个女孩轻快的笑声贯穿整段视频。\n\nnon_diegetic_music:\n轻快明亮的旅行 vlog 风格背景音乐，以木吉他、尤克里里和轻快鼓点为主，节奏轻松欢快，音量适中，在视频结尾处自然淡出。",
+          "parts": [
+            {
+              "type": "text",
+              "text": "subject_definitions:\n<Subject 1> 是 "
+            },
+            {
+              "type": "mention",
+              "token": "@图片1",
+              "tag": "<Picture 1>",
+              "label": "图片1",
+              "fullLabel": "lilithakasovnavitas_hbxdhbxsgvcgg_--niji_7_b867d512-efa1-467e-bcf3-ede6dc96e7d3.png",
+              "mediaType": "image",
+              "referenceMode": "index",
+              "ordinal": 1,
+              "mediaIndex": null,
+              "sourceId": 45,
+              "sourceSlot": 0,
+              "previewUrl": "/view?filename=lilithakasovnavitas_hbxdhbxsgvcgg_--niji_7_b867d512-efa1-467e-bcf3-ede6dc96e7d3.png&type=input"
+            },
+            {
+              "type": "text",
+              "text": " 中的女孩，具有浅蓝色齐刘海短发、白色猫耳连帽外套、领口粉色蝴蝶结、胸前金色小铃铛、棕色大眼睛和粉色脸颊，头顶带有白色小圆脸装饰（配粉色蝴蝶结和绿色叶片）。\n<Subject 2> 是 "
+            },
+            {
+              "type": "mention",
+              "token": "@图片2",
+              "tag": "<Picture 2>",
+              "label": "图片2",
+              "fullLabel": "微信图片_20260817224235_127_208.png",
+              "mediaType": "image",
+              "referenceMode": "index",
+              "ordinal": 2,
+              "mediaIndex": null,
+              "sourceId": 45,
+              "sourceSlot": 0,
+              "previewUrl": "/view?filename=%E5%BE%AE%E4%BF%A1%E5%9B%BE%E7%89%87_20260817224235_127_208.png&type=input"
+            },
+            {
+              "type": "text",
+              "text": " 中的女孩，具有深蓝色渐变波浪长发、蓝色眼睛、头戴白色荷叶边发带配蓝色蝴蝶结、头部两侧有蓝色鲸鱼鳍状装饰、身穿深蓝色女仆装（白色蕾丝领口和袖口）、系白色围裙（印有鲸鱼图案）、裙摆为多层蓝白花边、身后有蓝色鲸鱼尾巴。\n\nsummary:\n[reference generation] 目标视频是一段游轮度假 vlog，<Subject 1> 和 <Subject 2> 在游轮甲板上度假：两人站在栏杆旁向镜头挥手、手拉手沿甲板漫步、靠在船头栏杆看海，最后一起向镜头挥手结束。\n\nretention_analysis:\n<Subject 1>（出现在 [Shot 1]、[Shot 2]、[Shot 3]、[Shot 4]）：fully_preserved - 浅蓝色齐刘海短发、白色猫耳连帽外套、粉色蝴蝶结和金色铃铛完整保留。\n<Subject 2>（出现在 [Shot 1]、[Shot 2]、[Shot 3]、[Shot 4]）：fully_preserved - 深蓝色渐变波浪长发、白色荷叶边发带、蓝色鲸鱼鳍装饰、深蓝色鲸鱼主题女仆装和鲸鱼围裙完整保留。\n\ndetailed_description:\n目标视频采用明亮清新的 Q 版动漫风格，手持旅行 vlog 镜头略带自然晃动，全片在游轮甲板上进行，阳光充足。\n[Shot 1] 中景建立 <Subject 1> 和 <Subject 2>，两人站在游轮白色栏杆旁，背景是蔚蓝海面、白色船体和晴朗天空。午后阳光从右上方照射。<Subject 1> 保持 "
+            },
+            {
+              "type": "mention",
+              "token": "@图片1",
+              "tag": "<Picture 1>",
+              "label": "图片1",
+              "fullLabel": "lilithakasovnavitas_hbxdhbxsgvcgg_--niji_7_b867d512-efa1-467e-bcf3-ede6dc96e7d3.png",
+              "mediaType": "image",
+              "referenceMode": "index",
+              "ordinal": 1,
+              "mediaIndex": null,
+              "sourceId": 45,
+              "sourceSlot": 0,
+              "previewUrl": "/view?filename=lilithakasovnavitas_hbxdhbxsgvcgg_--niji_7_b867d512-efa1-467e-bcf3-ede6dc96e7d3.png&type=input"
+            },
+            {
+              "type": "text",
+              "text": " 中的浅蓝色短发、白色猫耳连帽外套、粉色蝴蝶结和金色铃铛，头顶白色小圆脸装饰随她动作轻轻晃动。<Subject 2> 保持 "
+            },
+            {
+              "type": "mention",
+              "token": "@图片2",
+              "tag": "<Picture 2>",
+              "label": "图片2",
+              "fullLabel": "微信图片_20260817224235_127_208.png",
+              "mediaType": "image",
+              "referenceMode": "index",
+              "ordinal": 2,
+              "mediaIndex": null,
+              "sourceId": 45,
+              "sourceSlot": 0,
+              "previewUrl": "/view?filename=%E5%BE%AE%E4%BF%A1%E5%9B%BE%E7%89%87_20260817224235_127_208.png&type=input"
+            },
+            {
+              "type": "text",
+              "text": " 中的深蓝色波浪长发、白色荷叶边发带和鲸鱼主题深蓝色女仆装。两人面向镜头开心挥手，海风吹动她们的头发和裙摆。\n[Shot 2] At 00:03.000, 镜头横移跟拍，<Subject 2> 拉着 <Subject 1> 的手沿甲板从右向左快步走，<Subject 2> 抬起左手指向远处海面并回头看向 <Subject 1>，两人都面带笑容，裙摆和发丝随风摆动，白色栏杆在背景中后退。\n[Shot 3] At 00:07.000, 镜头切到两人并排靠在船头栏杆上，身体侧对镜头面向大海。<Subject 1> 双手搭在栏杆上，转头看向 <Subject 2> 露出笑容；<Subject 2> 也转过头与她对视，阳光在两人脸上形成明亮光斑，海面在背景中伸展，天空飘着白云。\n[Shot 4] At 00:11.000, 镜头切到两人正面近景并缓慢推近，<Subject 1> 和 <Subject 2> 一起面向镜头灿烂微笑挥手，<Subject 2> 微微偏头，<Subject 1> 眨了一下眼睛，两人在挥手动作中结束视频。\n\noverall_soundscape:\n游轮甲板上的海风声、海浪声、远处海鸥叫声、游轮汽笛声、脚步踏在木甲板上的声音，以及两个女孩轻快的笑声贯穿整段视频。\n\nnon_diegetic_music:\n轻快明亮的旅行 vlog 风格背景音乐，以木吉他、尤克里里和轻快鼓点为主，节奏轻松欢快，音量适中，在视频结尾处自然淡出。"
+            }
+          ]
+        },
+        "minimax_h3_prompt_view_mode": "structured",
+        "minimax_h3_prompt_optimizer": {
+          "enabled": false,
+          "api_format": "openai",
+          "api_url": "",
+          "model": "",
+          "scene_guide": "none",
+          "read_media": false,
+          "optimize_on_run": false
+        }
+      },
+      "widgets_values": [
+        "参考生视频",
+        "subject_definitions:\n<Subject 1> 是 <Picture 1> 中的女孩，具有浅蓝色齐刘海短发、白色猫耳连帽外套、领口粉色蝴蝶结、胸前金色小铃铛、棕色大眼睛和粉色脸颊，头顶带有白色小圆脸装饰（配粉色蝴蝶结和绿色叶片）。\n<Subject 2> 是 <Picture 2> 中的女孩，具有深蓝色渐变波浪长发、蓝色眼睛、头戴白色荷叶边发带配蓝色蝴蝶结、头部两侧有蓝色鲸鱼鳍状装饰、身穿深蓝色女仆装（白色蕾丝领口和袖口）、系白色围裙（印有鲸鱼图案）、裙摆为多层蓝白花边、身后有蓝色鲸鱼尾巴。\n\nsummary:\n[reference generation] 目标视频是一段游轮度假 vlog，<Subject 1> 和 <Subject 2> 在游轮甲板上度假：两人站在栏杆旁向镜头挥手、手拉手沿甲板漫步、靠在船头栏杆看海，最后一起向镜头挥手结束。\n\nretention_analysis:\n<Subject 1>（出现在 [Shot 1]、[Shot 2]、[Shot 3]、[Shot 4]）：fully_preserved - 浅蓝色齐刘海短发、白色猫耳连帽外套、粉色蝴蝶结和金色铃铛完整保留。\n<Subject 2>（出现在 [Shot 1]、[Shot 2]、[Shot 3]、[Shot 4]）：fully_preserved - 深蓝色渐变波浪长发、白色荷叶边发带、蓝色鲸鱼鳍装饰、深蓝色鲸鱼主题女仆装和鲸鱼围裙完整保留。\n\ndetailed_description:\n目标视频采用明亮清新的 Q 版动漫风格，手持旅行 vlog 镜头略带自然晃动，全片在游轮甲板上进行，阳光充足。\n[Shot 1] 中景建立 <Subject 1> 和 <Subject 2>，两人站在游轮白色栏杆旁，背景是蔚蓝海面、白色船体和晴朗天空。午后阳光从右上方照射。<Subject 1> 保持 <Picture 1> 中的浅蓝色短发、白色猫耳连帽外套、粉色蝴蝶结和金色铃铛，头顶白色小圆脸装饰随她动作轻轻晃动。<Subject 2> 保持 <Picture 2> 中的深蓝色波浪长发、白色荷叶边发带和鲸鱼主题深蓝色女仆装。两人面向镜头开心挥手，海风吹动她们的头发和裙摆。\n[Shot 2] At 00:03.000, 镜头横移跟拍，<Subject 2> 拉着 <Subject 1> 的手沿甲板从右向左快步走，<Subject 2> 抬起左手指向远处海面并回头看向 <Subject 1>，两人都面带笑容，裙摆和发丝随风摆动，白色栏杆在背景中后退。\n[Shot 3] At 00:07.000, 镜头切到两人并排靠在船头栏杆上，身体侧对镜头面向大海。<Subject 1> 双手搭在栏杆上，转头看向 <Subject 2> 露出笑容；<Subject 2> 也转过头与她对视，阳光在两人脸上形成明亮光斑，海面在背景中伸展，天空飘着白云。\n[Shot 4] At 00:11.000, 镜头切到两人正面近景并缓慢推近，<Subject 1> 和 <Subject 2> 一起面向镜头灿烂微笑挥手，<Subject 2> 微微偏头，<Subject 1> 眨了一下眼睛，两人在挥手动作中结束视频。\n\noverall_soundscape:\n游轮甲板上的海风声、海浪声、远处海鸥叫声、游轮汽笛声、脚步踏在木甲板上的声音，以及两个女孩轻快的笑声贯穿整段视频。\n\nnon_diegetic_music:\n轻快明亮的旅行 vlog 风格背景音乐，以木吉他、尤克里里和轻快鼓点为主，节奏轻松欢快，音量适中，在视频结尾处自然淡出。",
+        null,
+        "540P",
+        "1:1",
+        1344,
+        1344,
+        15,
+        true,
+        24,
+        "首帧优先",
+        "1K 面积（约1MP）",
+        "按序号",
+        false,
+        "通用"
+      ],
+      "widgets_values_named": {
+        "mode": "参考生视频",
+        "prompt": "subject_definitions:\n<Subject 1> 是 <Picture 1> 中的女孩，具有浅蓝色齐刘海短发、白色猫耳连帽外套、领口粉色蝴蝶结、胸前金色小铃铛、棕色大眼睛和粉色脸颊，头顶带有白色小圆脸装饰（配粉色蝴蝶结和绿色叶片）。\n<Subject 2> 是 <Picture 2> 中的女孩，具有深蓝色渐变波浪长发、蓝色眼睛、头戴白色荷叶边发带配蓝色蝴蝶结、头部两侧有蓝色鲸鱼鳍状装饰、身穿深蓝色女仆装（白色蕾丝领口和袖口）、系白色围裙（印有鲸鱼图案）、裙摆为多层蓝白花边、身后有蓝色鲸鱼尾巴。\n\nsummary:\n[reference generation] 目标视频是一段游轮度假 vlog，<Subject 1> 和 <Subject 2> 在游轮甲板上度假：两人站在栏杆旁向镜头挥手、手拉手沿甲板漫步、靠在船头栏杆看海，最后一起向镜头挥手结束。\n\nretention_analysis:\n<Subject 1>（出现在 [Shot 1]、[Shot 2]、[Shot 3]、[Shot 4]）：fully_preserved - 浅蓝色齐刘海短发、白色猫耳连帽外套、粉色蝴蝶结和金色铃铛完整保留。\n<Subject 2>（出现在 [Shot 1]、[Shot 2]、[Shot 3]、[Shot 4]）：fully_preserved - 深蓝色渐变波浪长发、白色荷叶边发带、蓝色鲸鱼鳍装饰、深蓝色鲸鱼主题女仆装和鲸鱼围裙完整保留。\n\ndetailed_description:\n目标视频采用明亮清新的 Q 版动漫风格，手持旅行 vlog 镜头略带自然晃动，全片在游轮甲板上进行，阳光充足。\n[Shot 1] 中景建立 <Subject 1> 和 <Subject 2>，两人站在游轮白色栏杆旁，背景是蔚蓝海面、白色船体和晴朗天空。午后阳光从右上方照射。<Subject 1> 保持 <Picture 1> 中的浅蓝色短发、白色猫耳连帽外套、粉色蝴蝶结和金色铃铛，头顶白色小圆脸装饰随她动作轻轻晃动。<Subject 2> 保持 <Picture 2> 中的深蓝色波浪长发、白色荷叶边发带和鲸鱼主题深蓝色女仆装。两人面向镜头开心挥手，海风吹动她们的头发和裙摆。\n[Shot 2] At 00:03.000, 镜头横移跟拍，<Subject 2> 拉着 <Subject 1> 的手沿甲板从右向左快步走，<Subject 2> 抬起左手指向远处海面并回头看向 <Subject 1>，两人都面带笑容，裙摆和发丝随风摆动，白色栏杆在背景中后退。\n[Shot 3] At 00:07.000, 镜头切到两人并排靠在船头栏杆上，身体侧对镜头面向大海。<Subject 1> 双手搭在栏杆上，转头看向 <Subject 2> 露出笑容；<Subject 2> 也转过头与她对视，阳光在两人脸上形成明亮光斑，海面在背景中伸展，天空飘着白云。\n[Shot 4] At 00:11.000, 镜头切到两人正面近景并缓慢推近，<Subject 1> 和 <Subject 2> 一起面向镜头灿烂微笑挥手，<Subject 2> 微微偏头，<Subject 1> 眨了一下眼睛，两人在挥手动作中结束视频。\n\noverall_soundscape:\n游轮甲板上的海风声、海浪声、远处海鸥叫声、游轮汽笛声、脚步踏在木甲板上的声音，以及两个女孩轻快的笑声贯穿整段视频。\n\nnon_diegetic_music:\n轻快明亮的旅行 vlog 风格背景音乐，以木吉他、尤克里里和轻快鼓点为主，节奏轻松欢快，音量适中，在视频结尾处自然淡出。",
+        "resolution": "540P",
+        "aspect_ratio": "1:1",
+        "width": 1344,
+        "height": 1344,
+        "seconds": 15,
+        "advanced": true,
+        "fps": 24,
+        "keyframe_role": "首帧优先",
+        "ref_image_size": "1K 面积（约1MP）",
+        "reference_mention_mode": "按序号",
+        "prompt_optimizer_settings": false,
+        "prompt_optimizer_scene_guide": "通用"
+      }
+    },
+    {
+      "id": 45,
+      "type": "MiniMaxH3EasyMediaLoader",
+      "pos": [
+        -610.2199504039011,
+        -591.8619018695449
+      ],
+      "size": [
+        320,
+        366
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "media_state",
+          "name": "media_state",
+          "type": "STRING",
+          "widget": {
+            "name": "media_state"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "label": "媒体包",
+          "localized_name": "媒体包",
+          "name": "media_bundle",
+          "type": "MINIMAX_H3_MEDIA_BUNDLE",
+          "links": [
+            74
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-minimaxh3-easy",
+        "ver": "0c0580b07e334e08ce4c66e51720a7da8f7ce25d",
+        "Node name for S&R": "MiniMaxH3EasyMediaLoader",
+        "media_loader_state": "{\"images\":[{\"filename\":\"lilithakasovnavitas_hbxdhbxsgvcgg_--niji_7_b867d512-efa1-467e-bcf3-ede6dc96e7d3.png\"},{\"filename\":\"微信图片_20260817224235_127_208.png\"}],\"audios\":[],\"videos\":[]}"
+      },
+      "widgets_values": [
+        "{\"images\":[{\"filename\":\"lilithakasovnavitas_hbxdhbxsgvcgg_--niji_7_b867d512-efa1-467e-bcf3-ede6dc96e7d3.png\"},{\"filename\":\"微信图片_20260817224235_127_208.png\"}],\"audios\":[],\"videos\":[]}"
+      ],
+      "widgets_values_named": {
+        "media_state": "{\"images\":[{\"filename\":\"lilithakasovnavitas_hbxdhbxsgvcgg_--niji_7_b867d512-efa1-467e-bcf3-ede6dc96e7d3.png\"},{\"filename\":\"微信图片_20260817224235_127_208.png\"}],\"audios\":[],\"videos\":[]}"
+      }
+    },
+    {
+      "id": 69,
+      "type": "MiniMaxH3TRTVAELoader",
+      "pos": [
+        1605,
+        -650
+      ],
+      "size": [
+        320,
+        118
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "Decoder",
+          "name": "decoder",
+          "type": "COMBO",
+          "widget": {
+            "name": "decoder"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Encoder",
+          "name": "encoder",
+          "type": "COMBO",
+          "widget": {
+            "name": "encoder"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "VAE",
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            89
+          ]
+        }
+      ],
+      "properties": {
+        "ver": "4360e00867eca86ab61b3899216c0ec281367b46",
+        "Node name for S&R": "MiniMaxH3TRTVAELoader",
+        "cnr_id": "ComfyUI-H3VAE_TRT"
+      },
+      "widgets_values": [
+        "minimax_h3_vae_decoder_w4a16_awq.engine",
+        "minimax_h3_vae_encoder.engine"
+      ],
+      "widgets_values_named": {
+        "encoder": "minimax_h3_vae_encoder.engine",
+        "decoder": "minimax_h3_vae_decoder_w4a16_awq.engine"
+      }
+    },
+    {
+      "id": 70,
+      "type": "MiniMaxH3EasyModelAdapter",
+      "pos": [
+        350,
+        -820
+      ],
+      "size": [
+        317.8221978791819,
+        106
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "文本编码器",
+          "localized_name": "文本编码器",
+          "name": "text_encoder",
+          "type": "CLIP",
+          "link": 92
+        },
+        {
+          "label": "视频 VAE",
+          "localized_name": "视频 VAE",
+          "name": "video_vae",
+          "type": "VAE",
+          "link": 93
+        },
+        {
+          "label": "音频 VAE",
+          "localized_name": "音频 VAE",
+          "name": "audio_vae",
+          "type": "VAE",
+          "link": 94
+        },
+        {
+          "label": "FL2VA 模型",
+          "localized_name": "FL2VA 模型",
+          "name": "fl2va_model",
+          "shape": 7,
+          "type": "MODEL",
+          "link": null
+        },
+        {
+          "label": "REF2VA 模型",
+          "localized_name": "REF2VA 模型",
+          "name": "ref2va_model",
+          "shape": 7,
+          "type": "MODEL",
+          "link": 91
+        }
+      ],
+      "outputs": [
+        {
+          "label": "H3 模型组合",
+          "localized_name": "H3 模型组合",
+          "name": "h3_bundle",
+          "type": "MINIMAX_H3_BUNDLE",
+          "links": [
+            90
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-minimaxh3-easy",
+        "ver": "local",
+        "Node name for S&R": "MiniMaxH3EasyModelAdapter"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 71,
+      "type": "UNETLoader",
+      "pos": [
+        20,
+        -1040
+      ],
+      "size": [
+        210,
+        82
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "UNet名称",
+          "name": "unet_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "unet_name"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "数据类型",
+          "name": "weight_dtype",
+          "type": "COMBO",
+          "widget": {
+            "name": "weight_dtype"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "模型",
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            91
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.30.0",
+        "Node name for S&R": "UNETLoader"
+      },
+      "widgets_values": [
+        "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+        "default"
+      ]
+    },
+    {
+      "id": 72,
+      "type": "CLIPLoader",
+      "pos": [
+        20,
+        -920
+      ],
+      "size": [
+        210,
+        106
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "CLIP名称",
+          "name": "clip_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "clip_name"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "类型",
+          "name": "type",
+          "type": "COMBO",
+          "widget": {
+            "name": "type"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "设备",
+          "name": "device",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "device"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "CLIP",
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            92
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.30.0",
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+        "minimax",
+        "default"
+      ]
+    },
+    {
+      "id": 73,
+      "type": "VAELoader",
+      "pos": [
+        20,
+        -770
+      ],
+      "size": [
+        210,
+        58
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "vae名称",
+          "name": "vae_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "vae_name"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "VAE",
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            94
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.30.0",
+        "Node name for S&R": "VAELoader"
+      },
+      "widgets_values": [
+        "minimax_h3_audio_vae_fp32.safetensors"
+      ]
+    }
+  ],
+  "links": [
+    [
+      5,
+      13,
+      0,
+      4,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      6,
+      13,
+      1,
+      8,
+      4,
+      "LATENT"
+    ],
+    [
+      7,
+      6,
+      0,
+      8,
+      0,
+      "NOISE"
+    ],
+    [
+      8,
+      4,
+      0,
+      8,
+      1,
+      "GUIDER"
+    ],
+    [
+      9,
+      7,
+      0,
+      8,
+      2,
+      "SAMPLER"
+    ],
+    [
+      10,
+      5,
+      0,
+      8,
+      3,
+      "SIGMAS"
+    ],
+    [
+      11,
+      8,
+      0,
+      9,
+      0,
+      "LATENT"
+    ],
+    [
+      12,
+      8,
+      1,
+      10,
+      0,
+      "LATENT"
+    ],
+    [
+      14,
+      13,
+      3,
+      10,
+      1,
+      "VAE"
+    ],
+    [
+      15,
+      9,
+      0,
+      11,
+      0,
+      "IMAGE"
+    ],
+    [
+      16,
+      10,
+      0,
+      11,
+      1,
+      "AUDIO"
+    ],
+    [
+      17,
+      11,
+      0,
+      12,
+      0,
+      "VIDEO"
+    ],
+    [
+      18,
+      13,
+      4,
+      11,
+      2,
+      "FLOAT"
+    ],
+    [
+      27,
+      2,
+      0,
+      24,
+      0,
+      "MODEL"
+    ],
+    [
+      90,
+      70,
+      0,
+      2,
+      0,
+      "MINIMAX_H3_BUNDLE"
+    ],
+    [
+      36,
+      24,
+      0,
+      34,
+      0,
+      "MODEL"
+    ],
+    [
+      37,
+      34,
+      0,
+      4,
+      0,
+      "MODEL"
+    ],
+    [
+      38,
+      34,
+      0,
+      5,
+      0,
+      "MODEL"
+    ],
+    [
+      40,
+      11,
+      0,
+      25,
+      0,
+      "VIDEO"
+    ],
+    [
+      51,
+      2,
+      1,
+      13,
+      0,
+      "MINIMAX_H3_CONTEXT"
+    ],
+    [
+      74,
+      45,
+      0,
+      2,
+      1,
+      "MINIMAX_H3_MEDIA_BUNDLE"
+    ],
+    [
+      89,
+      69,
+      0,
+      9,
+      1,
+      "VAE"
+    ],
+    [
+      91,
+      71,
+      0,
+      70,
+      4,
+      "MODEL"
+    ],
+    [
+      92,
+      72,
+      0,
+      70,
+      0,
+      "CLIP"
+    ],
+    [
+      93,
+      69,
+      0,
+      70,
+      1,
+      "VAE"
+    ],
+    [
+      94,
+      73,
+      0,
+      70,
+      2,
+      "VAE"
+    ]
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "title": "model",
+      "bounding": [
+        531.0288731315221,
+        -864.0384567097077,
+        510.46656905933025,
+        269.60456647521823
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    },
+    {
+      "id": 2,
+      "title": "Fast Generation",
+      "bounding": [
+        534.7859868836375,
+        -584.8228312898407,
+        504.874217351257,
+        332.0169181043701
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    },
+    {
+      "id": 3,
+      "title": "Sampling",
+      "bounding": [
+        1057.859053026726,
+        -718.9799883516353,
+        532.6183788163173,
+        462.81032836602253
+      ],
+      "color": "#8AA",
+      "flags": {}
+    },
+    {
+      "id": 4,
+      "title": "Decode & Assemble",
+      "bounding": [
+        1602.5953083909699,
+        -507.97935702252255,
+        466.89356750488196,
+        249.3031837524412
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {
+    "frontendVersion": "1.47.12",
+    "VHS_latentpreview": false,
+    "ds": {
+      "scale": 1.3310000000000004,
+      "offset": [
+        886.3265534263597,
+        773.7517520024162
+      ]
+    }
+  },
+  "version": 0.4
+}

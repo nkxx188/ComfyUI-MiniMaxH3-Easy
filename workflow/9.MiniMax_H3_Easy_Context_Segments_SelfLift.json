@@ -1,8 +1,8 @@
 {
   "id": "78dafec3-eedf-45c3-9570-a322ffdb6b48",
   "revision": 0,
-  "last_node_id": 12,
-  "last_link_id": 515,
+  "last_node_id": 13,
+  "last_link_id": 516,
   "nodes": [
     {
       "id": 10,
@@ -88,11 +88,11 @@
         }
       },
       "widgets_values": [
-        "minimax_h3_fl2v_turbo_4step_v1.0_768p_comfyui_bf16.safetensors",
+        "minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors",
         1
       ],
       "widgets_values_named": {
-        "lora_name": "minimax_h3_fl2v_turbo_4step_v1.0_768p_comfyui_bf16.safetensors",
+        "lora_name": "minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors",
         "strength_model": 1
       },
       "color": "#223",
@@ -180,13 +180,13 @@
         }
       },
       "widgets_values": [
-        "beta",
-        4,
+        "simple",
+        8,
         1
       ],
       "widgets_values_named": {
-        "scheduler": "beta",
-        "steps": 4,
+        "scheduler": "simple",
+        "steps": 8,
         "denoise": 1
       }
     },
@@ -400,13 +400,7 @@
         "1K area (~1MP)",
         "By index",
         false,
-        "openai",
-        "",
-        "",
-        "",
         "General only",
-        false,
-        false,
         "Whole sequence",
         3
       ],
@@ -427,14 +421,8 @@
         "keyframe_role": "First frame priority",
         "ref_image_size": "1K area (~1MP)",
         "reference_mention_mode": "By index",
-        "prompt_optimizer": false,
-        "prompt_optimizer_api_format": "openai",
-        "prompt_optimizer_api_url": "",
-        "prompt_optimizer_api_key": "",
-        "prompt_optimizer_model": "",
+        "prompt_optimizer_settings": false,
         "prompt_optimizer_scene_guide": "General only",
-        "prompt_optimizer_read_media": false,
-        "prompt_optimizer_optimize_on_run": false,
         "context_prompt_optimizer_mode": "Whole sequence",
         "context_prompt_optimizer_concurrency": 3
       }
@@ -451,7 +439,7 @@
         26
       ],
       "flags": {},
-      "order": 8,
+      "order": 9,
       "mode": 0,
       "inputs": [
         {
@@ -487,7 +475,7 @@
         106
       ],
       "flags": {},
-      "order": 9,
+      "order": 10,
       "mode": 0,
       "inputs": [
         {
@@ -540,7 +528,7 @@
         142
       ],
       "flags": {},
-      "order": 7,
+      "order": 8,
       "mode": 0,
       "inputs": [
         {
@@ -562,16 +550,22 @@
           "name": "sigmas",
           "type": "SIGMAS",
           "link": 506
+        },
+        {
+          "label": "采样方案",
+          "name": "sampling_plan",
+          "shape": 7,
+          "type": "MINIMAX_H3_SAMPLING_PLAN",
+          "link": 516
         }
       ],
       "outputs": [
         {
           "name": "segments",
           "type": "MINIMAX_H3_SEGMENTS",
-          "links": [
-            509,
-            514
-          ]
+        "links": [
+          514
+        ]
         }
       ],
       "title": "MiniMax H3 Easy 分段采样",
@@ -582,11 +576,71 @@
       },
       "widgets_values": [
         0,
-        "randomize"
+        "randomize",
+        "default"
       ],
       "widgets_values_named": {
         "seed": 0,
-        "control_after_generate": "randomize"
+        "control_after_generate": "randomize",
+        "segment_seeds": "default"
+      }
+    },
+    {
+      "id": 13,
+      "type": "MiniMaxH3EasySelfLiftStrategy",
+      "pos": [
+        473.0,
+        -570.0
+      ],
+      "size": [
+        300.0,
+        154.0
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "label": "采样方案",
+          "name": "sampling_plan",
+          "type": "MINIMAX_H3_SAMPLING_PLAN",
+          "links": [
+            516
+          ]
+        }
+      ],
+      "title": "MiniMax H3 Easy SelfLift",
+      "properties": {
+        "cnr_id": "comfyui-minimaxh3-easy",
+        "ver": "1658798be6a8ac004aa3a3973b29a41d3e036abc",
+        "Node name for S&R": "MiniMaxH3EasySelfLiftStrategy"
+      },
+      "widgets_values": [
+        5,
+        0.8,
+        "minimax_h3_latent_upscaler_3d_fp16.safetensors",
+        false,
+        1.0,
+        0.0,
+        0.5,
+        1.0,
+        "cuda",
+        "fp16",
+        true
+      ],
+      "widgets_values_named": {
+        "transition_step": 5,
+        "lowres_scale": 0.8,
+        "upscaler_model": "minimax_h3_latent_upscaler_3d_fp16.safetensors",
+        "advanced": false,
+        "cfg": 1.0,
+        "rho": 0.0,
+        "w_min": 0.5,
+        "w_max": 1.0,
+        "upscaler_device": "cuda",
+        "upscaler_precision": "fp16",
+        "upscaler_chunking": true
       }
     }
   ],
@@ -678,6 +732,14 @@
       8,
       0,
       "VIDEO"
+    ],
+    [
+      516,
+      13,
+      0,
+      6,
+      4,
+      "MINIMAX_H3_SAMPLING_PLAN"
     ]
   ],
   "groups": [],

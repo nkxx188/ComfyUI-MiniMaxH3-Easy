@@ -5,18 +5,33 @@
     "name": "H3 General",
     "name_zh": "H3 通用",
     "path": "h3_general/guide.md",
+    "path_by_language": {
+      "en": "h3_general/guide.md",
+      "zh": "h3_general/guide-zh.md"
+    },
     "base_reference": "h3_general/references/base-en.txt",
-    "ref_reference": "h3_general/references/ref-en.txt"
+    "ref_reference": "h3_general/references/ref-en.txt",
+    "base_reference_by_language": {
+      "en": "h3_general/references/base-en.txt",
+      "zh": "h3_general/references/base-zh.txt"
+    },
+    "ref_reference_by_language": {
+      "en": "h3_general/references/ref-en.txt",
+      "zh": "h3_general/references/ref-zh.txt"
+    }
   },
   "scene_guides": [
-    {"id": "none", "name": "General only", "name_zh": "仅通用方案"},
-    {"id": "3d_animation_short", "name": "3D Animation Short", "name_zh": "3D 动画短片", "path": "3d_animation_short/guide.md"},
-    {"id": "brand_promo", "name": "Brand Promo Video", "name_zh": "品牌宣传片", "path": "brand_promo/guide.md"},
-    {"id": "coop_game_intro", "name": "Co-op Game Intro", "name_zh": "合作游戏开场", "path": "coop_game_intro/guide.md"},
-    {"id": "handdrawn_live", "name": "Hand-drawn Live-action Fusion", "name_zh": "手绘实拍融合", "path": "handdrawn_live/guide.md"},
-    {"id": "minimalist_product_ad", "name": "Minimalist Product Ad", "name_zh": "极简产品广告", "path": "minimalist_product_ad/guide.md"},
-    {"id": "music_video_subtitle", "name": "Music Video Subtitle", "name_zh": "音乐视频字幕", "path": "music_video_subtitle/guide.md"},
-    {"id": "paper_collage", "name": "Paper Collage Explainer", "name_zh": "纸张拼贴解说", "path": "paper_collage/guide.md"},
-    {"id": "papercraft_stop_motion", "name": "Papercraft Stop-motion Explainer", "name_zh": "纸艺定格解说", "path": "papercraft_stop_motion/guide.md"}
+    {"id": "none", "name": "General only", "name_zh": "通用", "languages": ["en", "zh"]},
+    {"id": "3d_animation_short", "name": "3D Animation Short", "name_zh": "3D 动画短片", "path": "3d_animation_short/guide.md", "languages": ["en"]},
+    {"id": "brand_promo", "name": "Brand Promo Video", "name_zh": "品牌宣传片", "path": "brand_promo/guide.md", "languages": ["en"]},
+    {"id": "coop_game_intro", "name": "Co-op Game Intro", "name_zh": "合作游戏开场", "path": "coop_game_intro/guide.md", "languages": ["en"]},
+    {"id": "handdrawn_live", "name": "Hand-drawn Live-action Fusion", "name_zh": "手绘实拍融合", "path": "handdrawn_live/guide.md", "languages": ["en"]},
+    {"id": "minimalist_product_ad", "name": "Minimalist Product Ad", "name_zh": "极简产品广告", "path": "minimalist_product_ad/guide.md", "languages": ["en"]},
+    {"id": "music_video_subtitle", "name": "Music Video Subtitle", "name_zh": "音乐视频字幕", "path": "music_video_subtitle/guide.md", "languages": ["en"]},
+    {"id": "paper_collage", "name": "Paper Collage Explainer", "name_zh": "纸张拼贴解说", "path": "paper_collage/guide.md", "languages": ["en"]},
+    {"id": "papercraft_stop_motion", "name": "Papercraft Stop-motion Explainer", "name_zh": "纸艺定格解说", "path": "papercraft_stop_motion/guide.md", "languages": ["en"]},
+    {"id": "zh_dialogue", "name": "Dialogue and Performance", "name_zh": "文戏", "path": "zh_dialogue/guide.md", "languages": ["zh"]},
+    {"id": "zh_action", "name": "Action", "name_zh": "动作", "path": "zh_action/guide.md", "languages": ["zh"]},
+    {"id": "zh_advertisement", "name": "Advertisement", "name_zh": "广告", "path": "zh_advertisement/guide.md", "languages": ["zh"]}
   ]
 }

@@ -1,0 +1,266 @@
+# MiniMax H3 基础模式中文规则（T2VA / I2VA / FL2VA / L2VA）
+
+本文件是基础模式的完整中文规则。它与 `guide-zh.md` 一起使用，负责把文本、首帧、首尾帧或尾帧要求整理成 H3 可执行的视听时间线。
+
+## 1. 模式定义
+
+- **T2VA**：只根据文字建立完整的视听时间线。
+- **I2VA**：从第一帧图片的状态开始，向后连续发展。
+- **FL2VA**：连接第一帧和最后一帧，重点描述两张图片之间的连续变化路径。
+- **L2VA**：从合理的前置状态开始，逐步收束到最后一帧图片。
+
+先根据实际输入判断模式，不要因为存在一张图片就自动把任务写成完整参考模式。
+
+## 2. 基础输出结构
+
+### 2.1 第一部分是对齐指令
+
+T2VA 没有图片对齐指令，直接从三个核心字段开始。
+
+I2VA 的第一行必须是：
+
+```text
+For the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.
+```
+
+FL2VA 的第一行必须说明两张图片和目标视频的对齐时间：
+
+```text
+How the reference pictures align with the target video — Picture 1 (from Shot 1) aligns with the 0.00-second mark of the target video; Picture 2 (from Shot N) aligns with the S.SS-second mark of the target video.
+```
+
+L2VA 的第一行必须说明图片对齐目标视频的最终时间：
+
+```text
+How the reference pictures align with the target video — <Picture 1> (from [Shot N]) aligns with the S.SS-second mark of the target video.
+```
+
+这些固定英文标记、字段名、镜头标签和时间码必须保留。自然语言正文使用中文。`N` 是实际最后一个镜头的编号，`S.SS` 是按两位小数写出的有效视频时长。
+
+### 2.2 三个核心字段
+
+```text
+integrated_multimodal_description: [Shot 1] ...
+
+overall_soundscape: ...
+
+non_diegetic_music: ...
+```
+
+- `integrated_multimodal_description`：按时间顺序写画面、主体、动作、镜头、对白、演唱和与画面同步的声音。
+- `overall_soundscape`：概括整段视频的环境声、动作声和非语言人声。
+- `non_diegetic_music`：只描述角色听不到、只有观众能听到的背景音乐。
+
+## 3. 关键帧写法
+
+### 3.1 I2VA：从第一帧继续发展
+
+`<Picture 1>` 是视频 0.00 秒的实际第一帧，并属于 `[Shot 1]`。先建立图片中的风格、主体、构图、服装、颜色、关键物体和空间关系，再写后续动作。
+
+推荐顺序：
+
+```text
+第一帧状态 → 动作开始 → 连续发展 → 结果或反应
+```
+
+必须保持人物身份、服装、物体颜色、位置关系和场景布局稳定。不要重新发明第一帧中没有的主要内容。
+
+### 3.2 FL2VA：描述首尾帧之间的路径
+
+第一张图片是开头，第二张图片是结尾。不要重复描写两张静态图，而要说明：
+
+- 主体如何移动；
+- 姿势如何变化；
+- 物体如何被操作；
+- 构图如何改变；
+- 镜头和光线如何过渡；
+- 最后一镜如何准确到达第二张图片的状态。
+
+FL2VA 通常适合单个连续镜头。只有用户明确要求时才增加多个镜头。
+
+推荐顺序：
+
+```text
+第一帧状态 → 可观察的中间变化 → 差异逐步缩小 → 最后一帧状态
+```
+
+### 3.3 L2VA：逐步落到最后一帧
+
+`<Picture 1>` 只作为视频最终帧，不要默认把它放进 `[Shot 1]`。根据用户意图和最后一帧推断合理的较早状态，再让人物、物体、镜头和构图逐步靠近最后一帧。
+
+推荐顺序：
+
+```text
+合理的前置状态 → 明确的动作和过渡 → 最后一镜逐步收束 → 最后一帧落点
+```
+
+最后一镜必须明确到达图片中的人物位置、物体状态、相机角度、光线和构图。
+
+## 4. integrated_multimodal_description
+
+这是主要的视听描述，按视频播放顺序写出每个可见或可听的变化：
+
+- 整体视觉风格和初始构图；
+- 主体外观、位置和动作；
+- 场景、关键道具和空间关系；
+- 镜头景别、运动和切换；
+- 说话人、对白、歌唱和口型；
+- 与画面同步的环境声、动作声和人声。
+
+第一个镜头开头要建立初始状态。不要先写剧情摘要再把真正的画面藏到后面。
+
+### 4.1 镜头和切点
+
+- `[Shot 1]` 不写时间戳，代表视频开头。
+- 后续镜头使用严格递增的时间码，并且时间必须落在视频时长内。
+- 只有在引入新的主体、空间、状态、时间或观点时才切镜。
+- 只需要改变距离或轻微角度时，优先用镜头运动，不要无意义切镜。
+- 普通切换可以写 `the camera cuts to`、`the shot cuts to`、`the shot transitions to`、`the shot changes to` 或 `the shot switches to`；这些固定表达可以保留在中文句子中，也可以使用自然中文说明切镜。
+- 交叉溶解、淡入淡出和擦除只有在用户明确要求时使用。
+
+示例：
+
+```text
+[Shot 1] ...
+[Shot 2] At 00:03.500, 镜头切到桌面上的信封特写，纸张边缘在风中轻轻颤动。
+```
+
+### 4.2 镜头运动
+
+需要描述镜头运动时，至少说明运动类型；只有幅度和速度确实影响画面时才补充它们。
+
+可用的固定类型包括：
+
+- `Zoom In / Zoom Out`：变焦推进或拉远，机身保持相对固定；
+- `Push In / Pull Out`：摄影机向前或向后移动；
+- `Pan Left / Pan Right`：摄影机位置基本不变，镜头水平转动；
+- `Truck Left / Truck Right`：摄影机水平平移；
+- `Tilt Up / Tilt Down`：镜头向上或向下转动；
+- `Pedestal Up / Pedestal Down`：整台摄影机上下移动；
+- `Arc Shot`：围绕主体弧线移动；
+- `Tracking Shot`：跟随移动中的主体；
+- `Static Shot`：摄影机和镜头保持静止；
+- `Shake Slightly / Shake Strongly`：轻微或明显的手持抖动；
+- `POV`：主体的主观视角；
+- `Roll Clockwise / Roll Counterclockwise`：绕镜头轴旋转。
+
+幅度可用 `with small amplitude` 或 `with large amplitude`，速度可用 `at slow speed` 或 `at fast speed`。不要把镜头术语孤零零堆在句末，应把它们放进自然动作中：
+
+```text
+镜头以小幅度、慢速 Push In，靠近她手里的折叠信件。
+镜头以大幅度、快速 Pan Right，显露敞开的门口。
+镜头保持 Static Shot，直到跑步者离开画面。
+```
+
+## 5. 说话人、对白和歌唱
+
+使用稳定的 `(S1)`、`(S2)` 等编号表示实际发声的人。已经编号的说话人在后续镜头中必须继续使用同一编号；从不发声的角色不分配说话人编号。
+
+第一次出现说话人时，说明足以稳定识别其声音和画面身份的信息，例如年龄、性别、是否在画面内、音高、音色、语速、口音或说话方式。
+
+`<d>` 内只放语言标签和用户提供的实际对白或歌词：
+
+```text
+年轻女人保持低声、缓慢的语气（S1），说：<d>[Chinese] 我明天会回来。</d>
+两个孩子（S1,S2）一起喊：<d>[Chinese] 等等我们！</d>
+```
+
+不得翻译、扩写或改写用户明确给出的对白。原有标点也要尽量保留。
+
+旁白必须明确写成离屏声音，并在同一句说明画面人物嘴唇保持闭合：
+
+```text
+男人（S1）以离屏旁白说道：<d>[Chinese] 我仍然记得那条路。</d>，画面中的人物嘴唇始终闭合。
+```
+
+如果同一句对白跨越切镜，在两处连接位置使用 `<scenetrans>`，并说明声音连续通过切镜。对白在视频结束处被截断时使用 `<cutoff>`。
+
+## 6. 画面文字
+
+可见的招牌、标签、字幕、屏幕文字、包装文字和霓虹灯文字都要使用英文双引号写出，并保留用户要求的原文和标点：
+
+```text
+门上方的红色霓虹灯显示“营业中”，从镜头开始一直亮到结束。
+```
+
+除非用户明确要求，不要主动添加字幕、Logo、水印、标题卡或画面文字。
+
+## 7. overall_soundscape
+
+用一到四个中文句子概括整段视频的环境声、物理动作声和非语言人声，例如风、雨、交通、脚步、衣料摩擦、碰撞、呼吸、笑声或喘息。
+
+对白、歌唱、现场音乐和特定镜头内的声音事件属于 `integrated_multimodal_description`，不要在这里重复完整内容。只有用户明确要求整段完全静音时才使用 `N/A`。
+
+```text
+overall_soundscape: 雨水持续敲打咖啡馆的玻璃窗，室内有低沉的通风声。门铃响了一次，随后传来湿鞋踩过地面的脚步声和椅子轻轻刮过地板的声音。
+```
+
+## 8. non_diegetic_music
+
+只描述角色听不到、只有观众能听到的背景音乐。重点写乐器、速度、节奏、音量和动态变化，不要只写“悲伤”“高级”或“很有电影感”。没有背景音乐时使用 `N/A`。
+
+```text
+non_diegetic_music: 稀疏的钢琴音符以慢速演奏，随后加入持续的低音弦乐，音量逐步上升并在最后淡出。
+```
+
+角色能听到的收音机、电视、手机音乐、现场演奏或人物歌唱必须写在主描述中，不要误放到 `non_diegetic_music`。
+
+## 9. 完整模式示例
+
+### T2VA
+
+```text
+integrated_multimodal_description: [Shot 1] 写实真人风格，日出前的街角面包店里，中景拍到一位中年面包师拉开木窗。镜头缓慢 Push In，面包师把刚出炉的面包放到木台上，用略带沙哑的平静声音（S1）说：<d>[Chinese] 今天的第一炉。</d> [Shot 2] At 00:05.000, 镜头切到面包切面的特写，热气缓慢升起，面包师最后几个字的声音延续到切镜之后。
+
+overall_soundscape: 木窗在安静街道上缓慢刮过，店内传来烤盘轻碰和面包刀切开的清脆声音。门铃响了一次，随后是轻缓的脚步声。
+
+non_diegetic_music: 中速的轻柔原声吉他节奏，加入稀疏的低音提琴音符，结尾逐渐淡出。
+```
+
+### I2VA
+
+```text
+For the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.
+
+integrated_multimodal_description: [Shot 1] 写实真人风格，<Picture 1> 中的年轻女人仍坐在雨水覆盖的列车窗边，保持她的外貌、衣服、座位位置和车厢布局。镜头以小幅度慢速 Truck Right，她从折叠信件上抬起视线，看向掠过窗外的城市灯光。她的倒影沿着玻璃移动，随后用轻柔、略带气声的声音（S1）说：<d>[Chinese] 我在下一站下车。</d>，并沿着原有折痕重新折好信件。
+
+overall_soundscape: 列车车轮保持规律的金属节奏，底下有低沉的通风声。雨点敲打窗户，手中的纸张轻轻作响。
+
+non_diegetic_music: 慢速的大提琴持续音和间隔稀疏的钢琴音符逐渐减弱。
+```
+
+### FL2VA
+
+```text
+How the reference pictures align with the target video — Picture 1 (from Shot 1) aligns with the 0.00-second mark of the target video; Picture 2 (from Shot 1) aligns with the 8.00-second mark of the target video.
+
+integrated_multimodal_description: [Shot 1] 写实真人风格，雨中的骑行者从 <Picture 1> 规定的位置和构图开始，手里握着收拢的黑色雨伞，银色自行车停在身旁。镜头以小幅度慢速 Pull Out，她松开车把，把雨伞抬到肩膀上，向上推动伞骨。伞面展开，水珠从布面滚落，她走到伞下，调整伞柄角度，最后在镜头结尾到达 <Picture 2> 中的姿势、间距和构图。
+
+overall_soundscape: 雨水持续落在路面上，随后响起伞骨金属卡扣和伞面弹开的声音。自行车车架上的水滴落下，远处有车辆经过。
+
+non_diegetic_music: N/A
+```
+
+### L2VA
+
+```text
+How the reference pictures align with the target video — <Picture 1> (from [Shot 1]) aligns with the 6.00-second mark of the target video.
+
+integrated_multimodal_description: [Shot 1] 写实真人风格，特写从深色木桌边缘的一只完整玻璃杯开始，<Picture 1> 中的同一只手和袖口从画面右侧靠近。镜头以小幅度慢速 Push In，指尖敲到杯沿。玻璃杯倾倒、落地并发出清脆撞击声，裂纹扩散，碎片向四周滑开。最后，碎片逐渐停止移动，在视频结尾收束为 <Picture 1> 中的破碎排列、手的位置、相机角度、光线和构图。
+
+overall_soundscape: 指尖敲击玻璃，玻璃杯在桌面上刮过后坠落并发出清脆的碎裂声。小碎片散开，在地面上逐渐停止滑动。
+
+non_diegetic_music: 低沉的电子脉冲以慢速持续，在玻璃杯碎裂后立即结束。
+```
+
+## 10. 最终检查
+
+输出前检查：
+
+1. 模式是否与参考素材和关键帧角色一致。
+2. 字段、标签、时间码、说话人编号和固定标记是否完整且顺序正确。
+3. 正文是否使用中文，用户对白、歌词和画面文字是否保留原文。
+4. 每个镜头是否有明确主体、动作、镜头和状态结果。
+5. `overall_soundscape` 和 `non_diegetic_music` 是否没有重复对白或误分类声音。
+6. 是否添加了用户没有提供或没有要求的主体、文字、Logo、字幕、水印和参考素材。
+7. 输出是否只有最终提示词，没有解释、分析、标题或 Markdown 围栏。

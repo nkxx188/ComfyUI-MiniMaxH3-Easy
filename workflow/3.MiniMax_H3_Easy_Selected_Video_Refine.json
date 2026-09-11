@@ -1,15 +1,15 @@
 {
   "id": "8a5f8b0e-2f1e-4f4a-9f7a-1a2b3c4d5e6f",
   "revision": 0,
-  "last_node_id": 34,
-  "last_link_id": 71,
+  "last_node_id": 51,
+  "last_link_id": 93,
   "nodes": [
     {
       "id": 5,
       "type": "KSamplerSelect",
       "pos": [
-        269.8468629439364,
-        -871.8434795583341
+        270.6762390136719,
+        -876.8197021484375
       ],
       "size": [
         210,
@@ -18,9 +18,19 @@
       "flags": {},
       "order": 0,
       "mode": 0,
-      "inputs": [],
+      "inputs": [
+        {
+          "label": "sampler_name",
+          "name": "sampler_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "sampler_name"
+          }
+        }
+      ],
       "outputs": [
         {
+          "label": "SAMPLER",
           "name": "SAMPLER",
           "type": "SAMPLER",
           "links": [
@@ -32,7 +42,8 @@
       "properties": {
         "cnr_id": "comfy-core",
         "ver": "0.33.0",
-        "Node name for S&R": "KSamplerSelect"
+        "Node name for S&R": "KSamplerSelect",
+        "widget_ue_connectable": {}
       },
       "widgets_values": [
         "euler"
@@ -42,173 +53,22 @@
       }
     },
     {
-      "id": 12,
-      "type": "LoraLoaderModelOnly",
-      "pos": [
-        262.0382626805585,
-        -660.5589991868915
-      ],
-      "size": [
-        268.54559326171875,
-        82
-      ],
-      "flags": {},
-      "order": 11,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "model",
-          "type": "MODEL",
-          "link": 19
-        }
-      ],
-      "outputs": [
-        {
-          "name": "MODEL",
-          "type": "MODEL",
-          "links": [
-            17
-          ]
-        }
-      ],
-      "properties": {
-        "cnr_id": "comfy-core",
-        "ver": "0.33.0",
-        "Node name for S&R": "LoraLoaderModelOnly"
-      },
-      "widgets_values": [
-        "minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors",
-        1
-      ],
-      "widgets_values_named": {
-        "lora_name": "minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors",
-        "strength_model": 1
-      }
-    },
-    {
-      "id": 6,
-      "type": "BasicScheduler",
-      "pos": [
-        276.433121387578,
-        -528.6236097270263
-      ],
-      "size": [
-        220,
-        110
-      ],
-      "flags": {},
-      "order": 8,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "model",
-          "type": "MODEL",
-          "link": 40
-        }
-      ],
-      "outputs": [
-        {
-          "name": "SIGMAS",
-          "type": "SIGMAS",
-          "links": [
-            11,
-            12
-          ]
-        }
-      ],
-      "properties": {
-        "cnr_id": "comfy-core",
-        "ver": "0.33.0",
-        "Node name for S&R": "BasicScheduler"
-      },
-      "widgets_values": [
-        "beta",
-        2,
-        0.25
-      ],
-      "widgets_values_named": {
-        "scheduler": "beta",
-        "steps": 2,
-        "denoise": 0.25
-      }
-    },
-    {
-      "id": 7,
-      "type": "MiniMaxH3EasySegmentRender",
-      "pos": [
-        576.8488444776223,
-        -827.6143180299057
-      ],
-      "size": [
-        350,
-        166
-      ],
-      "flags": {},
-      "order": 14,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "h3_context",
-          "type": "MINIMAX_H3_CONTEXT",
-          "link": 43
-        },
-        {
-          "name": "model",
-          "type": "MODEL",
-          "link": 17
-        },
-        {
-          "name": "sampler",
-          "type": "SAMPLER",
-          "link": 9
-        },
-        {
-          "name": "sigmas",
-          "type": "SIGMAS",
-          "link": 11
-        }
-      ],
-      "outputs": [
-        {
-          "name": "segments",
-          "type": "MINIMAX_H3_SEGMENTS",
-          "links": [
-            13
-          ]
-        }
-      ],
-      "properties": {
-        "cnr_id": "comfyui-minimaxh3-easy",
-        "ver": "4138b716fc3e2a2780487c5e9cf2e3c5903afc92",
-        "Node name for S&R": "MiniMaxH3EasySegmentRender"
-      },
-      "widgets_values": [
-        0,
-        "fixed",
-        ""
-      ],
-      "widgets_values_named": {
-        "seed": 0,
-        "control_after_generate": "fixed",
-        "segment_seeds": ""
-      }
-    },
-    {
       "id": 9,
       "type": "MiniMaxH3EasySegmentDecode",
       "pos": [
-        1406.8186715754869,
-        -864.4469076610617
+        1407.6480712890625,
+        -869.423095703125
       ],
       "size": [
         300,
         26
       ],
       "flags": {},
-      "order": 18,
+      "order": 21,
       "mode": 0,
       "inputs": [
         {
+          "label": "segments",
           "name": "segments",
           "type": "MINIMAX_H3_SEGMENTS",
           "link": 14
@@ -216,6 +76,7 @@
       ],
       "outputs": [
         {
+          "label": "preview",
           "name": "preview",
           "type": "VIDEO",
           "links": [
@@ -226,177 +87,43 @@
       "properties": {
         "cnr_id": "comfyui-minimaxh3-easy",
         "ver": "4138b716fc3e2a2780487c5e9cf2e3c5903afc92",
-        "Node name for S&R": "MiniMaxH3EasySegmentDecode"
-      }
-    },
-    {
-      "id": 10,
-      "type": "SaveVideo",
-      "pos": [
-        1402.814863677538,
-        -772.734198895082
-      ],
-      "size": [
-        240,
-        126
-      ],
-      "flags": {},
-      "order": 20,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "video",
-          "type": "VIDEO",
-          "link": 15
-        }
-      ],
-      "outputs": [
-        {
-          "name": "video",
-          "type": "VIDEO",
-          "links": null
-        },
-        {
-          "name": "video",
-          "type": "VIDEO",
-          "links": null
-        }
-      ],
-      "properties": {
-        "cnr_id": "comfy-core",
-        "ver": "0.33.0",
-        "Node name for S&R": "SaveVideo"
-      },
-      "widgets_values": [
-        "video/MiniMax_H3_Easy_Selected_Video_Refine",
-        "auto",
-        "auto",
-        "auto"
-      ],
-      "widgets_values_named": {
-        "filename_prefix": "video/MiniMax_H3_Easy_Selected_Video_Refine",
-        "format": "auto",
-        "format.codec": "auto",
-        "codec": "auto"
-      }
-    },
-    {
-      "id": 8,
-      "type": "MiniMaxH3EasySegmentRefine",
-      "pos": [
-        967.6592409321631,
-        -841.9695923515023
-      ],
-      "size": [
-        400,
-        330
-      ],
-      "flags": {},
-      "order": 16,
-      "mode": 0,
-      "inputs": [
-        {
-          "label": "H3 Context",
-          "name": "h3_context",
-          "type": "MINIMAX_H3_CONTEXT",
-          "link": 42
-        },
-        {
-          "label": "分段结果",
-          "name": "segments",
-          "type": "MINIMAX_H3_SEGMENTS",
-          "link": 13
-        },
-        {
-          "label": "Model",
-          "name": "model",
-          "type": "MODEL",
-          "link": 41
-        },
-        {
-          "name": "sampler",
-          "type": "SAMPLER",
-          "link": 10
-        },
-        {
-          "name": "sigmas",
-          "type": "SIGMAS",
-          "link": 12
-        }
-      ],
-      "outputs": [
-        {
-          "label": "分段结果",
-          "name": "refined_segments",
-          "type": "MINIMAX_H3_SEGMENTS",
-          "links": [
-            14
-          ]
-        }
-      ],
-      "properties": {
-        "cnr_id": "comfyui-minimaxh3-easy",
-        "ver": "4138b716fc3e2a2780487c5e9cf2e3c5903afc92",
-        "Node name for S&R": "MiniMaxH3EasySegmentRefine"
-      },
-      "widgets_values": [
-        "Latent Upscale",
-        0,
-        "fixed",
-        "Standard",
-        0,
-        0,
-        "minimax_h3_latent_upscaler_3d_fp16.safetensors",
-        1.5,
-        "cuda",
-        "fp16",
-        512,
-        512,
-        128,
-        32,
-        ""
-      ],
-      "widgets_values_named": {
-        "refine_mode": "Latent Upscale",
-        "seed": 0,
-        "control_after_generate": "fixed",
-        "refine_execution": "Standard",
-        "target_width": 0,
-        "target_height": 0,
-        "latent_upscale_model": "minimax_h3_latent_upscaler_3d_fp16.safetensors",
-        "latent_upscale_scale": 1.5,
-        "latent_upscale_device": "cuda",
-        "latent_upscale_precision": "fp16",
-        "tile_width": 512,
-        "tile_height": 512,
-        "tile_overlap": 128,
-        "tile_fade": 32,
-        "segment_seeds": ""
+        "Node name for S&R": "MiniMaxH3EasySegmentDecode",
+        "widget_ue_connectable": {}
       }
     },
     {
       "id": 13,
       "type": "ModelAttentionBackend",
       "pos": [
-        260.0034248817673,
-        -764.1261569814737
+        260.832763671875,
+        -769.1023559570312
       ],
       "size": [
         270,
         58
       ],
       "flags": {},
-      "order": 7,
+      "order": 11,
       "mode": 0,
       "inputs": [
         {
+          "label": "model",
           "name": "model",
           "type": "MODEL",
           "link": 39
+        },
+        {
+          "label": "attention",
+          "name": "attention",
+          "type": "COMBO",
+          "widget": {
+            "name": "attention"
+          }
         }
       ],
       "outputs": [
         {
+          "label": "MODEL",
           "name": "MODEL",
           "type": "MODEL",
           "links": [
@@ -407,7 +134,8 @@
       "properties": {
         "cnr_id": "comfy-core",
         "ver": "0.33.0",
-        "Node name for S&R": "ModelAttentionBackend"
+        "Node name for S&R": "ModelAttentionBackend",
+        "widget_ue_connectable": {}
       },
       "widgets_values": [
         "comfy kitchen attention"
@@ -420,25 +148,35 @@
       "id": 34,
       "type": "ModelAttentionBackend",
       "pos": [
-        265.55946342637964,
-        -1302.5680650516683
+        265.5594482421875,
+        -1302.568115234375
       ],
       "size": [
         270,
         58
       ],
       "flags": {},
-      "order": 9,
+      "order": 12,
       "mode": 4,
       "inputs": [
         {
+          "label": "model",
           "name": "model",
           "type": "MODEL",
           "link": 70
+        },
+        {
+          "label": "attention",
+          "name": "attention",
+          "type": "COMBO",
+          "widget": {
+            "name": "attention"
+          }
         }
       ],
       "outputs": [
         {
+          "label": "MODEL",
           "name": "MODEL",
           "type": "MODEL",
           "links": [
@@ -449,7 +187,8 @@
       "properties": {
         "cnr_id": "comfy-core",
         "ver": "0.33.0",
-        "Node name for S&R": "ModelAttentionBackend"
+        "Node name for S&R": "ModelAttentionBackend",
+        "widget_ue_connectable": {}
       },
       "widgets_values": [
         "comfy kitchen attention"
@@ -459,28 +198,221 @@
       }
     },
     {
-      "id": 28,
-      "type": "LoraLoaderModelOnly",
+      "id": 24,
+      "type": "KSamplerSelect",
       "pos": [
-        251.1599501630575,
-        -1192.3409822870626
+        251.26963806152344,
+        -1449.94384765625
       ],
       "size": [
-        273.60542420351,
-        82
+        210,
+        58
       ],
       "flags": {},
-      "order": 12,
+      "order": 1,
       "mode": 4,
       "inputs": [
         {
-          "name": "model",
-          "type": "MODEL",
-          "link": 71
+          "label": "sampler_name",
+          "name": "sampler_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "sampler_name"
+          }
         }
       ],
       "outputs": [
         {
+          "label": "SAMPLER",
+          "name": "SAMPLER",
+          "type": "SAMPLER",
+          "links": [
+            46,
+            69
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.30.0",
+        "Node name for S&R": "KSamplerSelect",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.2"
+        },
+        "widget_ue_connectable": {}
+      },
+      "widgets_values": [
+        "euler"
+      ],
+      "widgets_values_named": {
+        "sampler_name": "euler"
+      }
+    },
+    {
+      "id": 23,
+      "type": "MiniMaxH3EasySegmentRender",
+      "pos": [
+        695.9124755859375,
+        -1369.72900390625
+      ],
+      "size": [
+        340,
+        166
+      ],
+      "flags": {},
+      "order": 20,
+      "mode": 4,
+      "inputs": [
+        {
+          "label": "h3_context",
+          "name": "h3_context",
+          "type": "MINIMAX_H3_CONTEXT",
+          "link": 64
+        },
+        {
+          "label": "model",
+          "name": "model",
+          "type": "MODEL",
+          "link": 45
+        },
+        {
+          "label": "sampler",
+          "name": "sampler",
+          "type": "SAMPLER",
+          "link": 46
+        },
+        {
+          "label": "sigmas",
+          "name": "sigmas",
+          "type": "SIGMAS",
+          "link": 47
+        },
+        {
+          "label": "seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          }
+        },
+        {
+          "label": "segment_seeds",
+          "name": "segment_seeds",
+          "type": "STRING",
+          "widget": {
+            "name": "segment_seeds"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "label": "segments",
+          "name": "segments",
+          "type": "MINIMAX_H3_SEGMENTS",
+          "links": [
+            51
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-minimaxh3-easy",
+        "ver": "4138b716fc3e2a2780487c5e9cf2e3c5903afc92",
+        "Node name for S&R": "MiniMaxH3EasySegmentRender",
+        "widget_ue_connectable": {}
+      },
+      "widgets_values": [
+        1787524893,
+        "randomize",
+        ""
+      ],
+      "widgets_values_named": {
+        "seed": 1787524893,
+        "control_after_generate": "randomize",
+        "segment_seeds": ""
+      }
+    },
+    {
+      "id": 33,
+      "type": "MiniMaxH3EasySegmentDecode",
+      "pos": [
+        1103.2601318359375,
+        -1551.242431640625
+      ],
+      "size": [
+        300,
+        26
+      ],
+      "flags": {},
+      "order": 24,
+      "mode": 4,
+      "inputs": [
+        {
+          "label": "segments",
+          "name": "segments",
+          "type": "MINIMAX_H3_SEGMENTS",
+          "link": 59
+        }
+      ],
+      "outputs": [
+        {
+          "label": "preview",
+          "name": "preview",
+          "type": "VIDEO",
+          "links": [
+            60
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-minimaxh3-easy",
+        "ver": "4138b716fc3e2a2780487c5e9cf2e3c5903afc92",
+        "Node name for S&R": "MiniMaxH3EasySegmentDecode",
+        "widget_ue_connectable": {}
+      }
+    },
+    {
+      "id": 28,
+      "type": "LoraLoaderModelOnly",
+      "pos": [
+        251.15994262695312,
+        -1192.3409423828125
+      ],
+      "size": [
+        273.6054382324219,
+        82
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 4,
+      "inputs": [
+        {
+          "label": "model",
+          "name": "model",
+          "type": "MODEL",
+          "link": 71
+        },
+        {
+          "label": "lora_name",
+          "name": "lora_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "lora_name"
+          }
+        },
+        {
+          "label": "strength_model",
+          "name": "strength_model",
+          "type": "FLOAT",
+          "widget": {
+            "name": "strength_model"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "label": "MODEL",
           "name": "MODEL",
           "type": "MODEL",
           "links": [
@@ -497,174 +429,99 @@
           "widget_ue_connectable": {},
           "input_ue_unconnectable": {},
           "version": "7.5.2"
-        }
+        },
+        "widget_ue_connectable": {}
       },
       "widgets_values": [
-        "minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors",
+        "minimax_h3_fl2v_turbo_4step_v1.2_768p_comfyui_bf16.safetensors",
         1
       ],
       "widgets_values_named": {
-        "lora_name": "minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors",
+        "lora_name": "minimax_h3_fl2v_turbo_4step_v1.2_768p_comfyui_bf16.safetensors",
         "strength_model": 1
       },
       "color": "#223",
       "bgcolor": "#335"
     },
     {
-      "id": 19,
-      "type": "MiniMaxH3EasyAspectRatio",
+      "id": 4,
+      "type": "LoadVideo",
       "pos": [
-        263.5372289041962,
-        -1548.4705624625096
+        -1703.570068359375,
+        -1273.92724609375
       ],
       "size": [
-        384.87874774169916,
-        50.19992614746093
+        679.1538696289062,
+        1295.083984375
       ],
       "flags": {},
-      "order": 10,
-      "mode": 4,
+      "order": 2,
+      "mode": 0,
       "inputs": [
         {
-          "name": "h3_context",
-          "type": "MINIMAX_H3_CONTEXT",
-          "link": 63
+          "label": "file",
+          "name": "file",
+          "type": "COMBO",
+          "widget": {
+            "name": "file"
+          }
+        },
+        {
+          "label": "upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          }
         }
       ],
       "outputs": [
         {
-          "name": "aspect_ratio",
-          "type": "*",
+          "label": "VIDEO",
+          "name": "VIDEO",
+          "type": "VIDEO",
           "links": [
-            48
-          ]
-        }
-      ],
-      "properties": {
-        "cnr_id": "comfyui-minimaxh3-easy",
-        "ver": "5ee7d61c46cd6b0fa1994a390be44f17f9b72919",
-        "Node name for S&R": "MiniMaxH3EasyAspectRatio"
-      }
-    },
-    {
-      "id": 24,
-      "type": "KSamplerSelect",
-      "pos": [
-        251.26963469328618,
-        -1449.9438939734923
-      ],
-      "size": [
-        210,
-        58
-      ],
-      "flags": {},
-      "order": 1,
-      "mode": 4,
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "SAMPLER",
-          "type": "SAMPLER",
-          "links": [
-            46,
-            69
+            37
           ]
         }
       ],
       "properties": {
         "cnr_id": "comfy-core",
-        "ver": "0.30.0",
-        "Node name for S&R": "KSamplerSelect",
-        "ue_properties": {
-          "widget_ue_connectable": {},
-          "version": "7.5.2",
-          "input_ue_unconnectable": {}
-        }
+        "ver": "0.33.0",
+        "Node name for S&R": "LoadVideo",
+        "widget_ue_connectable": {}
       },
       "widgets_values": [
-        "euler"
+        "6240c1f306da7766f9d7c34f8da0c8bc7eb8a492e20c371b56bd6910430d306b.mp4",
+        "image"
       ],
       "widgets_values_named": {
-        "sampler_name": "euler"
-      }
-    },
-    {
-      "id": 23,
-      "type": "MiniMaxH3EasySegmentRender",
-      "pos": [
-        695.9124605898947,
-        -1369.7290507536336
-      ],
-      "size": [
-        340,
-        166
-      ],
-      "flags": {},
-      "order": 17,
-      "mode": 4,
-      "inputs": [
-        {
-          "name": "h3_context",
-          "type": "MINIMAX_H3_CONTEXT",
-          "link": 64
-        },
-        {
-          "name": "model",
-          "type": "MODEL",
-          "link": 45
-        },
-        {
-          "name": "sampler",
-          "type": "SAMPLER",
-          "link": 46
-        },
-        {
-          "name": "sigmas",
-          "type": "SIGMAS",
-          "link": 47
-        }
-      ],
-      "outputs": [
-        {
-          "name": "segments",
-          "type": "MINIMAX_H3_SEGMENTS",
-          "links": [
-            51
-          ]
-        }
-      ],
-      "properties": {
-        "cnr_id": "comfyui-minimaxh3-easy",
-        "ver": "4138b716fc3e2a2780487c5e9cf2e3c5903afc92",
-        "Node name for S&R": "MiniMaxH3EasySegmentRender"
-      },
-      "widgets_values": [
-        561279386,
-        "randomize",
-        ""
-      ],
-      "widgets_values_named": {
-        "seed": 561279386,
-        "control_after_generate": "randomize",
-        "segment_seeds": ""
+        "file": "6240c1f306da7766f9d7c34f8da0c8bc7eb8a492e20c371b56bd6910430d306b.mp4",
+        "upload": "image"
       }
     },
     {
       "id": 25,
       "type": "ResolutionSelector",
       "pos": [
-        687.3324067737601,
-        -1557.4993983521701
+        687.3323974609375,
+        -1557.4993896484375
       ],
       "size": [
-        289.3520324951173,
+        289.3520202636719,
         126
       ],
       "flags": {},
-      "order": 13,
+      "order": 16,
       "mode": 4,
       "showAdvanced": false,
       "inputs": [
+        {
+          "name": "preview",
+          "shape": 7,
+          "type": "RESOLUTION_PREVIEW",
+          "link": null
+        },
         {
           "label": "aspect_ratio",
           "name": "aspect_ratio",
@@ -680,8 +537,7 @@
           "type": "FLOAT",
           "widget": {
             "name": "megapixels"
-          },
-          "link": null
+          }
         },
         {
           "label": "multiple",
@@ -689,8 +545,7 @@
           "type": "INT",
           "widget": {
             "name": "multiple"
-          },
-          "link": null
+          }
         }
       ],
       "outputs": [
@@ -729,247 +584,30 @@
       },
       "widgets_values": [
         "16:9 (Widescreen)",
-        0.6,
+        1,
         32
       ],
       "widgets_values_named": {
         "aspect_ratio": "16:9 (Widescreen)",
-        "megapixels": 0.6,
+        "megapixels": 1,
         "multiple": 32
       },
       "color": "#322",
       "bgcolor": "#533"
     },
     {
-      "id": 4,
-      "type": "LoadVideo",
-      "pos": [
-        -756.2832512698337,
-        -924.8925723856663
-      ],
-      "size": [
-        320,
-        254.8695652173913
-      ],
-      "flags": {},
-      "order": 2,
-      "mode": 0,
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "VIDEO",
-          "type": "VIDEO",
-          "links": [
-            37
-          ]
-        }
-      ],
-      "properties": {
-        "cnr_id": "comfy-core",
-        "ver": "0.33.0",
-        "Node name for S&R": "LoadVideo"
-      },
-      "widgets_values": [
-        "H3Seg_FirstPass_00003_.mp4",
-        "image"
-      ],
-      "widgets_values_named": {
-        "file": "H3Seg_FirstPass_00003_.mp4",
-        "upload": "image"
-      }
-    },
-    {
-      "id": 27,
-      "type": "BasicScheduler",
-      "pos": [
-        474.7015180185395,
-        -1443.8399270800958
-      ],
-      "size": [
-        210,
-        106
-      ],
-      "flags": {},
-      "order": 15,
-      "mode": 4,
-      "inputs": [
-        {
-          "name": "model",
-          "type": "MODEL",
-          "link": 50
-        }
-      ],
-      "outputs": [
-        {
-          "name": "SIGMAS",
-          "type": "SIGMAS",
-          "links": [
-            47,
-            67
-          ]
-        }
-      ],
-      "properties": {
-        "cnr_id": "comfy-core",
-        "ver": "0.30.0",
-        "Node name for S&R": "BasicScheduler",
-        "ue_properties": {
-          "widget_ue_connectable": {},
-          "version": "7.5.2",
-          "input_ue_unconnectable": {}
-        }
-      },
-      "widgets_values": [
-        "beta",
-        2,
-        0.25
-      ],
-      "widgets_values_named": {
-        "scheduler": "beta",
-        "steps": 2,
-        "denoise": 0.25
-      }
-    },
-    {
-      "id": 2,
-      "type": "MiniMaxH3EasyMediaLoader",
-      "pos": [
-        -762.8099233298352,
-        -577.1620494936392
-      ],
-      "size": [
-        320,
-        316
-      ],
-      "flags": {},
-      "order": 3,
-      "mode": 0,
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "media_bundle",
-          "type": "MINIMAX_H3_MEDIA_BUNDLE",
-          "links": [
-            36
-          ]
-        }
-      ],
-      "properties": {
-        "cnr_id": "comfyui-minimaxh3-easy",
-        "ver": "4138b716fc3e2a2780487c5e9cf2e3c5903afc92",
-        "Node name for S&R": "MiniMaxH3EasyMediaLoader",
-        "media_loader_state": "{\"images\":[{\"filename\":\"downloaded-image.jpeg\"}],\"audios\":[],\"videos\":[]}"
-      },
-      "widgets_values": [
-        "{\"images\":[{\"filename\":\"downloaded-image.jpeg\"}],\"audios\":[],\"videos\":[]}"
-      ],
-      "widgets_values_named": {
-        "media_state": "{\"images\":[{\"filename\":\"downloaded-image.jpeg\"}],\"audios\":[],\"videos\":[]}"
-      }
-    },
-    {
-      "id": 33,
-      "type": "MiniMaxH3EasySegmentDecode",
-      "pos": [
-        1103.2601739957277,
-        -1551.2424848925432
-      ],
-      "size": [
-        300,
-        26
-      ],
-      "flags": {},
-      "order": 21,
-      "mode": 4,
-      "inputs": [
-        {
-          "name": "segments",
-          "type": "MINIMAX_H3_SEGMENTS",
-          "link": 59
-        }
-      ],
-      "outputs": [
-        {
-          "name": "preview",
-          "type": "VIDEO",
-          "links": [
-            60
-          ]
-        }
-      ],
-      "properties": {
-        "cnr_id": "comfyui-minimaxh3-easy",
-        "ver": "4138b716fc3e2a2780487c5e9cf2e3c5903afc92",
-        "Node name for S&R": "MiniMaxH3EasySegmentDecode"
-      }
-    },
-    {
-      "id": 31,
-      "type": "SaveVideo",
-      "pos": [
-        1411.231642218218,
-        -1496.9373716131615
-      ],
-      "size": [
-        394.28197041191265,
-        106
-      ],
-      "flags": {},
-      "order": 22,
-      "mode": 4,
-      "inputs": [
-        {
-          "name": "video",
-          "type": "VIDEO",
-          "link": 60
-        }
-      ],
-      "outputs": [
-        {
-          "name": "video",
-          "type": "VIDEO",
-          "links": []
-        }
-      ],
-      "title": "分段二采成片",
-      "properties": {
-        "cnr_id": "comfy-core",
-        "ver": "0.30.0",
-        "Node name for S&R": "SaveVideo",
-        "ue_properties": {
-          "widget_ue_connectable": {},
-          "version": "7.5.2",
-          "input_ue_unconnectable": {}
-        }
-      },
-      "widgets_values": [
-        "video/H3Seg_SegmentRefine_Pixel",
-        "auto",
-        "auto",
-        "auto"
-      ],
-      "widgets_values_named": {
-        "filename_prefix": "video/H3Seg_SegmentRefine_Pixel",
-        "format": "auto",
-        "format.codec": "auto",
-        "codec": "auto"
-      },
-      "color": "#232",
-      "bgcolor": "#353"
-    },
-    {
       "id": 29,
       "type": "MiniMaxH3EasySegmentRefine",
       "pos": [
-        1050.2228369573982,
-        -1469.265264564262
+        1050.2227783203125,
+        -1469.2652587890625
       ],
       "size": [
-        327.55437331349617,
+        327.55438232421875,
         282
       ],
       "flags": {},
-      "order": 19,
+      "order": 22,
       "mode": 4,
       "inputs": [
         {
@@ -991,16 +629,43 @@
           "link": 68
         },
         {
+          "label": "sampler",
           "name": "sampler",
           "type": "SAMPLER",
           "link": 69
         },
         {
+          "label": "sigmas",
           "name": "sigmas",
           "type": "SIGMAS",
           "link": 67
         },
         {
+          "label": "refine_mode",
+          "name": "refine_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "refine_mode"
+          }
+        },
+        {
+          "label": "seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          }
+        },
+        {
+          "label": "refine_execution",
+          "name": "refine_execution",
+          "type": "COMBO",
+          "widget": {
+            "name": "refine_execution"
+          }
+        },
+        {
+          "label": "target_width",
           "name": "target_width",
           "type": "INT",
           "widget": {
@@ -1009,12 +674,85 @@
           "link": 55
         },
         {
+          "label": "target_height",
           "name": "target_height",
           "type": "INT",
           "widget": {
             "name": "target_height"
           },
           "link": 56
+        },
+        {
+          "label": "latent_upscale_model",
+          "name": "latent_upscale_model",
+          "type": "COMBO",
+          "widget": {
+            "name": "latent_upscale_model"
+          }
+        },
+        {
+          "label": "latent_upscale_scale",
+          "name": "latent_upscale_scale",
+          "type": "FLOAT",
+          "widget": {
+            "name": "latent_upscale_scale"
+          }
+        },
+        {
+          "label": "latent_upscale_device",
+          "name": "latent_upscale_device",
+          "type": "COMBO",
+          "widget": {
+            "name": "latent_upscale_device"
+          }
+        },
+        {
+          "label": "latent_upscale_precision",
+          "name": "latent_upscale_precision",
+          "type": "COMBO",
+          "widget": {
+            "name": "latent_upscale_precision"
+          }
+        },
+        {
+          "label": "tile_width",
+          "name": "tile_width",
+          "type": "INT",
+          "widget": {
+            "name": "tile_width"
+          }
+        },
+        {
+          "label": "tile_height",
+          "name": "tile_height",
+          "type": "INT",
+          "widget": {
+            "name": "tile_height"
+          }
+        },
+        {
+          "label": "tile_overlap",
+          "name": "tile_overlap",
+          "type": "INT",
+          "widget": {
+            "name": "tile_overlap"
+          }
+        },
+        {
+          "label": "tile_fade",
+          "name": "tile_fade",
+          "type": "INT",
+          "widget": {
+            "name": "tile_fade"
+          }
+        },
+        {
+          "label": "segment_seeds",
+          "name": "segment_seeds",
+          "type": "STRING",
+          "widget": {
+            "name": "segment_seeds"
+          }
         }
       ],
       "outputs": [
@@ -1030,11 +768,15 @@
       "properties": {
         "cnr_id": "comfyui-minimaxh3-easy",
         "ver": "4138b716fc3e2a2780487c5e9cf2e3c5903afc92",
-        "Node name for S&R": "MiniMaxH3EasySegmentRefine"
+        "Node name for S&R": "MiniMaxH3EasySegmentRefine",
+        "widget_ue_connectable": {
+          "target_height": true,
+          "target_width": true
+        }
       },
       "widgets_values": [
         "Pixel Resize",
-        111,
+        113,
         "fixed",
         "Standard",
         0,
@@ -1051,7 +793,7 @@
       ],
       "widgets_values_named": {
         "refine_mode": "Pixel Resize",
-        "seed": 111,
+        "seed": 113,
         "control_after_generate": "fixed",
         "refine_execution": "Standard",
         "target_width": 0,
@@ -1068,108 +810,558 @@
       }
     },
     {
-      "id": 1,
-      "type": "MiniMaxH3EasyLoader",
+      "id": 27,
+      "type": "BasicScheduler",
       "pos": [
-        -914.5504293527416,
-        -1145.7942188535965
+        474.7015075683594,
+        -1443.8399658203125
       ],
       "size": [
-        515.935423945918,
-        157.98694633888778
+        210,
+        106
       ],
       "flags": {},
-      "order": 4,
-      "mode": 0,
+      "order": 18,
+      "mode": 4,
       "inputs": [
         {
-          "label": "FL2VA 模型",
-          "name": "fl2va_model",
-          "type": "COMBO",
-          "widget": {
-            "name": "fl2va_model"
-          },
-          "link": null
+          "label": "model",
+          "name": "model",
+          "type": "MODEL",
+          "link": 50
         },
         {
-          "label": "REF2VA 模型",
-          "name": "ref2va_model",
+          "label": "scheduler",
+          "name": "scheduler",
           "type": "COMBO",
           "widget": {
-            "name": "ref2va_model"
-          },
-          "link": null
+            "name": "scheduler"
+          }
         },
         {
-          "label": "文本编码器",
-          "name": "text_encoder",
-          "type": "COMBO",
+          "label": "steps",
+          "name": "steps",
+          "type": "INT",
           "widget": {
-            "name": "text_encoder"
-          },
-          "link": null
+            "name": "steps"
+          }
         },
         {
-          "label": "视频 VAE",
-          "name": "video_vae",
-          "type": "COMBO",
+          "label": "denoise",
+          "name": "denoise",
+          "type": "FLOAT",
           "widget": {
-            "name": "video_vae"
-          },
-          "link": null
-        },
-        {
-          "label": "音频 VAE",
-          "name": "audio_vae",
-          "type": "COMBO",
-          "widget": {
-            "name": "audio_vae"
-          },
-          "link": null
+            "name": "denoise"
+          }
         }
       ],
       "outputs": [
         {
-          "name": "h3_bundle",
-          "type": "MINIMAX_H3_BUNDLE",
+          "label": "SIGMAS",
+          "name": "SIGMAS",
+          "type": "SIGMAS",
           "links": [
-            38
+            47,
+            67
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.30.0",
+        "Node name for S&R": "BasicScheduler",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.2"
+        },
+        "widget_ue_connectable": {}
+      },
+      "widgets_values": [
+        "beta",
+        4,
+        0.8000000000000002
+      ],
+      "widgets_values_named": {
+        "scheduler": "beta",
+        "steps": 4,
+        "denoise": 0.8000000000000002
+      }
+    },
+    {
+      "id": 31,
+      "type": "SaveVideo",
+      "pos": [
+        1511.09765625,
+        -1510.5526123046875
+      ],
+      "size": [
+        210,
+        126
+      ],
+      "flags": {},
+      "order": 25,
+      "mode": 4,
+      "inputs": [
+        {
+          "label": "video",
+          "name": "video",
+          "type": "VIDEO",
+          "link": 60
+        },
+        {
+          "label": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          }
+        },
+        {
+          "label": "format",
+          "name": "format",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "format"
+          }
+        },
+        {
+          "label": "codec",
+          "name": "codec",
+          "shape": 7,
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "codec"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "label": "video_url",
+          "name": "video",
+          "type": "VIDEO",
+          "links": []
+        },
+        {
+          "label": "video",
+          "name": "video",
+          "type": "VIDEO"
+        }
+      ],
+      "title": "分段二采成片",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.30.0",
+        "Node name for S&R": "SaveVideo",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.2"
+        },
+        "widget_ue_connectable": {}
+      },
+      "widgets_values": [
+        "video/H3Seg_SegmentRefine_Pixel",
+        "auto",
+        "auto",
+        "auto"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "video/H3Seg_SegmentRefine_Pixel",
+        "format": "auto",
+        "format.codec": "auto",
+        "codec": "auto"
+      },
+      "color": "#232",
+      "bgcolor": "#353"
+    },
+    {
+      "id": 32,
+      "type": "Fast Groups Bypasser (rgthree)",
+      "pos": [
+        -203.42189025878906,
+        -1171.1654052734375
+      ],
+      "size": [
+        364.5703430175781,
+        106
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "label": "OPT_CONNECTION",
+          "name": "OPT_CONNECTION",
+          "type": "*"
+        }
+      ],
+      "properties": {
+        "matchColors": "",
+        "matchTitle": "",
+        "showNav": true,
+        "showAllGraphs": true,
+        "sort": "position",
+        "customSortAlphabet": "",
+        "toggleRestriction": "max one",
+        "widget_ue_connectable": {}
+      }
+    },
+    {
+      "id": 7,
+      "type": "MiniMaxH3EasySegmentRender",
+      "pos": [
+        580.6483154296875,
+        -854.3713989257812
+      ],
+      "size": [
+        350,
+        166
+      ],
+      "flags": {},
+      "order": 17,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "h3_context",
+          "name": "h3_context",
+          "type": "MINIMAX_H3_CONTEXT",
+          "link": 43
+        },
+        {
+          "label": "model",
+          "name": "model",
+          "type": "MODEL",
+          "link": 17
+        },
+        {
+          "label": "sampler",
+          "name": "sampler",
+          "type": "SAMPLER",
+          "link": 9
+        },
+        {
+          "label": "sigmas",
+          "name": "sigmas",
+          "type": "SIGMAS",
+          "link": 92
+        },
+        {
+          "label": "seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          }
+        },
+        {
+          "label": "segment_seeds",
+          "name": "segment_seeds",
+          "type": "STRING",
+          "widget": {
+            "name": "segment_seeds"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "label": "segments",
+          "name": "segments",
+          "type": "MINIMAX_H3_SEGMENTS",
+          "links": [
+            13
           ]
         }
       ],
       "properties": {
         "cnr_id": "comfyui-minimaxh3-easy",
         "ver": "4138b716fc3e2a2780487c5e9cf2e3c5903afc92",
-        "Node name for S&R": "MiniMaxH3EasyLoader"
+        "Node name for S&R": "MiniMaxH3EasySegmentRender",
+        "widget_ue_connectable": {}
       },
       "widgets_values": [
-        "无",
-        "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
-        "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
-        "minimax_h3_video_vae_fp16.safetensors",
-        "minimax_h3_audio_vae_fp32.safetensors"
+        0,
+        "fixed",
+        ""
       ],
       "widgets_values_named": {
-        "fl2va_model": "无",
-        "ref2va_model": "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
-        "text_encoder": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
-        "video_vae": "minimax_h3_video_vae_fp16.safetensors",
-        "audio_vae": "minimax_h3_audio_vae_fp32.safetensors"
+        "seed": 0,
+        "control_after_generate": "fixed",
+        "segment_seeds": ""
+      }
+    },
+    {
+      "id": 10,
+      "type": "SaveVideo",
+      "pos": [
+        1647.595458984375,
+        -784.469970703125
+      ],
+      "size": [
+        210,
+        126
+      ],
+      "flags": {},
+      "order": 23,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "video",
+          "name": "video",
+          "type": "VIDEO",
+          "link": 15
+        },
+        {
+          "label": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          }
+        },
+        {
+          "label": "format",
+          "name": "format",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "format"
+          }
+        },
+        {
+          "label": "codec",
+          "name": "codec",
+          "shape": 7,
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "codec"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "label": "video_url",
+          "name": "video",
+          "type": "VIDEO"
+        },
+        {
+          "label": "video",
+          "name": "video",
+          "type": "VIDEO"
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.33.0",
+        "Node name for S&R": "SaveVideo",
+        "widget_ue_connectable": {}
+      },
+      "widgets_values": [
+        "video/MiniMax_H3_Easy_Selected_Video_Refine",
+        "auto",
+        "auto",
+        "auto"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "video/MiniMax_H3_Easy_Selected_Video_Refine",
+        "format": "auto",
+        "format.codec": "auto",
+        "codec": "auto"
+      }
+    },
+    {
+      "id": 46,
+      "type": "ManualSigmas",
+      "pos": [
+        758.4534912109375,
+        -441.16607666015625
+      ],
+      "size": [
+        447.2088928222656,
+        58
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 4,
+      "inputs": [
+        {
+          "label": "sigmas",
+          "name": "sigmas",
+          "type": "STRING",
+          "widget": {
+            "name": "sigmas"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "label": "SIGMAS",
+          "name": "SIGMAS",
+          "type": "SIGMAS",
+          "links": []
+        }
+      ],
+      "title": "4 Step Sigmas",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.34.0",
+        "Node name for S&R": "ManualSigmas",
+        "widget_ue_connectable": {}
+      },
+      "widgets_values": [
+        "0.9035, 0.8000, 0.6316, 0.3158, 0.0000"
+      ],
+      "widgets_values_named": {
+        "sigmas": "0.9035, 0.8000, 0.6316, 0.3158, 0.0000"
+      }
+    },
+    {
+      "id": 47,
+      "type": "ManualSigmas",
+      "pos": [
+        658.056396484375,
+        -315.6120300292969
+      ],
+      "size": [
+        447.2088928222656,
+        58
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 4,
+      "inputs": [
+        {
+          "label": "sigmas",
+          "name": "sigmas",
+          "type": "STRING",
+          "widget": {
+            "name": "sigmas"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "label": "SIGMAS",
+          "name": "SIGMAS",
+          "type": "SIGMAS",
+          "links": []
+        }
+      ],
+      "title": "5 Step Sigmas",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.34.0",
+        "Node name for S&R": "ManualSigmas",
+        "widget_ue_connectable": {}
+      },
+      "widgets_values": [
+        "0.9231, 0.8780, 0.8000, 0.6316, 0.3158, 0.0000"
+      ],
+      "widgets_values_named": {
+        "sigmas": "0.9231, 0.8780, 0.8000, 0.6316, 0.3158, 0.0000"
+      }
+    },
+    {
+      "id": 45,
+      "type": "ManualSigmas",
+      "pos": [
+        290.3395080566406,
+        -439.74468994140625
+      ],
+      "size": [
+        447.2088928222656,
+        58
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "sigmas",
+          "name": "sigmas",
+          "type": "STRING",
+          "widget": {
+            "name": "sigmas"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "label": "SIGMAS",
+          "name": "SIGMAS",
+          "type": "SIGMAS",
+          "links": [
+            92,
+            93
+          ]
+        }
+      ],
+      "title": "3 Step Sigmas",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.34.0",
+        "Node name for S&R": "ManualSigmas",
+        "widget_ue_connectable": {}
+      },
+      "widgets_values": [
+        "0.9035, 0.6316, 0.3158, 0.0000"
+      ],
+      "widgets_values_named": {
+        "sigmas": "0.9035, 0.6316, 0.3158, 0.0000"
+      }
+    },
+    {
+      "id": 19,
+      "type": "MiniMaxH3EasyAspectRatio",
+      "pos": [
+        263.5372314453125,
+        -1548.4705810546875
+      ],
+      "size": [
+        384.8787536621094,
+        50.19992446899414
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 4,
+      "inputs": [
+        {
+          "label": "h3_context",
+          "name": "h3_context",
+          "type": "MINIMAX_H3_CONTEXT",
+          "link": 63
+        }
+      ],
+      "outputs": [
+        {
+          "label": "aspect_ratio",
+          "name": "aspect_ratio",
+          "type": "*",
+          "links": [
+            48
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-minimaxh3-easy",
+        "ver": "5ee7d61c46cd6b0fa1994a390be44f17f9b72919",
+        "Node name for S&R": "MiniMaxH3EasyAspectRatio",
+        "widget_ue_connectable": {}
       }
     },
     {
       "id": 18,
       "type": "MiniMaxH3EasySelectedVideoContext",
       "pos": [
-        -305.69418746094436,
-        -936.0309733882278
+        -305.6941833496094,
+        -936.0309448242188
       ],
       "size": [
-        424.56004204025226,
-        590.0279821652945
+        395.4964904785156,
+        487.61572265625
       ],
       "flags": {},
-      "order": 6,
+      "order": 10,
       "mode": 0,
       "inputs": [
         {
@@ -1189,7 +1381,111 @@
           "name": "media",
           "shape": 7,
           "type": "*",
-          "link": 36
+          "link": 75
+        },
+        {
+          "label": "mode",
+          "name": "mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "mode"
+          }
+        },
+        {
+          "label": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          }
+        },
+        {
+          "label": "segment_mode",
+          "name": "segment_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "segment_mode"
+          }
+        },
+        {
+          "label": "segment_cuts",
+          "name": "segment_cuts",
+          "type": "STRING",
+          "widget": {
+            "name": "segment_cuts"
+          }
+        },
+        {
+          "label": "context_length",
+          "name": "context_length",
+          "type": "INT",
+          "widget": {
+            "name": "context_length"
+          }
+        },
+        {
+          "label": "continuity_mode",
+          "name": "continuity_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "continuity_mode"
+          }
+        },
+        {
+          "label": "advanced",
+          "name": "advanced",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "advanced"
+          }
+        },
+        {
+          "label": "keyframe_role",
+          "name": "keyframe_role",
+          "type": "COMBO",
+          "widget": {
+            "name": "keyframe_role"
+          }
+        },
+        {
+          "label": "ref_image_size",
+          "name": "ref_image_size",
+          "type": "COMBO",
+          "widget": {
+            "name": "ref_image_size"
+          }
+        },
+        {
+          "label": "reference_mention_mode",
+          "name": "reference_mention_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "reference_mention_mode"
+          }
+        },
+        {
+          "label": "prompt_optimizer_scene_guide",
+          "name": "prompt_optimizer_scene_guide",
+          "type": "COMBO",
+          "widget": {
+            "name": "prompt_optimizer_scene_guide"
+          }
+        },
+        {
+          "label": "context_prompt_optimizer_mode",
+          "name": "context_prompt_optimizer_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "context_prompt_optimizer_mode"
+          }
+        },
+        {
+          "label": "context_prompt_optimizer_concurrency",
+          "name": "context_prompt_optimizer_concurrency",
+          "type": "INT",
+          "widget": {
+            "name": "context_prompt_optimizer_concurrency"
+          }
         }
       ],
       "outputs": [
@@ -1199,7 +1495,6 @@
           "type": "MODEL",
           "links": [
             39,
-            40,
             41,
             68,
             70
@@ -1223,154 +1518,661 @@
         "ver": "4138b716fc3e2a2780487c5e9cf2e3c5903afc92",
         "Node name for S&R": "MiniMaxH3EasySelectedVideoContext",
         "minimax_h3_virtual_media_links": [],
+        "minimax_h3_prompt_optimizer": {
+          "scene_guide": "none",
+          "optimize_on_run": false,
+          "api_format": "openai",
+          "api_url": "",
+          "model": "",
+          "read_media": false,
+          "enabled": false
+        },
+        "widget_ue_connectable": {},
         "minimax_h3_prompt_reference_doc": {
           "version": 1,
-          "text": "For the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.\r\n\r\nintegrated_multimodal_description: [Shot 1] Pixel animation, a medium-wide shot shows the elderly farmer from <Picture 1> — straw hat, gray mustache and beard, blue plaid shirt with rolled sleeves, brown work gloves, dirt-stained blue jeans, and green rubber boots — standing at the head of a sunlit vegetable field with neat crop rows, a wooden fence, and a small red barn in the distance, holding his wicker basket of red and yellow peppers. He steps forward, sets the basket down between the rows, and kneels on one knee, his gloved hands snapping ripe peppers from their stems and dropping them one by one into the basket. The camera pushes in with small amplitude at slow speed toward his steady working hands.\r\n\r\noverall_soundscape: Morning birds chirp over a light wind moving through the crop rows. Leaves rustle, peppers snap off their stems, and each one lands in the wicker basket with a soft hollow thump.\r\n\r\nnon_diegetic_music: A bright chiptune melody at a moderate tempo, built from simple square-wave notes over a light percussion pulse, holding a steady level throughout.\r\n\r\nFor the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.\r\n\r\nintegrated_multimodal_description: [Shot 1] Pixel animation, a wide shot shows the elderly farmer from <Picture 1> — straw hat, gray mustache and beard, blue plaid shirt with rolled sleeves, brown work gloves, dirt-stained blue jeans, and green rubber boots — standing upright at the edge of a sunlit vegetable field, holding his wicker basket heaped full with red and yellow peppers. He starts walking along the dirt path between the crop rows, the basket swaying gently with each step, while the camera pulls out with small amplitude at slow speed to reveal the wooden fence and the small red barn ahead. Toward the end he slows to a stop just short of the barn door and settles into a still pose with the full basket in his grip.\r\n\r\noverall_soundscape: Wind sweeps across the open field while distant birds call. Rubber boots press into the dirt path with steady crunching steps, and the packed basket creaks softly with each stride.\r\n\r\nnon_diegetic_music: A bright chiptune melody at a moderate tempo with simple square-wave notes and a light bass line, resolving on a held final note as the farmer stops at the barn.",
+          "text": "subject_definitions:\r\n<Subject 1> is the little sister from <Picture 1>, a chibi girl with long wavy blue-gradient hair, a single bouncy ahoge, a white lace maid headdress, blue bow hair ornaments with small white wings, large round blue eyes, a navy lolita maid dress with a white apron printed with a blue whale, gold hem trim, white socks, navy shoes, and a small blue fin-shaped tail.\r\n<Subject 2> is the older sister from <Picture 2>, a young woman with long dark hair fading into purple-magenta streaks, white feather hair ornaments, and an elegant white-and-purple sheer fantasy gown with gold accents and flowing translucent fabric.\r\n<Subject 3> is the moonlit lakeside environment shown with <Subject 2> in <Picture 2>, featuring a huge full moon, a calm lake with drifting mist, and a mossy rock bank dotted with small white flowers.\r\n<Audio 1> is the voice-timbre reference for <Subject 1> (S1), binding the little sister's spoken lines to its vocal character.\r\n\r\nsummary:\r\n[reference generation + audio reference] The target video shows <Subject 1>, the little sister, running to visit <Subject 2>, the older sister, at <Subject 3>, the moonlit lakeside. The little sister calls out, clings to her sister's arm, and acts coquettish until the older sister warmly agrees to spend the day with her. <Audio 1> serves as the voice-timbre reference for <Subject 1> (S1) across all her lines.\r\n\r\nretention_analysis:\r\n<Subject 1> (appears in [Shot 1], [Shot 2], [Shot 3]): fully_preserved - the chibi build, blue-gradient hair, ahoge, lace headdress, whale-print apron dress, and fin tail are retained throughout.\r\n<Subject 2> (appears in [Shot 1], [Shot 2], [Shot 3]): fully_preserved - the dark-to-purple hair, white feather ornaments, and white-and-purple sheer gown are retained.\r\n<Subject 3> (appears in [Shot 1], [Shot 2], [Shot 3]): fully_preserved - the full moon, misty lake, and mossy rock bank remain the constant setting.\r\n<Audio 1>: reference - the little sister's dialogue delivery follows <Audio 1>'s sweet young voice timbre without copying the original signal.\r\n\r\ndetailed_description:\r\nThe target video uses a soft fantasy anime style with luminous blue moonlight, a gentle glow, and a warm sisterly mood.\r\n[Shot 1] A wide establishing shot shows <Subject 3>, the moonlit lakeside: an enormous full moon dominates the night sky above a calm lake, thin mist drifts over the water, and a mossy rock covered with small white flowers rises from a grassy bank in the foreground. <Subject 2>, the older sister with long dark hair fading into purple-magenta streaks, white feather hair ornaments, and a flowing white-and-purple sheer gown trimmed with gold, sits gracefully on the mossy rock, her translucent train spread over the stone as she gazes toward the water. From the left, <Subject 1>, the little sister with her blue-gradient hair, springy ahoge, lace headdress, whale-print apron dress, and little fin tail, runs into frame with quick, light steps, hair and apron fluttering. She stops in front of <Subject 2> and calls up at her in the bright, sweet young voice timbre referenced from <Audio 1>, <d>[Chinese] 姐姐～我来找你玩啦！</d> The camera pushes in slowly as <Subject 2> turns her head, her expression softening into a smile.\r\n[Shot 2] At 00:03.500, the shot cuts to a medium two-shot beside the rock. <Subject 1> (S1) clings to <Subject 2>'s arm, hugging it with both small hands, swaying side to side and tilting her head so the ahoge bounces, looking up with wide, sparkling, pleading eyes in an unmistakably coquettish gesture. Keeping the same sweet voice timbre bound to <Audio 1>, she draws out her words playfully, <d>[Chinese] 陪人家玩嘛，好不好嘛？</d> She tugs the sleeve gently and puffs her cheeks in a tiny pout while moonlight rims both figures in silver.\r\n[Shot 3] At 00:07.000, the shot cuts to a close-up of <Subject 2> (S2), the older sister from Shot 1, smiling down warmly. She answers in a gentle, mature female voice, <d>[Chinese] 好呀，今天就一直陪着你。</d> She reaches out and pats <Subject 1>'s head between the lace headdress ribbons; the little sister beams, cheers softly, and nuzzles against her arm as the lake shimmers under the full moon behind them.\r\n\r\noverall_soundscape:\r\nGentle night-lakeside ambience continues throughout: soft water lapping, a light breeze through the grass, faint insect chirps, and the subtle rustle of fabric as the sisters move.\r\n\r\nnon_diegetic_music:\r\nA delicate music-box and harp score at a slow, lullaby-like tempo, with soft celesta accents that warm slightly when the older sister agrees to stay with her little sister.",
           "parts": [
             {
               "type": "text",
-              "text": "For the target video, at 0.00 seconds into the target video, "
+              "text": "subject_definitions:\r\n<Subject 1> is the little sister from "
             },
             {
               "type": "mention",
               "token": "@图片1",
               "tag": "<Picture 1>",
               "label": "图片1",
-              "fullLabel": "downloaded-image.jpeg",
+              "fullLabel": "0bcaf799640c2cd2b73a99001512fb1d493ecc6b88efbd97d5277c58d8fc7e63.png",
               "mediaType": "image",
               "referenceMode": "index",
               "ordinal": 1,
-              "mediaIndex": 1,
-              "sourceId": 2,
+              "mediaIndex": null,
+              "sourceId": 40,
               "sourceSlot": 0,
-              "previewUrl": "/view?filename=downloaded-image.jpeg&type=input"
+              "previewUrl": ""
             },
             {
               "type": "text",
-              "text": " (from [Shot 1]) is fully referenced.\r\n\r\nintegrated_multimodal_description: [Shot 1] Pixel animation, a medium-wide shot shows the elderly farmer from "
+              "text": ", a chibi girl with long wavy blue-gradient hair, a single bouncy ahoge, a white lace maid headdress, blue bow hair ornaments with small white wings, large round blue eyes, a navy lolita maid dress with a white apron printed with a blue whale, gold hem trim, white socks, navy shoes, and a small blue fin-shaped tail.\r\n<Subject 2> is the older sister from "
             },
             {
               "type": "mention",
-              "token": "@图片1",
-              "tag": "<Picture 1>",
-              "label": "图片1",
-              "fullLabel": "downloaded-image.jpeg",
+              "token": "@图片2",
+              "tag": "<Picture 2>",
+              "label": "图片2",
+              "fullLabel": "49b0d7a50891279adec589d4e430e691fce970fce17e85a797f734da0e2bb5d3.jpg",
               "mediaType": "image",
               "referenceMode": "index",
-              "ordinal": 1,
-              "mediaIndex": 1,
-              "sourceId": 2,
+              "ordinal": 2,
+              "mediaIndex": null,
+              "sourceId": 40,
               "sourceSlot": 0,
-              "previewUrl": "/view?filename=downloaded-image.jpeg&type=input"
+              "previewUrl": ""
             },
             {
               "type": "text",
-              "text": " — straw hat, gray mustache and beard, blue plaid shirt with rolled sleeves, brown work gloves, dirt-stained blue jeans, and green rubber boots — standing at the head of a sunlit vegetable field with neat crop rows, a wooden fence, and a small red barn in the distance, holding his wicker basket of red and yellow peppers. He steps forward, sets the basket down between the rows, and kneels on one knee, his gloved hands snapping ripe peppers from their stems and dropping them one by one into the basket. The camera pushes in with small amplitude at slow speed toward his steady working hands.\r\n\r\noverall_soundscape: Morning birds chirp over a light wind moving through the crop rows. Leaves rustle, peppers snap off their stems, and each one lands in the wicker basket with a soft hollow thump.\r\n\r\nnon_diegetic_music: A bright chiptune melody at a moderate tempo, built from simple square-wave notes over a light percussion pulse, holding a steady level throughout.\r\n\r\nFor the target video, at 0.00 seconds into the target video, "
+              "text": ", a young woman with long dark hair fading into purple-magenta streaks, white feather hair ornaments, and an elegant white-and-purple sheer fantasy gown with gold accents and flowing translucent fabric.\r\n<Subject 3> is the moonlit lakeside environment shown with <Subject 2> in "
             },
             {
               "type": "mention",
-              "token": "@图片1",
-              "tag": "<Picture 1>",
-              "label": "图片1",
-              "fullLabel": "downloaded-image.jpeg",
+              "token": "@图片2",
+              "tag": "<Picture 2>",
+              "label": "图片2",
+              "fullLabel": "49b0d7a50891279adec589d4e430e691fce970fce17e85a797f734da0e2bb5d3.jpg",
               "mediaType": "image",
               "referenceMode": "index",
-              "ordinal": 1,
-              "mediaIndex": 1,
-              "sourceId": 2,
+              "ordinal": 2,
+              "mediaIndex": null,
+              "sourceId": 40,
               "sourceSlot": 0,
-              "previewUrl": "/view?filename=downloaded-image.jpeg&type=input"
+              "previewUrl": ""
             },
             {
               "type": "text",
-              "text": " (from [Shot 1]) is fully referenced.\r\n\r\nintegrated_multimodal_description: [Shot 1] Pixel animation, a wide shot shows the elderly farmer from "
+              "text": ", featuring a huge full moon, a calm lake with drifting mist, and a mossy rock bank dotted with small white flowers.\r\n"
             },
             {
               "type": "mention",
-              "token": "@图片1",
-              "tag": "<Picture 1>",
-              "label": "图片1",
-              "fullLabel": "downloaded-image.jpeg",
-              "mediaType": "image",
+              "token": "@音频1",
+              "tag": "<Audio 1>",
+              "label": "音频1",
+              "fullLabel": "音频1",
+              "mediaType": "audio",
               "referenceMode": "index",
               "ordinal": 1,
-              "mediaIndex": 1,
-              "sourceId": 2,
+              "mediaIndex": null,
+              "sourceId": null,
               "sourceSlot": 0,
-              "previewUrl": "/view?filename=downloaded-image.jpeg&type=input"
+              "previewUrl": ""
             },
             {
               "type": "text",
-              "text": " — straw hat, gray mustache and beard, blue plaid shirt with rolled sleeves, brown work gloves, dirt-stained blue jeans, and green rubber boots — standing upright at the edge of a sunlit vegetable field, holding his wicker basket heaped full with red and yellow peppers. He starts walking along the dirt path between the crop rows, the basket swaying gently with each step, while the camera pulls out with small amplitude at slow speed to reveal the wooden fence and the small red barn ahead. Toward the end he slows to a stop just short of the barn door and settles into a still pose with the full basket in his grip.\r\n\r\noverall_soundscape: Wind sweeps across the open field while distant birds call. Rubber boots press into the dirt path with steady crunching steps, and the packed basket creaks softly with each stride.\r\n\r\nnon_diegetic_music: A bright chiptune melody at a moderate tempo with simple square-wave notes and a light bass line, resolving on a held final note as the farmer stops at the barn."
+              "text": " is the voice-timbre reference for <Subject 1> (S1), binding the little sister's spoken lines to its vocal character.\r\n\r\nsummary:\r\n[reference generation + audio reference] The target video shows <Subject 1>, the little sister, running to visit <Subject 2>, the older sister, at <Subject 3>, the moonlit lakeside. The little sister calls out, clings to her sister's arm, and acts coquettish until the older sister warmly agrees to spend the day with her. "
+            },
+            {
+              "type": "mention",
+              "token": "@音频1",
+              "tag": "<Audio 1>",
+              "label": "音频1",
+              "fullLabel": "音频1",
+              "mediaType": "audio",
+              "referenceMode": "index",
+              "ordinal": 1,
+              "mediaIndex": null,
+              "sourceId": null,
+              "sourceSlot": 0,
+              "previewUrl": ""
+            },
+            {
+              "type": "text",
+              "text": " serves as the voice-timbre reference for <Subject 1> (S1) across all her lines.\r\n\r\nretention_analysis:\r\n<Subject 1> (appears in [Shot 1], [Shot 2], [Shot 3]): fully_preserved - the chibi build, blue-gradient hair, ahoge, lace headdress, whale-print apron dress, and fin tail are retained throughout.\r\n<Subject 2> (appears in [Shot 1], [Shot 2], [Shot 3]): fully_preserved - the dark-to-purple hair, white feather ornaments, and white-and-purple sheer gown are retained.\r\n<Subject 3> (appears in [Shot 1], [Shot 2], [Shot 3]): fully_preserved - the full moon, misty lake, and mossy rock bank remain the constant setting.\r\n"
+            },
+            {
+              "type": "mention",
+              "token": "@音频1",
+              "tag": "<Audio 1>",
+              "label": "音频1",
+              "fullLabel": "音频1",
+              "mediaType": "audio",
+              "referenceMode": "index",
+              "ordinal": 1,
+              "mediaIndex": null,
+              "sourceId": null,
+              "sourceSlot": 0,
+              "previewUrl": ""
+            },
+            {
+              "type": "text",
+              "text": ": reference - the little sister's dialogue delivery follows "
+            },
+            {
+              "type": "mention",
+              "token": "@音频1",
+              "tag": "<Audio 1>",
+              "label": "音频1",
+              "fullLabel": "音频1",
+              "mediaType": "audio",
+              "referenceMode": "index",
+              "ordinal": 1,
+              "mediaIndex": null,
+              "sourceId": null,
+              "sourceSlot": 0,
+              "previewUrl": ""
+            },
+            {
+              "type": "text",
+              "text": "'s sweet young voice timbre without copying the original signal.\r\n\r\ndetailed_description:\r\nThe target video uses a soft fantasy anime style with luminous blue moonlight, a gentle glow, and a warm sisterly mood.\r\n[Shot 1] A wide establishing shot shows <Subject 3>, the moonlit lakeside: an enormous full moon dominates the night sky above a calm lake, thin mist drifts over the water, and a mossy rock covered with small white flowers rises from a grassy bank in the foreground. <Subject 2>, the older sister with long dark hair fading into purple-magenta streaks, white feather hair ornaments, and a flowing white-and-purple sheer gown trimmed with gold, sits gracefully on the mossy rock, her translucent train spread over the stone as she gazes toward the water. From the left, <Subject 1>, the little sister with her blue-gradient hair, springy ahoge, lace headdress, whale-print apron dress, and little fin tail, runs into frame with quick, light steps, hair and apron fluttering. She stops in front of <Subject 2> and calls up at her in the bright, sweet young voice timbre referenced from "
+            },
+            {
+              "type": "mention",
+              "token": "@音频1",
+              "tag": "<Audio 1>",
+              "label": "音频1",
+              "fullLabel": "音频1",
+              "mediaType": "audio",
+              "referenceMode": "index",
+              "ordinal": 1,
+              "mediaIndex": null,
+              "sourceId": null,
+              "sourceSlot": 0,
+              "previewUrl": ""
+            },
+            {
+              "type": "text",
+              "text": ", <d>[Chinese] 姐姐～我来找你玩啦！</d> The camera pushes in slowly as <Subject 2> turns her head, her expression softening into a smile.\r\n[Shot 2] At 00:03.500, the shot cuts to a medium two-shot beside the rock. <Subject 1> (S1) clings to <Subject 2>'s arm, hugging it with both small hands, swaying side to side and tilting her head so the ahoge bounces, looking up with wide, sparkling, pleading eyes in an unmistakably coquettish gesture. Keeping the same sweet voice timbre bound to "
+            },
+            {
+              "type": "mention",
+              "token": "@音频1",
+              "tag": "<Audio 1>",
+              "label": "音频1",
+              "fullLabel": "音频1",
+              "mediaType": "audio",
+              "referenceMode": "index",
+              "ordinal": 1,
+              "mediaIndex": null,
+              "sourceId": null,
+              "sourceSlot": 0,
+              "previewUrl": ""
+            },
+            {
+              "type": "text",
+              "text": ", she draws out her words playfully, <d>[Chinese] 陪人家玩嘛，好不好嘛？</d> She tugs the sleeve gently and puffs her cheeks in a tiny pout while moonlight rims both figures in silver.\r\n[Shot 3] At 00:07.000, the shot cuts to a close-up of <Subject 2> (S2), the older sister from Shot 1, smiling down warmly. She answers in a gentle, mature female voice, <d>[Chinese] 好呀，今天就一直陪着你。</d> She reaches out and pats <Subject 1>'s head between the lace headdress ribbons; the little sister beams, cheers softly, and nuzzles against her arm as the lake shimmers under the full moon behind them.\r\n\r\noverall_soundscape:\r\nGentle night-lakeside ambience continues throughout: soft water lapping, a light breeze through the grass, faint insect chirps, and the subtle rustle of fabric as the sisters move.\r\n\r\nnon_diegetic_music:\r\nA delicate music-box and harp score at a slow, lullaby-like tempo, with soft celesta accents that warm slightly when the older sister agrees to stay with her little sister."
             }
           ]
         }
       },
       "widgets_values": [
         "参考生视频",
-        "For the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.\r\n\r\nintegrated_multimodal_description: [Shot 1] Pixel animation, a medium-wide shot shows the elderly farmer from <Picture 1> — straw hat, gray mustache and beard, blue plaid shirt with rolled sleeves, brown work gloves, dirt-stained blue jeans, and green rubber boots — standing at the head of a sunlit vegetable field with neat crop rows, a wooden fence, and a small red barn in the distance, holding his wicker basket of red and yellow peppers. He steps forward, sets the basket down between the rows, and kneels on one knee, his gloved hands snapping ripe peppers from their stems and dropping them one by one into the basket. The camera pushes in with small amplitude at slow speed toward his steady working hands.\r\n\r\noverall_soundscape: Morning birds chirp over a light wind moving through the crop rows. Leaves rustle, peppers snap off their stems, and each one lands in the wicker basket with a soft hollow thump.\r\n\r\nnon_diegetic_music: A bright chiptune melody at a moderate tempo, built from simple square-wave notes over a light percussion pulse, holding a steady level throughout.\r\n\r\nFor the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.\r\n\r\nintegrated_multimodal_description: [Shot 1] Pixel animation, a wide shot shows the elderly farmer from <Picture 1> — straw hat, gray mustache and beard, blue plaid shirt with rolled sleeves, brown work gloves, dirt-stained blue jeans, and green rubber boots — standing upright at the edge of a sunlit vegetable field, holding his wicker basket heaped full with red and yellow peppers. He starts walking along the dirt path between the crop rows, the basket swaying gently with each step, while the camera pulls out with small amplitude at slow speed to reveal the wooden fence and the small red barn ahead. Toward the end he slows to a stop just short of the barn door and settles into a still pose with the full basket in his grip.\r\n\r\noverall_soundscape: Wind sweeps across the open field while distant birds call. Rubber boots press into the dirt path with steady crunching steps, and the packed basket creaks softly with each stride.\r\n\r\nnon_diegetic_music: A bright chiptune melody at a moderate tempo with simple square-wave notes and a light bass line, resolving on a held final note as the farmer stops at the barn.",
+        "subject_definitions:\r\n<Subject 1> is the little sister from <Picture 1>, a chibi girl with long wavy blue-gradient hair, a single bouncy ahoge, a white lace maid headdress, blue bow hair ornaments with small white wings, large round blue eyes, a navy lolita maid dress with a white apron printed with a blue whale, gold hem trim, white socks, navy shoes, and a small blue fin-shaped tail.\r\n<Subject 2> is the older sister from <Picture 2>, a young woman with long dark hair fading into purple-magenta streaks, white feather hair ornaments, and an elegant white-and-purple sheer fantasy gown with gold accents and flowing translucent fabric.\r\n<Subject 3> is the moonlit lakeside environment shown with <Subject 2> in <Picture 2>, featuring a huge full moon, a calm lake with drifting mist, and a mossy rock bank dotted with small white flowers.\r\n<Audio 1> is the voice-timbre reference for <Subject 1> (S1), binding the little sister's spoken lines to its vocal character.\r\n\r\nsummary:\r\n[reference generation + audio reference] The target video shows <Subject 1>, the little sister, running to visit <Subject 2>, the older sister, at <Subject 3>, the moonlit lakeside. The little sister calls out, clings to her sister's arm, and acts coquettish until the older sister warmly agrees to spend the day with her. <Audio 1> serves as the voice-timbre reference for <Subject 1> (S1) across all her lines.\r\n\r\nretention_analysis:\r\n<Subject 1> (appears in [Shot 1], [Shot 2], [Shot 3]): fully_preserved - the chibi build, blue-gradient hair, ahoge, lace headdress, whale-print apron dress, and fin tail are retained throughout.\r\n<Subject 2> (appears in [Shot 1], [Shot 2], [Shot 3]): fully_preserved - the dark-to-purple hair, white feather ornaments, and white-and-purple sheer gown are retained.\r\n<Subject 3> (appears in [Shot 1], [Shot 2], [Shot 3]): fully_preserved - the full moon, misty lake, and mossy rock bank remain the constant setting.\r\n<Audio 1>: reference - the little sister's dialogue delivery follows <Audio 1>'s sweet young voice timbre without copying the original signal.\r\n\r\ndetailed_description:\r\nThe target video uses a soft fantasy anime style with luminous blue moonlight, a gentle glow, and a warm sisterly mood.\r\n[Shot 1] A wide establishing shot shows <Subject 3>, the moonlit lakeside: an enormous full moon dominates the night sky above a calm lake, thin mist drifts over the water, and a mossy rock covered with small white flowers rises from a grassy bank in the foreground. <Subject 2>, the older sister with long dark hair fading into purple-magenta streaks, white feather hair ornaments, and a flowing white-and-purple sheer gown trimmed with gold, sits gracefully on the mossy rock, her translucent train spread over the stone as she gazes toward the water. From the left, <Subject 1>, the little sister with her blue-gradient hair, springy ahoge, lace headdress, whale-print apron dress, and little fin tail, runs into frame with quick, light steps, hair and apron fluttering. She stops in front of <Subject 2> and calls up at her in the bright, sweet young voice timbre referenced from <Audio 1>, <d>[Chinese] 姐姐～我来找你玩啦！</d> The camera pushes in slowly as <Subject 2> turns her head, her expression softening into a smile.\r\n[Shot 2] At 00:03.500, the shot cuts to a medium two-shot beside the rock. <Subject 1> (S1) clings to <Subject 2>'s arm, hugging it with both small hands, swaying side to side and tilting her head so the ahoge bounces, looking up with wide, sparkling, pleading eyes in an unmistakably coquettish gesture. Keeping the same sweet voice timbre bound to <Audio 1>, she draws out her words playfully, <d>[Chinese] 陪人家玩嘛，好不好嘛？</d> She tugs the sleeve gently and puffs her cheeks in a tiny pout while moonlight rims both figures in silver.\r\n[Shot 3] At 00:07.000, the shot cuts to a close-up of <Subject 2> (S2), the older sister from Shot 1, smiling down warmly. She answers in a gentle, mature female voice, <d>[Chinese] 好呀，今天就一直陪着你。</d> She reaches out and pats <Subject 1>'s head between the lace headdress ribbons; the little sister beams, cheers softly, and nuzzles against her arm as the lake shimmers under the full moon behind them.\r\n\r\noverall_soundscape:\r\nGentle night-lakeside ambience continues throughout: soft water lapping, a light breeze through the grass, faint insect chirps, and the subtle rustle of fabric as the sisters move.\r\n\r\nnon_diegetic_music:\r\nA delicate music-box and harp score at a slow, lullaby-like tempo, with soft celesta accents that warm slightly when the older sister agrees to stay with her little sister.",
         null,
         "整段视频",
         "",
-        73,
-        "Latent Guide",
-        true,
+        5,
+        "Motion Context",
+        false,
         "首帧优先",
         "1K 面积（约1MP）",
         "按序号",
         false,
         "仅通用方案",
         "整体优化",
-        3
+        1
       ],
       "widgets_values_named": {
         "mode": "参考生视频",
-        "prompt": "For the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.\r\n\r\nintegrated_multimodal_description: [Shot 1] Pixel animation, a medium-wide shot shows the elderly farmer from <Picture 1> — straw hat, gray mustache and beard, blue plaid shirt with rolled sleeves, brown work gloves, dirt-stained blue jeans, and green rubber boots — standing at the head of a sunlit vegetable field with neat crop rows, a wooden fence, and a small red barn in the distance, holding his wicker basket of red and yellow peppers. He steps forward, sets the basket down between the rows, and kneels on one knee, his gloved hands snapping ripe peppers from their stems and dropping them one by one into the basket. The camera pushes in with small amplitude at slow speed toward his steady working hands.\r\n\r\noverall_soundscape: Morning birds chirp over a light wind moving through the crop rows. Leaves rustle, peppers snap off their stems, and each one lands in the wicker basket with a soft hollow thump.\r\n\r\nnon_diegetic_music: A bright chiptune melody at a moderate tempo, built from simple square-wave notes over a light percussion pulse, holding a steady level throughout.\r\n\r\nFor the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.\r\n\r\nintegrated_multimodal_description: [Shot 1] Pixel animation, a wide shot shows the elderly farmer from <Picture 1> — straw hat, gray mustache and beard, blue plaid shirt with rolled sleeves, brown work gloves, dirt-stained blue jeans, and green rubber boots — standing upright at the edge of a sunlit vegetable field, holding his wicker basket heaped full with red and yellow peppers. He starts walking along the dirt path between the crop rows, the basket swaying gently with each step, while the camera pulls out with small amplitude at slow speed to reveal the wooden fence and the small red barn ahead. Toward the end he slows to a stop just short of the barn door and settles into a still pose with the full basket in his grip.\r\n\r\noverall_soundscape: Wind sweeps across the open field while distant birds call. Rubber boots press into the dirt path with steady crunching steps, and the packed basket creaks softly with each stride.\r\n\r\nnon_diegetic_music: A bright chiptune melody at a moderate tempo with simple square-wave notes and a light bass line, resolving on a held final note as the farmer stops at the barn.",
+        "prompt": "subject_definitions:\r\n<Subject 1> is the little sister from <Picture 1>, a chibi girl with long wavy blue-gradient hair, a single bouncy ahoge, a white lace maid headdress, blue bow hair ornaments with small white wings, large round blue eyes, a navy lolita maid dress with a white apron printed with a blue whale, gold hem trim, white socks, navy shoes, and a small blue fin-shaped tail.\r\n<Subject 2> is the older sister from <Picture 2>, a young woman with long dark hair fading into purple-magenta streaks, white feather hair ornaments, and an elegant white-and-purple sheer fantasy gown with gold accents and flowing translucent fabric.\r\n<Subject 3> is the moonlit lakeside environment shown with <Subject 2> in <Picture 2>, featuring a huge full moon, a calm lake with drifting mist, and a mossy rock bank dotted with small white flowers.\r\n<Audio 1> is the voice-timbre reference for <Subject 1> (S1), binding the little sister's spoken lines to its vocal character.\r\n\r\nsummary:\r\n[reference generation + audio reference] The target video shows <Subject 1>, the little sister, running to visit <Subject 2>, the older sister, at <Subject 3>, the moonlit lakeside. The little sister calls out, clings to her sister's arm, and acts coquettish until the older sister warmly agrees to spend the day with her. <Audio 1> serves as the voice-timbre reference for <Subject 1> (S1) across all her lines.\r\n\r\nretention_analysis:\r\n<Subject 1> (appears in [Shot 1], [Shot 2], [Shot 3]): fully_preserved - the chibi build, blue-gradient hair, ahoge, lace headdress, whale-print apron dress, and fin tail are retained throughout.\r\n<Subject 2> (appears in [Shot 1], [Shot 2], [Shot 3]): fully_preserved - the dark-to-purple hair, white feather ornaments, and white-and-purple sheer gown are retained.\r\n<Subject 3> (appears in [Shot 1], [Shot 2], [Shot 3]): fully_preserved - the full moon, misty lake, and mossy rock bank remain the constant setting.\r\n<Audio 1>: reference - the little sister's dialogue delivery follows <Audio 1>'s sweet young voice timbre without copying the original signal.\r\n\r\ndetailed_description:\r\nThe target video uses a soft fantasy anime style with luminous blue moonlight, a gentle glow, and a warm sisterly mood.\r\n[Shot 1] A wide establishing shot shows <Subject 3>, the moonlit lakeside: an enormous full moon dominates the night sky above a calm lake, thin mist drifts over the water, and a mossy rock covered with small white flowers rises from a grassy bank in the foreground. <Subject 2>, the older sister with long dark hair fading into purple-magenta streaks, white feather hair ornaments, and a flowing white-and-purple sheer gown trimmed with gold, sits gracefully on the mossy rock, her translucent train spread over the stone as she gazes toward the water. From the left, <Subject 1>, the little sister with her blue-gradient hair, springy ahoge, lace headdress, whale-print apron dress, and little fin tail, runs into frame with quick, light steps, hair and apron fluttering. She stops in front of <Subject 2> and calls up at her in the bright, sweet young voice timbre referenced from <Audio 1>, <d>[Chinese] 姐姐～我来找你玩啦！</d> The camera pushes in slowly as <Subject 2> turns her head, her expression softening into a smile.\r\n[Shot 2] At 00:03.500, the shot cuts to a medium two-shot beside the rock. <Subject 1> (S1) clings to <Subject 2>'s arm, hugging it with both small hands, swaying side to side and tilting her head so the ahoge bounces, looking up with wide, sparkling, pleading eyes in an unmistakably coquettish gesture. Keeping the same sweet voice timbre bound to <Audio 1>, she draws out her words playfully, <d>[Chinese] 陪人家玩嘛，好不好嘛？</d> She tugs the sleeve gently and puffs her cheeks in a tiny pout while moonlight rims both figures in silver.\r\n[Shot 3] At 00:07.000, the shot cuts to a close-up of <Subject 2> (S2), the older sister from Shot 1, smiling down warmly. She answers in a gentle, mature female voice, <d>[Chinese] 好呀，今天就一直陪着你。</d> She reaches out and pats <Subject 1>'s head between the lace headdress ribbons; the little sister beams, cheers softly, and nuzzles against her arm as the lake shimmers under the full moon behind them.\r\n\r\noverall_soundscape:\r\nGentle night-lakeside ambience continues throughout: soft water lapping, a light breeze through the grass, faint insect chirps, and the subtle rustle of fabric as the sisters move.\r\n\r\nnon_diegetic_music:\r\nA delicate music-box and harp score at a slow, lullaby-like tempo, with soft celesta accents that warm slightly when the older sister agrees to stay with her little sister.",
         "segment_mode": "整段视频",
         "segment_cuts": "",
-        "context_length": 73,
-        "continuity_mode": "Latent Guide",
-        "advanced": true,
+        "context_length": 5,
+        "continuity_mode": "Motion Context",
+        "advanced": false,
         "keyframe_role": "首帧优先",
         "ref_image_size": "1K 面积（约1MP）",
         "reference_mention_mode": "按序号",
         "prompt_optimizer_settings": false,
         "prompt_optimizer_scene_guide": "仅通用方案",
         "context_prompt_optimizer_mode": "整体优化",
-        "context_prompt_optimizer_concurrency": 3
+        "context_prompt_optimizer_concurrency": 1
       }
     },
     {
-      "id": 32,
-      "type": "Fast Groups Bypasser (rgthree)",
+      "id": 8,
+      "type": "MiniMaxH3EasySegmentRefine",
       "pos": [
-        -291.9131671918775,
-        -1138.3231957982707
+        1012.3358154296875,
+        -887.1190185546875
       ],
       "size": [
-        364.5703431209023,
-        106
+        333.5758972167969,
+        330
       ],
       "flags": {},
-      "order": 5,
+      "order": 19,
       "mode": 0,
-      "inputs": [],
+      "inputs": [
+        {
+          "label": "H3 Context",
+          "name": "h3_context",
+          "type": "MINIMAX_H3_CONTEXT",
+          "link": 42
+        },
+        {
+          "label": "分段结果",
+          "name": "segments",
+          "type": "MINIMAX_H3_SEGMENTS",
+          "link": 13
+        },
+        {
+          "label": "Model",
+          "name": "model",
+          "type": "MODEL",
+          "link": 41
+        },
+        {
+          "label": "sampler",
+          "name": "sampler",
+          "type": "SAMPLER",
+          "link": 10
+        },
+        {
+          "label": "sigmas",
+          "name": "sigmas",
+          "type": "SIGMAS",
+          "link": 93
+        },
+        {
+          "label": "refine_mode",
+          "name": "refine_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "refine_mode"
+          }
+        },
+        {
+          "label": "seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          }
+        },
+        {
+          "label": "refine_execution",
+          "name": "refine_execution",
+          "type": "COMBO",
+          "widget": {
+            "name": "refine_execution"
+          }
+        },
+        {
+          "label": "target_width",
+          "name": "target_width",
+          "type": "INT",
+          "widget": {
+            "name": "target_width"
+          }
+        },
+        {
+          "label": "target_height",
+          "name": "target_height",
+          "type": "INT",
+          "widget": {
+            "name": "target_height"
+          }
+        },
+        {
+          "label": "latent_upscale_model",
+          "name": "latent_upscale_model",
+          "type": "COMBO",
+          "widget": {
+            "name": "latent_upscale_model"
+          }
+        },
+        {
+          "label": "latent_upscale_scale",
+          "name": "latent_upscale_scale",
+          "type": "FLOAT",
+          "widget": {
+            "name": "latent_upscale_scale"
+          }
+        },
+        {
+          "label": "latent_upscale_device",
+          "name": "latent_upscale_device",
+          "type": "COMBO",
+          "widget": {
+            "name": "latent_upscale_device"
+          }
+        },
+        {
+          "label": "latent_upscale_precision",
+          "name": "latent_upscale_precision",
+          "type": "COMBO",
+          "widget": {
+            "name": "latent_upscale_precision"
+          }
+        },
+        {
+          "label": "tile_width",
+          "name": "tile_width",
+          "type": "INT",
+          "widget": {
+            "name": "tile_width"
+          }
+        },
+        {
+          "label": "tile_height",
+          "name": "tile_height",
+          "type": "INT",
+          "widget": {
+            "name": "tile_height"
+          }
+        },
+        {
+          "label": "tile_overlap",
+          "name": "tile_overlap",
+          "type": "INT",
+          "widget": {
+            "name": "tile_overlap"
+          }
+        },
+        {
+          "label": "tile_fade",
+          "name": "tile_fade",
+          "type": "INT",
+          "widget": {
+            "name": "tile_fade"
+          }
+        },
+        {
+          "label": "segment_seeds",
+          "name": "segment_seeds",
+          "type": "STRING",
+          "widget": {
+            "name": "segment_seeds"
+          }
+        }
+      ],
       "outputs": [
         {
-          "name": "OPT_CONNECTION",
-          "type": "*",
-          "links": null
+          "label": "分段结果",
+          "name": "refined_segments",
+          "type": "MINIMAX_H3_SEGMENTS",
+          "links": [
+            14
+          ]
         }
       ],
       "properties": {
-        "matchColors": "",
-        "matchTitle": "",
-        "showNav": true,
-        "showAllGraphs": true,
-        "sort": "position",
-        "customSortAlphabet": "",
-        "toggleRestriction": "max one"
+        "cnr_id": "comfyui-minimaxh3-easy",
+        "ver": "4138b716fc3e2a2780487c5e9cf2e3c5903afc92",
+        "Node name for S&R": "MiniMaxH3EasySegmentRefine",
+        "widget_ue_connectable": {}
+      },
+      "widgets_values": [
+        "Latent Upscale",
+        2,
+        "fixed",
+        "Standard",
+        0,
+        0,
+        "minimax_h3_latent_upscaler_3d_fp16.safetensors",
+        2,
+        "cuda",
+        "fp16",
+        512,
+        512,
+        128,
+        32,
+        ""
+      ],
+      "widgets_values_named": {
+        "refine_mode": "Latent Upscale",
+        "seed": 2,
+        "control_after_generate": "fixed",
+        "refine_execution": "Standard",
+        "target_width": 0,
+        "target_height": 0,
+        "latent_upscale_model": "minimax_h3_latent_upscaler_3d_fp16.safetensors",
+        "latent_upscale_scale": 2,
+        "latent_upscale_device": "cuda",
+        "latent_upscale_precision": "fp16",
+        "tile_width": 512,
+        "tile_height": 512,
+        "tile_overlap": 128,
+        "tile_fade": 32,
+        "segment_seeds": ""
       }
+    },
+    {
+      "id": 12,
+      "type": "LoraLoaderModelOnly",
+      "pos": [
+        308.85882568359375,
+        -624.3192749023438
+      ],
+      "size": [
+        543.8613891601562,
+        82
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "model",
+          "name": "model",
+          "type": "MODEL",
+          "link": 19
+        },
+        {
+          "label": "lora_name",
+          "name": "lora_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "lora_name"
+          }
+        },
+        {
+          "label": "strength_model",
+          "name": "strength_model",
+          "type": "FLOAT",
+          "widget": {
+            "name": "strength_model"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "label": "MODEL",
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            17
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.33.0",
+        "Node name for S&R": "LoraLoaderModelOnly",
+        "widget_ue_connectable": {}
+      },
+      "widgets_values": [
+        "minimax_h3_fl2v_turbo_4step_v1.0_768p_comfyui_bf16.safetensors",
+        1
+      ],
+      "widgets_values_named": {
+        "lora_name": "minimax_h3_fl2v_turbo_4step_v1.0_768p_comfyui_bf16.safetensors",
+        "strength_model": 1
+      }
+    },
+    {
+      "id": 1,
+      "type": "MiniMaxH3EasyLoader",
+      "pos": [
+        -938.5397338867188,
+        -1199.9417724609375
+      ],
+      "size": [
+        515.9354248046875,
+        157.98695373535156
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "FL2VA 模型",
+          "name": "fl2va_model",
+          "type": "COMBO",
+          "widget": {
+            "name": "fl2va_model"
+          }
+        },
+        {
+          "label": "REF2VA 模型",
+          "name": "ref2va_model",
+          "type": "COMBO",
+          "widget": {
+            "name": "ref2va_model"
+          }
+        },
+        {
+          "label": "文本编码器",
+          "name": "text_encoder",
+          "type": "COMBO",
+          "widget": {
+            "name": "text_encoder"
+          }
+        },
+        {
+          "label": "视频 VAE",
+          "name": "video_vae",
+          "type": "COMBO",
+          "widget": {
+            "name": "video_vae"
+          }
+        },
+        {
+          "label": "音频 VAE",
+          "name": "audio_vae",
+          "type": "COMBO",
+          "widget": {
+            "name": "audio_vae"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "label": "h3_bundle",
+          "name": "h3_bundle",
+          "type": "MINIMAX_H3_BUNDLE",
+          "links": [
+            38
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-minimaxh3-easy",
+        "ver": "4138b716fc3e2a2780487c5e9cf2e3c5903afc92",
+        "Node name for S&R": "MiniMaxH3EasyLoader",
+        "widget_ue_connectable": {
+          "fl2va_model": true,
+          "text_encoder": true,
+          "ref2va_model": true,
+          "audio_vae": true,
+          "video_vae": true
+        }
+      },
+      "widgets_values": [
+        "minimax_h3_fl2va_int8_convrot.safetensors",
+        "无",
+        "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+        "minimax_h3_video_vae_fp16.safetensors",
+        "minimax_h3_audio_vae_fp32.safetensors"
+      ],
+      "widgets_values_named": {
+        "fl2va_model": "minimax_h3_fl2va_int8_convrot.safetensors",
+        "ref2va_model": "无",
+        "text_encoder": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+        "video_vae": "minimax_h3_video_vae_fp16.safetensors",
+        "audio_vae": "minimax_h3_audio_vae_fp32.safetensors"
+      }
+    },
+    {
+      "id": 40,
+      "type": "MiniMaxH3EasyMediaLoader",
+      "pos": [
+        -898.6260375976562,
+        -803.515380859375
+      ],
+      "size": [
+        444.2850646972656,
+        365.29827880859375
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "media_state",
+          "name": "media_state",
+          "type": "STRING",
+          "widget": {
+            "name": "media_state"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "label": "media_bundle",
+          "name": "media_bundle",
+          "type": "MINIMAX_H3_MEDIA_BUNDLE",
+          "links": [
+            75
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-minimaxh3-easy",
+        "ver": "0c0580b07e334e08ce4c66e51720a7da8f7ce25d",
+        "Node name for S&R": "MiniMaxH3EasyMediaLoader",
+        "media_loader_state": "{\"images\":[],\"audios\":[],\"videos\":[]}",
+        "widget_ue_connectable": {}
+      },
+      "widgets_values": [
+        "{\"images\":[],\"audios\":[],\"videos\":[]}"
+      ],
+      "widgets_values_named": {
+        "media_state": "{\"images\":[],\"audios\":[],\"videos\":[]}"
+      }
+    },
+    {
+      "id": 51,
+      "type": "Note",
+      "pos": [
+        217.52654031318326,
+        -1944.7424141541796
+      ],
+      "size": [
+        503.5126022649388,
+        220.56720498955906
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "使用说明：把你原视频的提示词重新放进输入框并且加载好原有的参考素材点击运行即可\n该方法放大并不局限于h3生成的视频，其实是通用的，你拿seedance生成的视频来放大都行（只是提示词要按h3的形式写一下）\nlatent放大效果更好\n模型和lora大家可以自行搭配\n-------------------------------------\nInstructions: Re‑enter the prompt of your original video into the input box, load the original reference materials, and click Run.\nThis upscaling method is not limited to videos generated by h3; it is universally applicable. You can even use it to upscale videos generated by seedance (just rewrite the prompt in the h3 format).\nLatent upscaling delivers better results.\n\nB站 那颗星星188出品 \n交流QQ群 616255810"
+      ],
+      "widgets_values_named": {
+        "text": "使用说明：把你原视频的提示词重新放进输入框并且加载好原有的参考素材点击运行即可\n该方法放大并不局限于h3生成的视频，其实是通用的，你拿seedance生成的视频来放大都行（只是提示词要按h3的形式写一下）\nlatent放大效果更好\n模型和lora大家可以自行搭配\n-------------------------------------\nInstructions: Re‑enter the prompt of your original video into the input box, load the original reference materials, and click Run.\nThis upscaling method is not limited to videos generated by h3; it is universally applicable. You can even use it to upscale videos generated by seedance (just rewrite the prompt in the h3 format).\nLatent upscaling delivers better results.\n\nB站 那颗星星188出品 \n交流QQ群 616255810"
+      },
+      "color": "#432",
+      "bgcolor": "#653"
     }
   ],
   "links": [
@@ -1389,22 +2191,6 @@
       8,
       3,
       "SAMPLER"
-    ],
-    [
-      11,
-      6,
-      0,
-      7,
-      3,
-      "SIGMAS"
-    ],
-    [
-      12,
-      6,
-      0,
-      8,
-      4,
-      "SIGMAS"
     ],
     [
       13,
@@ -1447,14 +2233,6 @@
       "MODEL"
     ],
     [
-      36,
-      2,
-      0,
-      18,
-      2,
-      "MINIMAX_H3_MEDIA_BUNDLE"
-    ],
-    [
       37,
       4,
       0,
@@ -1475,14 +2253,6 @@
       18,
       0,
       13,
-      0,
-      "MODEL"
-    ],
-    [
-      40,
-      18,
-      0,
-      6,
       0,
       "MODEL"
     ],
@@ -1539,7 +2309,7 @@
       19,
       0,
       25,
-      0,
+      1,
       "COMBO"
     ],
     [
@@ -1563,7 +2333,7 @@
       25,
       0,
       29,
-      5,
+      8,
       "INT"
     ],
     [
@@ -1571,7 +2341,7 @@
       25,
       1,
       29,
-      6,
+      9,
       "INT"
     ],
     [
@@ -1653,6 +2423,30 @@
       28,
       0,
       "MODEL"
+    ],
+    [
+      75,
+      40,
+      0,
+      18,
+      2,
+      "*"
+    ],
+    [
+      92,
+      45,
+      0,
+      7,
+      3,
+      "SIGMAS"
+    ],
+    [
+      93,
+      45,
+      0,
+      8,
+      4,
+      "SIGMAS"
     ]
   ],
   "groups": [
@@ -1660,10 +2454,10 @@
       "id": 1,
       "title": "像素放大   (pixel resize)",
       "bounding": [
-        227.14556062288946,
-        -1627.4872306950795,
-        1750.8513760941696,
-        620.5096193044884
+        227.1455535888672,
+        -1627.4871826171875,
+        1750.851318359375,
+        620.5096435546875
       ],
       "color": "#A88",
       "flags": {}
@@ -1672,10 +2466,10 @@
       "id": 2,
       "title": "latent放大 (latent upscale)",
       "bounding": [
-        230.8682068177098,
-        -982.447505672761,
-        1747.8828615614343,
-        777.9758244987075
+        231.6975860595703,
+        -987.4237670898438,
+        1747.8828125,
+        777.975830078125
       ],
       "color": "#3f789e",
       "flags": {}
@@ -1683,16 +2477,24 @@
   ],
   "config": {},
   "extra": {
-    "frontendVersion": "1.49.6",
-    "VHS_latentpreview": false,
-    "VHS_latentpreviewrate": 0,
-    "VHS_MetadataImage": true,
     "VHS_KeepIntermediate": true,
+    "links_added_by_ue": [],
+    "VHS_MetadataImage": true,
+    "ue_links": [],
+    "pixaromaGroups": [],
+    "0246.VERSION": [
+      0,
+      0,
+      4
+    ],
+    "VHS_latentpreviewrate": 0,
+    "frontendVersion": "1.51.9",
+    "VHS_latentpreview": false,
     "ds": {
-      "scale": 0.6303940863128502,
+      "scale": 0.5989500000000024,
       "offset": [
-        1187.1101138975503,
-        1785.292898759128
+        1092.8943958325265,
+        2319.8437130356483
       ]
     }
   },

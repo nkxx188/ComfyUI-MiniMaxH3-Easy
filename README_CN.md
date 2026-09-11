@@ -100,6 +100,8 @@ Easy Loader → MiniMax H3 Easy → Easy Output → 采样 / 解码 / 保存
 
 Media Loader 支持从资源管理器直接拖入图片、视频和音频，也可以在单独选中该节点后使用 `Ctrl+V` 粘贴剪贴板中的媒体。拖入或粘贴的素材会自动归入对应分类。
 
+音频卡片提供低调的播放/暂停按钮，方便快速检查；视频卡片仍以缩略图预览为主。
+
 Media Loader 本身可以保存较大的素材库，实际数量限制由使用它的 Easy 或 Context Segments 节点检查。**四种方式中，只有 Media Loader 会缓存视频参考的解码结果**：同一个视频首次解码后，后续生成可通过 ComfyUI 的节点缓存直接复用，从而减少重复使用视频参考时的加载和解码时间。更换文件或文件内容变化后缓存会自动失效。直接连接 Media 口、Media Bridge 和 Media Splitter 不提供这项视频解码缓存；它节省的是生成前的视频处理时间，不会缩短模型本身的采样时间。
 
 `Media Splitter` 是 Media Loader / Media Bridge 的反向工具：把一个 `Media Bundle` 拆成标准的 `IMAGE`、`VIDEO`、`AUDIO` 输出。设置三类数量后，节点只显示对应数量的输出口；不需要的输出不会占用画布空间，适合把同一套素材分给其他 ComfyUI 工作流。
@@ -170,7 +172,7 @@ Context Segments → Segment Sample → Segment Decode → 第一采视频
 
 | 连续方式 | 作用 | 可用上下文帧数 |
 |---|---|---|
-| **Latent Guide** | 直接传递上一段的视频 latent，通常是最适合先尝试的模式 | `5 / 22 / 39 / 56 / 73` |
+| **Motion Context** | 直接传递上一段的视频 latent，通常是最适合先尝试的模式 | `5 / 22 / 39 / 56 / 73` |
 | **RGB Guide** | 将上一段尾帧作为多帧视觉 Guide 重新编码 | `5 / 22 / 39 / 56 / 73` |
 | **Soft AV Prefix** | 同时传递画面和音频前缀，并柔和释放音频边界 | `39 / 90 / 141` |
 | **Hard AV Prefix** | 严格保持画面和音频的重叠前缀 | `39 / 90 / 141` |
@@ -209,7 +211,8 @@ Segment Decode 会逐段解码并写入临时视频文件，最终输出带音�
 优化器还支持：
 
 - 可选读取已连接媒体；
-- 按生成模式加载对应的 MiniMax H3 Prompt Guide。
+- 按生成模式加载对应的 MiniMax H3 Prompt Guide；
+- 中文和 English 两种提示词语言，并分别使用对应的方案列表。中文目前提供“通用”“文戏”“动作”“广告”方案。
 
 <p align="center">
   <img src="images/prompt-editor-controls-en.png" alt="提示词优化和视图切换按钮" width="520">
@@ -242,7 +245,9 @@ API 设置随各自节点保存在工作流中，复制工作流时不需要重�
 | MiniMax H3 Easy Media Bridge | 为 API 或无头工作流提供显式媒体输入 |
 | MiniMax H3 Easy Media Splitter | 将 Media Bundle 拆成独立的 IMAGE、VIDEO 和 AUDIO 输出；最多 27 张图片、9 个视频和 9 个音频 |
 | MiniMax H3 Easy | 普通生成、参考生成与数字人 |
-| MiniMax H3 Easy Output | 将 H3 Context 展开为标准 Conditioning、Latent、VAE、FPS 和驱动音频 |
+| MiniMax H3 Easy Output | 将 H3 Context 展开为标准 Conditioning、Latent、VAE 和 FPS |
+| MiniMax H3 Easy Sample | 执行普通第一采，可选连接采样方案 |
+| MiniMax H3 Easy SelfLift Strategy | 为普通第一采或上下文分段工作流创建 SelfLift 采样方案 |
 | MiniMax H3 Easy Context Segments | 创建长视频分段计划 |
 | MiniMax H3 Easy Segment Sample | 执行分段第一采 |
 | MiniMax H3 Easy Sample Setup | 为逐段控制工作流提供一次公共采样设置 |
@@ -263,6 +268,7 @@ API 设置随各自节点保存在工作流中，复制工作流时不需要重�
 - 常规的 Segment Sample 和 Segment Refine 当前每次 Queue 都会重新执行，即使 Seed 和输入没有变化；逐段控制工作流中的 Segment Step 可以利用 ComfyUI 原生缓存复用未改变的前置分段。
 - Segment Decode 需要可用的 FFmpeg；项目会优先使用 `imageio-ffmpeg`，也支持系统 PATH 中的 FFmpeg。
 - 提示词优化是可选工具，不影响节点在未配置 API 时正常生成。
+- 如果节点内输入框的实际显示区域出现异常变宽或变窄，请安装 [ComfyUI-LegacyWidgetWidthFix](https://github.com/pekkAi-dev/ComfyUI-LegacyWidgetWidthFix)，并在工作流中放入并保留一个 `Legacy Widget Width Fix` 节点，这样修复才会生效；只安装插件不会启用修复。这是 ComfyUI 前端的问题，不是本节点的 bug。大多数用户无需处理。
 
 ## 其他说明
 
