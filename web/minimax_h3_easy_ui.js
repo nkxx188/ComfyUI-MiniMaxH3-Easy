@@ -181,6 +181,7 @@ const TEXT = {
     promptOptimizerApiUrl: ZH_BROWSER ? "API \u5730\u5740" : "API URL",
     promptOptimizerApiKey: "API Key",
     promptOptimizerModel: ZH_BROWSER ? "\u6a21\u578b\u540d" : "Model",
+    promptOptimizerLanguage: ZH_BROWSER ? "\u63d0\u793a\u8bcd\u8bed\u8a00" : "Prompt language",
     promptOptimizerSceneGuide: ZH_BROWSER ? "\u63d0\u793a\u8bcd\u65b9\u6848" : "Prompt Guide",
     promptOptimizerReadMedia: ZH_BROWSER ? "\u8bfb\u53d6\u5df2\u8fde\u63a5\u5a92\u4f53" : "Read connected media",
     promptOptimizerOptimizeOnRun: ZH_BROWSER ? "\u8fd0\u884c\u5de5\u4f5c\u6d41\u65f6\u81ea\u52a8\u4f18\u5316" : "Optimize when workflow runs",
@@ -742,7 +743,8 @@ function canonicalPromptGuide(value) {
 }
 
 function promptGuideLanguage(value) {
-    return String(value || "en").toLowerCase() === "zh" ? "zh" : "en";
+    const normalized = String(value ?? "").trim().toLowerCase();
+    return ["zh", "zh-cn", "zh_cn", "chinese", "中文"].includes(normalized) ? "zh" : "en";
 }
 
 function promptGuidesForLanguage(language) {
@@ -751,8 +753,9 @@ function promptGuidesForLanguage(language) {
 }
 
 function promptGuideOptionsForLanguage(language) {
+    const normalized = promptGuideLanguage(language);
     return Object.fromEntries(
-        promptGuidesForLanguage(language).map((item) => [item.value, ZH_BROWSER ? item.zh : item.en]),
+        promptGuidesForLanguage(normalized).map((item) => [item.value, normalized === "zh" ? item.zh : item.en]),
     );
 }
 
@@ -767,10 +770,13 @@ function canonicalPromptGuideForLanguage(value, language) {
 function localizeComboWidget(widget, node = null) {
     const name = String(widget?.name || "");
     if (name === "prompt_optimizer_scene_guide") {
-        const current = canonicalPromptGuide(widget?.value);
+        const languageWidget = node ? getWidget(node, "prompt_optimizer_language") : null;
+        const language = promptGuideLanguage(languageWidget?.value);
+        const current = canonicalPromptGuideForLanguage(widget?.value, language);
+        const options = promptGuideOptionsForLanguage(language);
         widget.options ||= {};
-        widget.options.values = PROMPT_GUIDES.map((item) => ZH_BROWSER ? item.zh : item.en);
-        widget.value = PROMPT_GUIDES.find((item) => item.value === current)?.[ZH_BROWSER ? "zh" : "en"] || widget.value;
+        widget.options.values = Object.values(options);
+        widget.value = options[current] || Object.values(options)[0] || widget.value;
         widget.__h3PromptGuideLocalized = true;
         return;
     }
@@ -1099,6 +1105,7 @@ function localizeNodeInstance(node) {
         prompt_optimizer_api_url: TEXT.promptOptimizerApiUrl,
         prompt_optimizer_api_key: TEXT.promptOptimizerApiKey,
         prompt_optimizer_model: TEXT.promptOptimizerModel,
+        prompt_optimizer_language: TEXT.promptOptimizerLanguage,
         prompt_optimizer_scene_guide: TEXT.promptOptimizerSceneGuide,
         prompt_optimizer_read_media: TEXT.promptOptimizerReadMedia,
         prompt_optimizer_optimize_on_run: TEXT.promptOptimizerOptimizeOnRun,
@@ -2793,6 +2800,10 @@ function patchGraphToPrompt() {
             promptNode.inputs.prompt_optimizer_api_url = String(getWidgetValue(node, "prompt_optimizer_api_url", "") || "");
             promptNode.inputs.prompt_optimizer_api_key = String(getWidgetValue(node, "prompt_optimizer_api_key", "") || "");
             promptNode.inputs.prompt_optimizer_model = String(getWidgetValue(node, "prompt_optimizer_model", "") || "");
+            promptNode.inputs.prompt_optimizer_language = canonicalOption(
+                "prompt_optimizer_language",
+                getWidgetValue(node, "prompt_optimizer_language", "en"),
+            );
             promptNode.inputs.prompt_optimizer_scene_guide = canonicalPromptGuide(getWidgetValue(node, "prompt_optimizer_scene_guide", "none"));
             promptNode.inputs.prompt_optimizer_read_media = asBoolean(getWidgetValue(node, "prompt_optimizer_read_media", false));
             promptNode.inputs.prompt_optimizer_optimize_on_run = asBoolean(getWidgetValue(node, "prompt_optimizer_optimize_on_run", false));
@@ -4869,6 +4880,7 @@ function promptOptimizerState(node) {
         api_url: String(widgetValue("prompt_optimizer_api_url", state.api_url || "") || ""),
         api_key: String(widgetValue("prompt_optimizer_api_key", "") || ""),
         model: String(widgetValue("prompt_optimizer_model", state.model || "") || ""),
+        language: promptGuideLanguage(widgetValue("prompt_optimizer_language", state.language || "en")),
         scene_guide: canonicalPromptGuide(widgetValue("prompt_optimizer_scene_guide", state.scene_guide || "none")),
         read_media: asBoolean(widgetValue("prompt_optimizer_read_media", state.read_media), false),
         optimize_on_run: asBoolean(widgetValue("prompt_optimizer_optimize_on_run", state.optimize_on_run), false),
@@ -4878,6 +4890,7 @@ function promptOptimizerState(node) {
         api_format: normalized.api_format,
         api_url: normalized.api_url,
         model: normalized.model,
+        language: normalized.language,
         scene_guide: normalized.scene_guide,
         read_media: normalized.read_media,
         optimize_on_run: normalized.optimize_on_run,
@@ -6337,6 +6350,7 @@ function bindPromptOptimizerWidgetCallbacks(node) {
         "prompt_optimizer_api_url",
         "prompt_optimizer_api_key",
         "prompt_optimizer_model",
+        "prompt_optimizer_language",
         "prompt_optimizer_scene_guide",
         "prompt_optimizer_read_media",
         "prompt_optimizer_optimize_on_run",
@@ -6350,9 +6364,17 @@ function bindPromptOptimizerWidgetCallbacks(node) {
         const original = widget.callback;
         widget.callback = (value) => {
             original?.call(widget, value);
-            if (name === "prompt_optimizer_scene_guide") widget.value = ZH_BROWSER
-                ? (PROMPT_GUIDES.find((item) => item.value === canonicalPromptGuide(value))?.zh || value)
-                : (PROMPT_GUIDES.find((item) => item.value === canonicalPromptGuide(value))?.en || value);
+            if (name === "prompt_optimizer_language") {
+                const language = promptGuideLanguage(value);
+                widget.value = OPTION_DEFS.prompt_optimizer_language[language] || value;
+                localizeComboWidget(getWidget(node, "prompt_optimizer_scene_guide"), node);
+            }
+            if (name === "prompt_optimizer_scene_guide") {
+                const language = promptGuideLanguage(getWidgetValue(node, "prompt_optimizer_language", "en"));
+                const guide = canonicalPromptGuideForLanguage(value, language);
+                const options = promptGuideOptionsForLanguage(language);
+                widget.value = options[guide] || Object.values(options)[0] || value;
+            }
             if (name === "context_prompt_optimizer_mode") {
                 widget.value = OPTION_DEFS.context_prompt_optimizer_mode[
                     canonicalOption("context_prompt_optimizer_mode", value)
@@ -6434,6 +6456,7 @@ function repairConfiguredWidgetValues(node, info) {
             prompt_optimizer_api_url: "",
             prompt_optimizer_api_key: "",
             prompt_optimizer_model: "",
+            prompt_optimizer_language: "en",
             prompt_optimizer_scene_guide: "none",
             prompt_optimizer_read_media: false,
             prompt_optimizer_optimize_on_run: false,
@@ -6453,12 +6476,18 @@ function repairConfiguredWidgetValues(node, info) {
             }
         }
         const apiFormat = canonicalOption("prompt_optimizer_api_format", suffix[1]);
+        const languageAt = (value) => canonicalOption("prompt_optimizer_language", value);
+        const isLanguage = (value) => Object.prototype.hasOwnProperty.call(
+            OPTION_DEFS.prompt_optimizer_language,
+            languageAt(value),
+        );
         const optimizer = {
             prompt_optimizer: defaults.prompt_optimizer,
             prompt_optimizer_api_format: defaults.prompt_optimizer_api_format,
             prompt_optimizer_api_url: defaults.prompt_optimizer_api_url,
             prompt_optimizer_api_key: defaults.prompt_optimizer_api_key,
             prompt_optimizer_model: defaults.prompt_optimizer_model,
+            prompt_optimizer_language: defaults.prompt_optimizer_language,
             prompt_optimizer_scene_guide: defaults.prompt_optimizer_scene_guide,
             prompt_optimizer_read_media: defaults.prompt_optimizer_read_media,
             prompt_optimizer_optimize_on_run: defaults.prompt_optimizer_optimize_on_run,
@@ -6469,9 +6498,23 @@ function repairConfiguredWidgetValues(node, info) {
             optimizer.prompt_optimizer_api_url = String(suffix[2] ?? "");
             optimizer.prompt_optimizer_api_key = String(suffix[3] ?? "");
             optimizer.prompt_optimizer_model = String(suffix[4] ?? "");
-            optimizer.prompt_optimizer_scene_guide = canonicalPromptGuide(suffix[5] || "none");
-            optimizer.prompt_optimizer_read_media = boolValue("prompt_optimizer_read_media", suffix[6], false);
-            optimizer.prompt_optimizer_optimize_on_run = boolValue("prompt_optimizer_optimize_on_run", suffix[7], false);
+            if (suffix.length >= 9 && isLanguage(suffix[5])) {
+                optimizer.prompt_optimizer_language = languageAt(suffix[5]);
+                optimizer.prompt_optimizer_scene_guide = canonicalPromptGuide(suffix[6] || "none");
+                optimizer.prompt_optimizer_read_media = boolValue("prompt_optimizer_read_media", suffix[7], false);
+                optimizer.prompt_optimizer_optimize_on_run = boolValue("prompt_optimizer_optimize_on_run", suffix[8], false);
+            } else {
+                // Older inline-API workflows did not have a language row.
+                optimizer.prompt_optimizer_scene_guide = canonicalPromptGuide(suffix[5] || "none");
+                optimizer.prompt_optimizer_read_media = boolValue("prompt_optimizer_read_media", suffix[6], false);
+                optimizer.prompt_optimizer_optimize_on_run = boolValue("prompt_optimizer_optimize_on_run", suffix[7], false);
+            }
+            if (isLanguage(namedValue("prompt_optimizer_language"))) {
+                optimizer.prompt_optimizer_language = languageAt(namedValue("prompt_optimizer_language"));
+            }
+            if (namedValue("prompt_optimizer_scene_guide") != null) {
+                optimizer.prompt_optimizer_scene_guide = canonicalPromptGuide(namedValue("prompt_optimizer_scene_guide"));
+            }
         } else if (suffix.length >= 2) {
             // Read the old temporary-settings layout only to preserve its
             // selected guide; the branch itself always writes inline API rows.
@@ -6508,7 +6551,8 @@ function repairConfiguredWidgetValues(node, info) {
             normalized.keyframe_role, normalized.ref_image_size, normalized.reference_mention_mode,
             normalized.prompt_optimizer, normalized.prompt_optimizer_api_format,
             normalized.prompt_optimizer_api_url, normalized.prompt_optimizer_api_key,
-            normalized.prompt_optimizer_model, normalized.prompt_optimizer_scene_guide,
+            normalized.prompt_optimizer_model, normalized.prompt_optimizer_language,
+            normalized.prompt_optimizer_scene_guide,
             normalized.prompt_optimizer_read_media, normalized.prompt_optimizer_optimize_on_run,
             normalized.context_prompt_optimizer_mode, normalized.context_prompt_optimizer_concurrency,
         ];
@@ -6558,6 +6602,7 @@ function repairConfiguredWidgetValues(node, info) {
         prompt_optimizer_api_url: "",
         prompt_optimizer_api_key: "",
         prompt_optimizer_model: "",
+        prompt_optimizer_language: "en",
         prompt_optimizer_scene_guide: "none",
         prompt_optimizer_read_media: false,
         prompt_optimizer_optimize_on_run: false,
@@ -6591,187 +6636,6 @@ function repairConfiguredWidgetValues(node, info) {
             contextOptimizerConcurrency = Math.max(1, Math.min(20, concurrencyCandidate || 3));
             suffix = suffix.slice(0, -2);
         }
-/*
-    const names = Object.keys(defaults);
-    const contextSegments = isContextSegmentsNode(node);
-    if (isSelectedVideoContextNode(node)) {
-        const selectedDefaults = {
-            mode: MODE_IMAGE,
-            prompt: "",
-            advanced: false,
-            keyframe_role: KEYFRAME_FIRST,
-            ref_image_size: REF_IMAGE_1K,
-            reference_mention_mode: "index",
-            prompt_optimizer_settings: false,
-            prompt_optimizer_scene_guide: "none",
-            segment_mode: SELECTED_VIDEO_SEGMENT_WHOLE,
-            segment_cuts: "",
-            context_length: GUIDE_CONTEXT_FRAME_GRID[0],
-            continuity_mode: CONTINUITY_LATENT,
-            context_prompt_optimizer_mode: "whole_sequence",
-            context_prompt_optimizer_concurrency: 3,
-        };
-
-        // Current selected-video schema is:
-        // mode, prompt, segment_mode, segment_cuts, context_length,
-        // continuity_mode, advanced, then the advanced controls.
-        //
-        // Some ComfyUI workflow snapshots contain an extra null placeholder
-        // after the prompt, producing:
-        // mode, prompt, null, segment_mode, segment_cuts, ...
-        // The generic Easy/context migration handles this case, but the
-        // selected-video node used to read raw positions directly. That made
-        // every field after the placeholder shift, with segment_mode falling
-        // back to whole_video and the stale mode label landing in segment_cuts.
-        const values = [...raw];
-        if (values.length < 14) return;
-
-        const named = info?.widgets_values_named && typeof info.widgets_values_named === "object"
-            ? info.widgets_values_named
-            : {};
-
-        const isSelectedSegmentMode = (value) => Object.prototype.hasOwnProperty.call(
-            OPTION_DEFS.selected_video_segment_mode,
-            canonicalOption("selected_video_segment_mode", value),
-        );
-        const placeholderAfterPrompt = values.length > 3
-            && (values[2] == null || String(values[2]).trim() === "")
-            && isSelectedSegmentMode(values[3]);
-        if (placeholderAfterPrompt) values.splice(2, 1);
-
-        const namedValue = (name) => named[name];
-        const optionValue = (widgetName, optionName, positional, fallback) => {
-            const normalize = (value) => canonicalOption(optionName, value);
-            const positionalValue = normalize(positional);
-            if (Object.prototype.hasOwnProperty.call(OPTION_DEFS[optionName], positionalValue)) {
-                return positionalValue;
-            }
-            const namedNormalized = normalize(namedValue(widgetName));
-            if (Object.prototype.hasOwnProperty.call(OPTION_DEFS[optionName], namedNormalized)) {
-                return namedNormalized;
-            }
-            return fallback;
-        };
-        const stringValue = (name, positional, fallback) => {
-            if (typeof positional === "string") return positional;
-            return typeof namedValue(name) === "string" ? namedValue(name) : fallback;
-        };
-        const strictBoolean = (value) => {
-            if (typeof value === "boolean") return value;
-            if (typeof value === "number" && Number.isFinite(value)) return value !== 0;
-            if (typeof value !== "string") return null;
-            const normalized = value.trim().toLowerCase();
-            if (["1", "true", "on", "yes"].includes(normalized)) return true;
-            if (["0", "false", "off", "no", ""].includes(normalized)) return false;
-            return null;
-        };
-        const booleanValue = (name, positional, fallback) => {
-            const parsed = strictBoolean(positional);
-            if (parsed !== null) return parsed;
-            const namedParsed = strictBoolean(namedValue(name));
-            return namedParsed === null ? fallback : namedParsed;
-        };
-        const numberValue = (name, positional, fallback) => {
-            const parsed = Number(positional);
-            if (Number.isFinite(parsed)) return parsed;
-            const namedParsed = Number(namedValue(name));
-            return Number.isFinite(namedParsed) ? namedParsed : fallback;
-        };
-
-        const selectedMode = optionValue("mode", "mode", values[0], selectedDefaults.mode);
-        const selectedSegmentMode = optionValue(
-            "segment_mode",
-            "selected_video_segment_mode",
-            values[2],
-            selectedDefaults.segment_mode,
-        );
-        const selectedContinuityMode = optionValue(
-            "continuity_mode",
-            "continuity_mode",
-            values[5],
-            selectedDefaults.continuity_mode,
-        );
-        const normalizedContinuityMode = Object.prototype.hasOwnProperty.call(OPTION_DEFS.continuity_mode, selectedContinuityMode)
-            ? selectedContinuityMode
-            : selectedDefaults.continuity_mode;
-        const selectedContextGrid = AV_CONTINUITY_MODES.has(normalizedContinuityMode)
-            ? AV_CONTEXT_FRAME_GRID
-            : GUIDE_CONTEXT_FRAME_GRID;
-        const rawContextLength = numberValue("context_length", values[4], selectedDefaults.context_length);
-        const normalizedContextLength = Number.isFinite(rawContextLength)
-            ? selectedContextGrid.reduce(
-                (best, candidate) => Math.abs(candidate - rawContextLength) < Math.abs(best - rawContextLength) ? candidate : best,
-                selectedContextGrid[0],
-            )
-            : selectedContextGrid[0];
-        const selectedValues = {
-            mode: Object.prototype.hasOwnProperty.call(OPTION_DEFS.mode, selectedMode)
-                ? selectedMode : selectedDefaults.mode,
-            prompt: stringValue("prompt", values[1], selectedDefaults.prompt),
-            keyframe_role: optionValue("keyframe_role", "keyframe_role", values[7], selectedDefaults.keyframe_role),
-            ref_image_size: optionValue("ref_image_size", "ref_image_size", values[8], selectedDefaults.ref_image_size),
-            reference_mention_mode: optionValue("reference_mention_mode", "reference_mention_mode", values[9], selectedDefaults.reference_mention_mode),
-            prompt_optimizer_settings: false,
-            prompt_optimizer_scene_guide: canonicalPromptGuide(
-                stringValue("prompt_optimizer_scene_guide", values[11], selectedDefaults.prompt_optimizer_scene_guide),
-            ),
-            segment_mode: selectedSegmentMode,
-            segment_cuts: stringValue("segment_cuts", values[3], selectedDefaults.segment_cuts),
-            context_length: normalizedContextLength,
-            continuity_mode: normalizedContinuityMode,
-            context_prompt_optimizer_mode: optionValue(
-                "context_prompt_optimizer_mode",
-                "context_prompt_optimizer_mode",
-                values[12],
-                selectedDefaults.context_prompt_optimizer_mode,
-            ),
-            context_prompt_optimizer_concurrency: Math.max(
-                1,
-                Math.min(20, numberValue(
-                    "context_prompt_optimizer_concurrency",
-                    values[13],
-                    selectedDefaults.context_prompt_optimizer_concurrency,
-                )),
-            ),
-            advanced: booleanValue("advanced", values[6], selectedDefaults.advanced),
-        };
-        // A whole-video snapshot can carry the old localized mode label in
-        // the cut-point slot. It is not a valid cut list and must not reappear
-        // when the user later switches to time/frame splitting.
-        if (selectedValues.segment_mode === SELECTED_VIDEO_SEGMENT_WHOLE
-            || isSelectedSegmentMode(selectedValues.segment_cuts)) {
-            selectedValues.segment_cuts = selectedDefaults.segment_cuts;
-        }
-        for (const name of Object.keys(selectedDefaults)) setConfiguredWidgetValue(node, name, selectedValues[name]);
-        info.widgets_values = [
-            selectedValues.mode,
-            selectedValues.prompt,
-            selectedValues.segment_mode,
-            selectedValues.segment_cuts,
-            selectedValues.context_length,
-            selectedValues.continuity_mode,
-            selectedValues.advanced,
-            selectedValues.keyframe_role,
-            selectedValues.ref_image_size,
-            selectedValues.reference_mention_mode,
-            selectedValues.prompt_optimizer_settings,
-            selectedValues.prompt_optimizer_scene_guide,
-            selectedValues.context_prompt_optimizer_mode,
-            selectedValues.context_prompt_optimizer_concurrency,
-        ];
-        info.widgets_values_named = {
-            ...(info.widgets_values_named && typeof info.widgets_values_named === "object" ? info.widgets_values_named : {}),
-            ...selectedValues,
-        };
-        return;
-    }
-    const values = raw;
-    // Context workflows saved before the audio-mode row existed have the
-    // prompt directly after mode. Normalize that in-memory before restoring
-    // the named widgets so the current workflow files remain usable.
-    if (contextSegments && !Object.prototype.hasOwnProperty.call(OPTION_DEFS.audio_mode, canonicalOption("audio_mode", values[1]))) {
-        values.splice(1, 0, CONTEXT_AUDIO_GENERATED);
-*/
     }
 
     const optimizer = {
@@ -6780,6 +6644,7 @@ function repairConfiguredWidgetValues(node, info) {
         prompt_optimizer_api_url: defaults.prompt_optimizer_api_url,
         prompt_optimizer_api_key: defaults.prompt_optimizer_api_key,
         prompt_optimizer_model: defaults.prompt_optimizer_model,
+        prompt_optimizer_language: defaults.prompt_optimizer_language,
         prompt_optimizer_scene_guide: defaults.prompt_optimizer_scene_guide,
         prompt_optimizer_read_media: defaults.prompt_optimizer_read_media,
         prompt_optimizer_optimize_on_run: defaults.prompt_optimizer_optimize_on_run,
@@ -6791,9 +6656,19 @@ function repairConfiguredWidgetValues(node, info) {
         optimizer.prompt_optimizer_api_url = String(suffix[2] ?? "");
         optimizer.prompt_optimizer_api_key = String(suffix[3] ?? "");
         optimizer.prompt_optimizer_model = String(suffix[4] ?? "");
-        optimizer.prompt_optimizer_scene_guide = canonicalPromptGuide(suffix[5] || "none");
-        optimizer.prompt_optimizer_read_media = asBoolean(suffix[6], false);
-        optimizer.prompt_optimizer_optimize_on_run = asBoolean(suffix[7], false);
+        const languageValue = canonicalOption("prompt_optimizer_language", suffix[5]);
+        if (suffix.length >= 9 && Object.prototype.hasOwnProperty.call(OPTION_DEFS.prompt_optimizer_language, languageValue)) {
+            optimizer.prompt_optimizer_language = languageValue;
+            optimizer.prompt_optimizer_scene_guide = canonicalPromptGuide(suffix[6] || "none");
+            optimizer.prompt_optimizer_read_media = asBoolean(suffix[7], false);
+            optimizer.prompt_optimizer_optimize_on_run = asBoolean(suffix[8], false);
+        } else {
+            // Workflows saved before the language selector keep the original
+            // inline-API positions; do not reinterpret their guide/booleans.
+            optimizer.prompt_optimizer_scene_guide = canonicalPromptGuide(suffix[5] || "none");
+            optimizer.prompt_optimizer_read_media = asBoolean(suffix[6], false);
+            optimizer.prompt_optimizer_optimize_on_run = asBoolean(suffix[7], false);
+        }
     } else if (suffix.length >= 2) {
         // Main-branch workflows used a temporary settings button followed by
         // Prompt Guide. Keep the selected guide while initializing inline API fields.
@@ -6842,7 +6717,8 @@ function repairConfiguredWidgetValues(node, info) {
         "mode", "prompt", "resolution", "aspect_ratio", "width", "height", "seconds",
         "advanced", "fps", "keyframe_role", "ref_image_size", "reference_mention_mode",
         "prompt_optimizer", "prompt_optimizer_api_format", "prompt_optimizer_api_url",
-        "prompt_optimizer_api_key", "prompt_optimizer_model", "prompt_optimizer_scene_guide",
+        "prompt_optimizer_api_key", "prompt_optimizer_model", "prompt_optimizer_language",
+        "prompt_optimizer_scene_guide",
         "prompt_optimizer_read_media", "prompt_optimizer_optimize_on_run",
     ];
     for (const name of commonNames) setConfiguredWidgetValue(node, name, normalized[name]);
@@ -6861,6 +6737,7 @@ function repairConfiguredWidgetValues(node, info) {
             normalized.reference_mention_mode, normalized.prompt_optimizer,
             normalized.prompt_optimizer_api_format, normalized.prompt_optimizer_api_url,
             normalized.prompt_optimizer_api_key, normalized.prompt_optimizer_model,
+            normalized.prompt_optimizer_language,
             normalized.prompt_optimizer_scene_guide, normalized.prompt_optimizer_read_media,
             normalized.prompt_optimizer_optimize_on_run, normalized.context_prompt_optimizer_mode,
             normalized.context_prompt_optimizer_concurrency,
@@ -7392,6 +7269,82 @@ function mediaLoaderHideStateWidget(widget) {
     widget.computeSize = () => [0, -4];
     setWidgetOption(widget, "hidden", true);
     setWidgetOption(widget, "canvasOnly", true);
+}
+
+// These two node installers are deliberately kept separate from the main
+// Easy-node installer.  The sampler and SelfLift nodes are standalone helper
+// nodes, so they only need label/localization and (for SelfLift) the advanced
+// widget visibility callback.  Keep the hooks idempotent because ComfyUI can
+// call onAdded/onConfigure again when a workflow tab is restored.
+function installEasySamplerNode(nodeType, nodeData) {
+    if (nodeData?.name !== EASY_SAMPLER_CLASS) return;
+    if (nodeType.prototype.__h3EasySamplerInstalled) return;
+    nodeType.prototype.__h3EasySamplerInstalled = true;
+
+    const setup = (node) => {
+        if (!node) return;
+        localizeNodeInstance(node);
+    };
+    const originalCreated = nodeType.prototype.onNodeCreated;
+    nodeType.prototype.onNodeCreated = function onNodeCreatedH3EasySampler() {
+        const result = originalCreated?.apply(this, arguments);
+        setup(this);
+        return result;
+    };
+    const originalAdded = nodeType.prototype.onAdded;
+    nodeType.prototype.onAdded = function onAddedH3EasySampler(graph) {
+        const result = originalAdded?.apply(this, arguments);
+        setup(this);
+        return result;
+    };
+    const originalConfigure = nodeType.prototype.onConfigure;
+    nodeType.prototype.onConfigure = function onConfigureH3EasySampler(info) {
+        const result = originalConfigure?.apply(this, arguments);
+        setup(this);
+        return result;
+    };
+}
+
+function installSelfLiftStrategyNode(nodeType, nodeData) {
+    if (nodeData?.name !== SELFLIFT_STRATEGY_CLASS) return;
+    if (nodeType.prototype.__h3SelfLiftStrategyInstalled) return;
+    nodeType.prototype.__h3SelfLiftStrategyInstalled = true;
+
+    const setup = (node, adjustHeight = true) => {
+        if (!node) return;
+        localizeNodeInstance(node);
+        const advanced = getWidget(node, "advanced");
+        if (advanced && !advanced.__h3SelfLiftAdvancedBound) {
+            advanced.__h3SelfLiftAdvancedBound = true;
+            const originalCallback = advanced.callback;
+            advanced.callback = function onSelfLiftAdvancedChanged(value) {
+                originalCallback?.apply(this, arguments);
+                syncSelfLiftWidgets(node);
+                repairNodeLayout(node);
+                node.setDirtyCanvas?.(true, true);
+            };
+        }
+        syncSelfLiftWidgets(node, { adjustHeight });
+    };
+
+    const originalCreated = nodeType.prototype.onNodeCreated;
+    nodeType.prototype.onNodeCreated = function onNodeCreatedH3SelfLiftStrategy() {
+        const result = originalCreated?.apply(this, arguments);
+        setup(this);
+        return result;
+    };
+    const originalAdded = nodeType.prototype.onAdded;
+    nodeType.prototype.onAdded = function onAddedH3SelfLiftStrategy(graph) {
+        const result = originalAdded?.apply(this, arguments);
+        setup(this, false);
+        return result;
+    };
+    const originalConfigure = nodeType.prototype.onConfigure;
+    nodeType.prototype.onConfigure = function onConfigureH3SelfLiftStrategy(info) {
+        const result = originalConfigure?.apply(this, arguments);
+        setup(this, false);
+        return result;
+    };
 }
 
 function formatMediaDuration(seconds) {
