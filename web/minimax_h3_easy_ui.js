@@ -5239,6 +5239,7 @@ async function optimizePromptFromEditor(node) {
             api_url: state.api_url,
             api_key: state.api_key,
             model: state.model,
+            language: state.language,
             scene_guide: state.scene_guide,
             read_media: state.read_media,
             mode: requestMode,
