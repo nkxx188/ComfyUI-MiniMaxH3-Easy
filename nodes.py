@@ -2130,7 +2130,7 @@ def _register_prompt_optimizer_route() -> bool:
             if mode == MODE_SEGMENTS and not _optimizer_media_read_allowed(resources):
                 read_media = False
             media_parts = _optimizer_media_parts(resources, api_format, resource_limit) if read_media else []
-            language = _normalize_optimizer_language(settings.get("language"))
+            language = _normalize_optimizer_language(payload.get("language"))
             system = _optimizer_system_prompt(
                 scene_guide,
                 optimizer_mode,
