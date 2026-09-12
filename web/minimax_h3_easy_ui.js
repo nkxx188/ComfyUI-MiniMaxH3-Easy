@@ -4742,6 +4742,7 @@ function syncModeWidgets(node, { adjustHeight = true } = {}) {
         setConditionalWidgetVisible(node, getWidget(node, "prompt_optimizer_api_url"), advanced && optimizerEnabled, { adjustHeight }),
         setConditionalWidgetVisible(node, getWidget(node, "prompt_optimizer_api_key"), advanced && optimizerEnabled, { adjustHeight }),
         setConditionalWidgetVisible(node, getWidget(node, "prompt_optimizer_model"), advanced && optimizerEnabled, { adjustHeight }),
+        setConditionalWidgetVisible(node, getWidget(node, "prompt_optimizer_language"), advanced && optimizerEnabled, { adjustHeight }),
         setConditionalWidgetVisible(node, getWidget(node, "prompt_optimizer_scene_guide"), advanced && optimizerEnabled, { adjustHeight }),
         setConditionalWidgetVisible(node, getWidget(node, "prompt_optimizer_read_media"), advanced && optimizerEnabled, { adjustHeight }),
         setConditionalWidgetVisible(node, getWidget(node, "prompt_optimizer_optimize_on_run"), advanced && optimizerEnabled, { adjustHeight }),
