@@ -837,8 +837,15 @@
         "1K 面积（约1MP）",
         "按序号",
         false,
-        "仅通用方案",
-        "整体优化",
+        "openai",
+        "",
+        "",
+        "",
+        "en",
+        "none",
+        false,
+        false,
+        "whole_sequence",
         3
       ],
       "widgets_values_named": {
@@ -858,10 +865,17 @@
         "keyframe_role": "首帧优先",
         "ref_image_size": "1K 面积（约1MP）",
         "reference_mention_mode": "按序号",
-        "prompt_optimizer_settings": false,
-        "prompt_optimizer_scene_guide": "仅通用方案",
-        "context_prompt_optimizer_mode": "整体优化",
-        "context_prompt_optimizer_concurrency": 3
+        "prompt_optimizer_scene_guide": "none",
+        "context_prompt_optimizer_mode": "whole_sequence",
+        "context_prompt_optimizer_concurrency": 3,
+        "prompt_optimizer": false,
+        "prompt_optimizer_api_format": "openai",
+        "prompt_optimizer_api_url": "",
+        "prompt_optimizer_api_key": "",
+        "prompt_optimizer_model": "",
+        "prompt_optimizer_language": "en",
+        "prompt_optimizer_read_media": false,
+        "prompt_optimizer_optimize_on_run": false
       }
     }
   ],

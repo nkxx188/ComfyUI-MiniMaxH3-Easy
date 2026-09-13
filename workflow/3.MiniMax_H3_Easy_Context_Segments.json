@@ -2,7 +2,7 @@
   "id": "78dafec3-eedf-45c3-9570-a322ffdb6b48",
   "revision": 0,
   "last_node_id": 13,
-  "last_link_id": 516,
+  "last_link_id": 515,
   "nodes": [
     {
       "id": 10,
@@ -16,7 +16,7 @@
         58
       ],
       "flags": {},
-      "order": 4,
+      "order": 5,
       "mode": 0,
       "inputs": [
         {
@@ -58,7 +58,7 @@
         82
       ],
       "flags": {},
-      "order": 5,
+      "order": 6,
       "mode": 0,
       "inputs": [
         {
@@ -88,11 +88,11 @@
         }
       },
       "widgets_values": [
-        "minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors",
+        "minimax_h3_fl2v_turbo_4step_v1.0_768p_comfyui_bf16.safetensors",
         1
       ],
       "widgets_values_named": {
-        "lora_name": "minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors",
+        "lora_name": "minimax_h3_fl2v_turbo_4step_v1.0_768p_comfyui_bf16.safetensors",
         "strength_model": 1
       },
       "color": "#223",
@@ -151,7 +151,7 @@
         106
       ],
       "flags": {},
-      "order": 6,
+      "order": 7,
       "mode": 0,
       "inputs": [
         {
@@ -180,13 +180,13 @@
         }
       },
       "widgets_values": [
-        "simple",
-        8,
+        "beta",
+        4,
         1
       ],
       "widgets_values_named": {
-        "scheduler": "simple",
-        "steps": 8,
+        "scheduler": "beta",
+        "steps": 4,
         "denoise": 1
       }
     },
@@ -206,7 +206,7 @@
       "mode": 0,
       "inputs": [
         {
-          "label": "FL2VA model",
+          "label": "FL2VA 模型",
           "name": "fl2va_model",
           "type": "COMBO",
           "widget": {
@@ -215,7 +215,7 @@
           "link": null
         },
         {
-          "label": "REF2VA model",
+          "label": "REF2VA 模型",
           "name": "ref2va_model",
           "type": "COMBO",
           "widget": {
@@ -224,7 +224,7 @@
           "link": null
         },
         {
-          "label": "Text encoder",
+          "label": "文本编码器",
           "name": "text_encoder",
           "type": "COMBO",
           "widget": {
@@ -233,7 +233,7 @@
           "link": null
         },
         {
-          "label": "Video VAE",
+          "label": "视频 VAE",
           "name": "video_vae",
           "type": "COMBO",
           "widget": {
@@ -242,7 +242,7 @@
           "link": null
         },
         {
-          "label": "Audio VAE",
+          "label": "音频 VAE",
           "name": "audio_vae",
           "type": "COMBO",
           "widget": {
@@ -267,14 +267,14 @@
       },
       "widgets_values": [
         "minimax_h3_fl2va_int8_convrot.safetensors",
-        "None",
+        "无",
         "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
         "minimax_h3_video_vae_fp16.safetensors",
         "minimax_h3_audio_vae_fp32.safetensors"
       ],
       "widgets_values_named": {
         "fl2va_model": "minimax_h3_fl2va_int8_convrot.safetensors",
-        "ref2va_model": "None",
+        "ref2va_model": "无",
         "text_encoder": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
         "video_vae": "minimax_h3_video_vae_fp16.safetensors",
         "audio_vae": "minimax_h3_audio_vae_fp32.safetensors"
@@ -297,7 +297,7 @@
       "inputs": [],
       "outputs": [
         {
-          "label": "Media bundle",
+          "label": "媒体包",
           "name": "media_bundle",
           "type": "MINIMAX_H3_MEDIA_BUNDLE",
           "links": [
@@ -329,11 +329,11 @@
         520
       ],
       "flags": {},
-      "order": 3,
+      "order": 4,
       "mode": 0,
       "inputs": [
         {
-          "label": "H3 model bundle",
+          "label": "H3 模型组合",
           "name": "h3_bundle",
           "type": "MINIMAX_H3_BUNDLE",
           "link": 501
@@ -382,49 +382,63 @@
         "minimax_h3_prompt_view_mode": "structured"
       },
       "widgets_values": [
-        "Context Segments",
-        "Default",
+        "上下文分段",
+        "默认",
         "\n",
         null,
-        "416P",
+        "480P",
         "16:9",
-        960,
-        544,
-        15,
-        "5,5,5",
-        5,
+        1344,
+        768,
+        900,
+        "",
+        22,
         "Motion Context",
         true,
         24,
-        "First frame priority",
-        "1K area (~1MP)",
-        "By index",
+        "首帧优先",
+        "1K 面积（约1MP）",
+        "按序号",
         false,
-        "General only",
+        "openai",
+        "",
+        "",
+        "",
+        "en",
+        "none",
+        false,
+        false,
         "Whole sequence",
         3
       ],
       "widgets_values_named": {
-        "mode": "Context Segments",
-        "audio_mode": "Default",
+        "mode": "上下文分段",
+        "audio_mode": "默认",
         "prompt": "\n",
-        "resolution": "416P",
+        "resolution": "480P",
         "aspect_ratio": "16:9",
-        "width": 960,
-        "height": 544,
-        "seconds": 15,
-        "segment_seconds": "5,5,5",
-        "context_length": 5,
+        "width": 1344,
+        "height": 768,
+        "seconds": 900,
+        "segment_seconds": "",
+        "context_length": 22,
         "continuity_mode": "Motion Context",
         "advanced": true,
         "fps": 24,
-        "keyframe_role": "First frame priority",
-        "ref_image_size": "1K area (~1MP)",
-        "reference_mention_mode": "By index",
-        "prompt_optimizer_settings": false,
-        "prompt_optimizer_scene_guide": "General only",
+        "keyframe_role": "首帧优先",
+        "ref_image_size": "1K 面积（约1MP）",
+        "reference_mention_mode": "按序号",
+        "prompt_optimizer_scene_guide": "none",
         "context_prompt_optimizer_mode": "Whole sequence",
-        "context_prompt_optimizer_concurrency": 3
+        "context_prompt_optimizer_concurrency": 3,
+        "prompt_optimizer": false,
+        "prompt_optimizer_api_format": "openai",
+        "prompt_optimizer_api_url": "",
+        "prompt_optimizer_api_key": "",
+        "prompt_optimizer_model": "",
+        "prompt_optimizer_language": "en",
+        "prompt_optimizer_read_media": false,
+        "prompt_optimizer_optimize_on_run": false
       }
     },
     {
@@ -525,7 +539,7 @@
       ],
       "size": [
         342.32578456617443,
-        142
+        186
       ],
       "flags": {},
       "order": 8,
@@ -552,23 +566,22 @@
           "link": 506
         },
         {
-          "label": "采样方案",
           "name": "sampling_plan",
           "shape": 7,
           "type": "MINIMAX_H3_SAMPLING_PLAN",
-          "link": 516
+          "link": null
         }
       ],
       "outputs": [
         {
           "name": "segments",
           "type": "MINIMAX_H3_SEGMENTS",
-        "links": [
-          514
-        ]
+          "links": [
+            509,
+            514
+          ]
         }
       ],
-      "title": "MiniMax H3 Easy 分段采样",
       "properties": {
         "cnr_id": "comfyui-minimaxh3-easy",
         "ver": "4138b716fc3e2a2780487c5e9cf2e3c5903afc92",
@@ -587,61 +600,29 @@
     },
     {
       "id": 13,
-      "type": "MiniMaxH3EasySelfLiftStrategy",
+      "type": "MarkdownNote",
       "pos": [
-        473.0,
-        -570.0
+        -1972.8762055704692,
+        -850.5349786683905
       ],
       "size": [
-        300.0,
-        154.0
+        836.141711917226,
+        1349.8374185103507
       ],
       "flags": {},
-      "order": 7,
+      "order": 3,
       "mode": 0,
       "inputs": [],
-      "outputs": [
-        {
-          "label": "采样方案",
-          "name": "sampling_plan",
-          "type": "MINIMAX_H3_SAMPLING_PLAN",
-          "links": [
-            516
-          ]
-        }
-      ],
-      "title": "MiniMax H3 Easy SelfLift",
-      "properties": {
-        "cnr_id": "comfyui-minimaxh3-easy",
-        "ver": "1658798be6a8ac004aa3a3973b29a41d3e036abc",
-        "Node name for S&R": "MiniMaxH3EasySelfLiftStrategy"
-      },
+      "outputs": [],
+      "properties": {},
       "widgets_values": [
-        5,
-        0.8,
-        "minimax_h3_latent_upscaler_3d_fp16.safetensors",
-        false,
-        1.0,
-        0.0,
-        0.5,
-        1.0,
-        "cuda",
-        "fp16",
-        true
+        "# Context Segments — Quick Guide\n\nUse **Context Segments** to generate a longer video as several connected clips.\n\n## 1. Write the segment prompts\n\nSeparate each segment with `---` on its own line.\n\nYou can also type `~` in the structured prompt editor to insert the divider.\n\n```text\nPrompt for segment 1\n\n---\n\nPrompt for segment 2\n\n---\n\nPrompt for segment 3\n```\n\n## 2. Set the segment durations\n\nEnter one duration for each segment in **Segment seconds**.\n\nFor example:\n\n```text\n5,5,5\n```\n\nThis creates three segments, each about 5 seconds long.\n\nThe number of durations must match the number of prompt segments.\n\n## 3. Assign reference media\n\nUse `@` inside a segment to select the images, videos, or audio required by that segment.\n\nReference media is not automatically shared with the next segment. If the same media is needed in multiple segments, mention it with `@` in every relevant segment.\n\n## 4. Select a continuity mode\n\n**Motion Context** is a good starting point for most videos. It passes motion information from the previous segment into the next one.\n\n## 5. Connect the workflow\n\n```text\nContext Segments → Segment Sample → Segment Decode\n```\n\n- **Segment Sample** generates all segments in sequence.\n- **Segment Decode** combines them into the final video.\n\n---\n\n# 上下文分段——快速用法\n\n使用 **上下文分段**，可以将一条长视频拆成多个相互衔接的片段生成。\n\n## 1. 编写分段提示词\n\n使用单独一行 `---` 分隔每段提示词。\n\n在结构化提示词编辑器中输入 `~`，也可以快速插入分隔线。\n\n```text\n第一段提示词\n\n---\n\n第二段提示词\n\n---\n\n第三段提示词\n```\n\n## 2. 设置每段时长\n\n在 **分段秒数** 中为每段填写一个时长。\n\n例如：\n\n```text\n5,5,5\n```\n\n这表示生成三段视频，每段约 5 秒。\n\n秒数的数量必须与提示词段数一致。\n\n## 3. 分配参考素材\n\n在对应分段中使用 `@`，选择该段需要使用的图片、视频或音频。\n\n参考素材不会自动继承到下一段。如果多段都需要使用同一份素材，需要在每个相关分段中分别使用 `@` 引用。\n\n## 4. 选择连续方式\n\n大多数情况下可以先使用 **Motion Context**。它会把上一段的运动信息传递给下一段。\n\n## 5. 连接工作流\n\n```text\n上下文分段 → 分段采样 → 分段解码\n```\n\n- **分段采样**会按照顺序生成所有片段。\n- **分段解码**会将所有片段合并为最终视频。"
       ],
       "widgets_values_named": {
-        "transition_step": 5,
-        "lowres_scale": 0.8,
-        "upscaler_model": "minimax_h3_latent_upscaler_3d_fp16.safetensors",
-        "advanced": false,
-        "cfg": 1.0,
-        "rho": 0.0,
-        "w_min": 0.5,
-        "w_max": 1.0,
-        "upscaler_device": "cuda",
-        "upscaler_precision": "fp16",
-        "upscaler_chunking": true
-      }
+        "text": "# Context Segments — Quick Guide\n\nUse **Context Segments** to generate a longer video as several connected clips.\n\n## 1. Write the segment prompts\n\nSeparate each segment with `---` on its own line.\n\nYou can also type `~` in the structured prompt editor to insert the divider.\n\n```text\nPrompt for segment 1\n\n---\n\nPrompt for segment 2\n\n---\n\nPrompt for segment 3\n```\n\n## 2. Set the segment durations\n\nEnter one duration for each segment in **Segment seconds**.\n\nFor example:\n\n```text\n5,5,5\n```\n\nThis creates three segments, each about 5 seconds long.\n\nThe number of durations must match the number of prompt segments.\n\n## 3. Assign reference media\n\nUse `@` inside a segment to select the images, videos, or audio required by that segment.\n\nReference media is not automatically shared with the next segment. If the same media is needed in multiple segments, mention it with `@` in every relevant segment.\n\n## 4. Select a continuity mode\n\n**Motion Context** is a good starting point for most videos. It passes motion information from the previous segment into the next one.\n\n## 5. Connect the workflow\n\n```text\nContext Segments → Segment Sample → Segment Decode\n```\n\n- **Segment Sample** generates all segments in sequence.\n- **Segment Decode** combines them into the final video.\n\n---\n\n# 上下文分段——快速用法\n\n使用 **上下文分段**，可以将一条长视频拆成多个相互衔接的片段生成。\n\n## 1. 编写分段提示词\n\n使用单独一行 `---` 分隔每段提示词。\n\n在结构化提示词编辑器中输入 `~`，也可以快速插入分隔线。\n\n```text\n第一段提示词\n\n---\n\n第二段提示词\n\n---\n\n第三段提示词\n```\n\n## 2. 设置每段时长\n\n在 **分段秒数** 中为每段填写一个时长。\n\n例如：\n\n```text\n5,5,5\n```\n\n这表示生成三段视频，每段约 5 秒。\n\n秒数的数量必须与提示词段数一致。\n\n## 3. 分配参考素材\n\n在对应分段中使用 `@`，选择该段需要使用的图片、视频或音频。\n\n参考素材不会自动继承到下一段。如果多段都需要使用同一份素材，需要在每个相关分段中分别使用 `@` 引用。\n\n## 4. 选择连续方式\n\n大多数情况下可以先使用 **Motion Context**。它会把上一段的运动信息传递给下一段。\n\n## 5. 连接工作流\n\n```text\n上下文分段 → 分段采样 → 分段解码\n```\n\n- **分段采样**会按照顺序生成所有片段。\n- **分段解码**会将所有片段合并为最终视频。"
+      },
+      "color": "#432",
+      "bgcolor": "#653"
     }
   ],
   "links": [
@@ -732,25 +713,17 @@
       8,
       0,
       "VIDEO"
-    ],
-    [
-      516,
-      13,
-      0,
-      6,
-      4,
-      "MINIMAX_H3_SAMPLING_PLAN"
     ]
   ],
   "groups": [],
   "config": {},
   "extra": {
-    "frontendVersion": "1.49.6",
+    "frontendVersion": "1.51.9",
     "ds": {
-      "scale": 0.8527725114535833,
+      "scale": 0.5824550996882611,
       "offset": [
-        1092.1453162378943,
-        783.8496562210476
+        1571.5253761590895,
+        1114.8210176278135
       ]
     },
     "VHS_latentpreview": false,

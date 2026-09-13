@@ -206,7 +206,6 @@ const TEXT = {
     outputVideoVae: "Video VAE",
     outputAudioVae: "Audio VAE",
     outputFps: "FPS",
-    drivingAudio: ZH_BROWSER ? "\u9a71\u52a8\u97f3\u9891" : "Driving audio",
     outputContext: "H3 Context",
     inputMedia: "Media",
     selectedVideoInput: ZH_BROWSER ? "候选视频" : "Selected video",

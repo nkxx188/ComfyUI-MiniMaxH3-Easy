@@ -813,7 +813,8 @@
         "https://zz.211b.site",
         "",
         "gpt-5.6-terra",
-        "仅通用方案",
+        "en",
+        "none",
         true,
         false
       ]

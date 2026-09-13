@@ -2479,6 +2479,9 @@ class MiniMaxH3SegmentSample:
     # can rebuild the final plan, including an optional external prompt override.
     prompt: str | None = None
     media: tuple[Any, ...] | None = None
+    # Motion Context keeps a phase-aligned slice of the sampled latent tail so
+    # the next segment can continue it without a lossy VAE round trip.
+    motion_context_tail_latent: torch.Tensor | None = None
 
 
 @dataclass(frozen=True)
@@ -3359,6 +3362,80 @@ def _selected_video_segment_boundaries(
     return boundaries
 
 
+def _motion_context_selected_video_boundaries(
+    boundaries: list[tuple[int, int]],
+    total_frames: int,
+) -> list[tuple[int, int]]:
+    """Snap selected-video interior cuts to the Motion Context latent grid.
+
+    A first clip ending at ``17k+5`` frames has a native H3 latent whose tail
+    can be sliced directly.  Every later visible body then spans ``17k``
+    frames; after its ``17m+5`` context head is added, the complete sample is
+    again ``17n+5``.  Aligning cumulative cuts, rather than rounding every
+    body independently, preserves that relationship across the whole chain.
+
+    The source beginning and ending are never moved.  An interior cut can
+    move by at most eight frames (half of the 17-frame grid); closer cuts that
+    cannot be represented without a larger change are rejected rather than
+    silently changing which prompt owns a substantial part of the video.
+    """
+    cuts = [int(end) for _start, end in boundaries[:-1]]
+    if not cuts:
+        return boundaries
+
+    total = max(5, int(total_frames))
+    candidates = list(range(5, max(5, total - 4), 17))
+    candidates = [value for value in candidates if value <= total - 5]
+    if len(candidates) < len(cuts):
+        raise ValueError(
+            "Selected-video cuts are too close for Motion Context: each interior "
+            "boundary must fit the native 17-frame latent grid"
+        )
+
+    # Dynamic programming finds the globally closest strictly increasing set
+    # of legal cuts.  This avoids two nearby desired cuts independently
+    # snapping onto the same boundary.
+    count = len(cuts)
+    inf = float("inf")
+    costs = [[inf] * len(candidates) for _ in range(count)]
+    parents = [[-1] * len(candidates) for _ in range(count)]
+    for candidate_index, candidate in enumerate(candidates):
+        costs[0][candidate_index] = abs(candidate - cuts[0])
+    for cut_index in range(1, count):
+        best_cost = inf
+        best_parent = -1
+        for candidate_index, candidate in enumerate(candidates):
+            previous_index = candidate_index - 1
+            if previous_index >= 0 and costs[cut_index - 1][previous_index] < best_cost:
+                best_cost = costs[cut_index - 1][previous_index]
+                best_parent = previous_index
+            if best_parent >= 0:
+                costs[cut_index][candidate_index] = best_cost + abs(candidate - cuts[cut_index])
+                parents[cut_index][candidate_index] = best_parent
+
+    final_index = min(range(len(candidates)), key=lambda index: costs[-1][index])
+    if not math.isfinite(costs[-1][final_index]):
+        raise ValueError("Selected-video cuts cannot be aligned to the Motion Context latent grid")
+    aligned = [0] * count
+    for cut_index in range(count - 1, -1, -1):
+        aligned[cut_index] = candidates[final_index]
+        final_index = parents[cut_index][final_index]
+
+    shifts = [abs(actual - requested) for actual, requested in zip(aligned, cuts)]
+    if any(shift > 8 for shift in shifts):
+        raise ValueError(
+            "Selected-video cuts are too close for Motion Context alignment; "
+            "increase the distance between adjacent cuts"
+        )
+
+    result = []
+    start = 0
+    for end in (*aligned, total):
+        result.append((start, int(end)))
+        start = int(end)
+    return result
+
+
 def _selected_video_prompt_parts(prompt: str, segment_count: int) -> list[str]:
     """Match a selected-video prompt to its cut count without forcing optimization.
 
@@ -3437,6 +3514,20 @@ def _frame_length(seconds: float, fps: float) -> int:
     target_frames = max(5.0, float(seconds) * float(fps))
     block_count = max(0, round((target_frames - 5) / 17))
     return block_count * 17 + 5
+
+
+def _motion_context_output_frame_length(seconds: float, fps: float, position: int) -> int:
+    """Resolve visible frames without adding a hidden warm-up.
+
+    The first segment starts at the real timeline origin and therefore keeps
+    H3's native ``17k+5`` length.  Later visible bodies use ``17k`` frames so
+    adding any supported Motion Context head (also ``17m+5``) produces a
+    complete native-length sample with no trailing alignment padding.
+    """
+    if int(position) <= 0:
+        return _frame_length(seconds, fps)
+    target_frames = max(1.0, float(seconds) * float(fps))
+    return max(17, round(target_frames / 17) * 17)
 
 
 def _segment_context_frame_count(
@@ -3760,6 +3851,20 @@ def _segment_context_keyframes_from_latent(
         })
         resolved_frame_index += int(frame_per_token[index % len(frame_per_token)])
     return guides, int(resolved_frame_index)
+
+
+def _segment_motion_context_tail_from_latent(
+    latent: torch.Tensor,
+    context_frames: int,
+) -> torch.Tensor:
+    """Slice a native, phase-aligned Motion Context tail without VAE loss."""
+    guides, _covered = _segment_context_keyframes_from_latent(latent, context_frames)
+    if not guides:
+        raise RuntimeError("Motion Context latent did not contain a usable tail")
+    return torch.cat(
+        [guide["latent"] for guide in guides],
+        dim=2,
+    ).detach().to("cpu").contiguous()
 
 
 def _segment_has_visual_reference(items: list[_MediaInput] | tuple[_MediaInput, ...] | None) -> bool:
@@ -4144,6 +4249,29 @@ def _segment_target_length(delivery_frames: int, context_frames: int = 0) -> int
     while required % 17 != 5:
         required += 1
     return required
+
+
+def _segment_stream_window(
+    head_frames: int,
+    body_frames: int,
+    stream_index: int,
+    motion_context: bool = False,
+) -> tuple[int, int]:
+    """Return a latent-stream interval for a visible segment body.
+
+    Legacy continuity modes build each body on its own ``17k+5`` grid, so
+    their existing phase-zero body size remains unchanged.  Motion Context
+    deliberately uses ``17k`` bodies after the first segment; their token
+    count must therefore be measured as ``shape(head + body) - shape(head)``
+    on the combined timeline.  This applies independently to video and audio.
+    """
+    head = max(0, int(head_frames))
+    body = max(1, int(body_frames))
+    prefix = int(h3.temporal_shape(head)[stream_index]) if head else 0
+    if bool(motion_context) and head:
+        total = int(h3.temporal_shape(head + body)[stream_index])
+        return prefix, max(1, total - prefix)
+    return prefix, int(h3.temporal_shape(body)[stream_index])
 
 
 def _segment_trim_audio(audio: Mapping[str, Any] | None, start_frames: int, delivery_frames: int) -> dict[str, Any] | None:
@@ -4887,11 +5015,21 @@ class MiniMaxH3EasySelectedVideoContext(MiniMaxH3Easy):
         frames = _normalize_video_frames(frames)
         frames = _resample_video_frames(frames, float(source_fps or h3.FPS))
         source_frame_count = max(5, int(frames.shape[0]))
+        normalized_continuity_mode = (
+            str(continuity_mode)
+            if str(continuity_mode) in CONTEXT_CONTINUITY_MODES
+            else CONTEXT_CONTINUITY_LATENT
+        )
         boundaries = _selected_video_segment_boundaries(
             source_frame_count,
             str(segment_mode or SELECTED_VIDEO_SEGMENT_WHOLE),
             segment_cuts,
         )
+        if normalized_continuity_mode == CONTEXT_CONTINUITY_LATENT and len(boundaries) > 1:
+            boundaries = _motion_context_selected_video_boundaries(
+                boundaries,
+                source_frame_count,
+            )
         segment_count = len(boundaries)
         duration_spec = ",".join(
             f"{(end - start) / float(h3.FPS):.6f}" for start, end in boundaries
@@ -4940,7 +5078,11 @@ class MiniMaxH3EasySelectedVideoContext(MiniMaxH3Easy):
                 "index": index,
                 "prompt": rewritten,
                 "seconds": output_frames / float(h3.FPS),
-                "delivery_frames": _selected_video_delivery_frames(output_frames),
+                "delivery_frames": (
+                    output_frames
+                    if normalized_continuity_mode == CONTEXT_CONTINUITY_LATENT and segment_count > 1
+                    else _selected_video_delivery_frames(output_frames)
+                ),
                 "output_frames": output_frames,
                 "source_start_frame": start,
                 "source_end_frame": end,
@@ -4954,11 +5096,7 @@ class MiniMaxH3EasySelectedVideoContext(MiniMaxH3Easy):
             "context_length": _segment_context_frame_count_for_mode(
                 context_length, continuity_mode,
             ),
-            "continuity_mode": (
-                str(continuity_mode)
-                if str(continuity_mode) in CONTEXT_CONTINUITY_MODES
-                else CONTEXT_CONTINUITY_LATENT
-            ),
+            "continuity_mode": normalized_continuity_mode,
             "audio_mode": CONTEXT_AUDIO_GENERATED,
             "source_audio": source_audio,
             "model_role": "ref2va" if uses_visual_media else "fl2va",
@@ -5132,7 +5270,11 @@ class MiniMaxH3EasyContextSegments:
                 "index": index,
                 "prompt": rewritten,
                 "seconds": seconds,
-                "delivery_frames": _frame_length(seconds, h3.FPS),
+                "delivery_frames": (
+                    _motion_context_output_frame_length(seconds, h3.FPS, index - 1)
+                    if normalized_continuity_mode == CONTEXT_CONTINUITY_LATENT
+                    else _frame_length(seconds, h3.FPS)
+                ),
                 "media": media,
             })
         plan = {
@@ -5644,7 +5786,7 @@ class MiniMaxH3EasySegmentRender:
         segment_samples = []
         tail_frames = None
         delivered_video_latent = None
-        previous_full_video_latent = None
+        previous_motion_context_tail_latent = None
         audio_reference = None
         timeline_frame = 0
 
@@ -5655,14 +5797,14 @@ class MiniMaxH3EasySegmentRender:
             # MotionContext-style continuity samples a target that starts
             # with a fresh context-sized head. The workflow discards that
             # repeated/noisy head before delivering the new segment. The head
-            # is only a temporal canvas here; latent_guide supplies the
+            # is only a temporal canvas here; Motion Context supplies the
             # previous motion exclusively through conditioning keyframes,
             # while the AV modes still use their explicit latent overlap.
             hidden_prefix_frames = context_length if position else 0
             sample_length = _segment_target_length(delivery_frames, hidden_prefix_frames)
-            # The H3 frame grid may add padding at the end of the sampled
-            # latent. Delivery below takes exactly the requested new frames
-            # after the repeated guide prefix, ignoring grid padding.
+            # Motion Context uses a native combined time grid; legacy modes
+            # and the final arbitrary selected-video interval may still carry
+            # trailing padding. Delivery always takes the requested body only.
             head_frames = hidden_prefix_frames
             prompt_text = str(shot.get("prompt") or "")
             items = list(shot.get("media") or [])
@@ -5696,10 +5838,10 @@ class MiniMaxH3EasySegmentRender:
             shot_seed = segment_seed_values[position]
             guides = []
             if (
-                previous_full_video_latent is not None
+                previous_motion_context_tail_latent is not None
                 and continuity_mode == CONTEXT_CONTINUITY_LATENT
             ):
-                guide_latent = previous_full_video_latent
+                guide_latent = previous_motion_context_tail_latent
                 if _segment_has_visual_reference(items):
                     guide_latent = _segment_apply_context_noise(
                         guide_latent,
@@ -5740,16 +5882,22 @@ class MiniMaxH3EasySegmentRender:
                 video_vae=bundle.video_vae,
             )
             video_stream, audio_stream = _segment_latent_streams(sampled)
-            video_prefix = h3.temporal_shape(head_frames)[1] if head_frames else 0
-            video_length = h3.temporal_shape(output_frames)[1]
+            video_prefix, video_length = _segment_stream_window(
+                head_frames,
+                output_frames,
+                1,
+                motion_context=continuity_mode == CONTEXT_CONTINUITY_LATENT,
+            )
             delivered_video_latent = video_stream[:, :, video_prefix:video_prefix + video_length].detach().to("cpu").contiguous()
-            # Keep the complete sampled clip for MotionContext-style latent
-            # slicing.  A context-prefixed H3 clip has a temporal token phase
-            # that must not be discarded: slicing its already-cropped body
-            # would make the next guide interpret 4-frame tokens as 1-frame
-            # tokens.  AV prefix modes intentionally continue using the
-            # delivered body below for their legacy masked handoff.
-            previous_full_video_latent = video_stream.detach().to("cpu").contiguous()
+            previous_motion_context_tail_latent = None
+            if (
+                continuity_mode == CONTEXT_CONTINUITY_LATENT
+                and position + 1 < len(shots)
+            ):
+                previous_motion_context_tail_latent = _segment_motion_context_tail_from_latent(
+                    video_stream,
+                    context_length,
+                )
 
             if continuity_mode == CONTEXT_CONTINUITY_GUIDE:
                 # RGB Guide needs the delivered tail before the next segment is sampled.
@@ -5775,6 +5923,7 @@ class MiniMaxH3EasySegmentRender:
                     output_frames=shot.get("output_frames"),
                     prompt=prompt_text,
                     media=tuple(items),
+                    motion_context_tail_latent=previous_motion_context_tail_latent,
                 )
             )
             audio_reference = (
@@ -6005,13 +6154,18 @@ class MiniMaxH3EasySegmentStep:
 
         previous_video = None
         previous_full_video = None
+        previous_motion_context_tail_latent = None
         previous_audio_reference = None
         tail_frames = None
         if previous_sample is not None:
-            # Keep both views: masked AV modes use the delivered body, while
-            # MotionContext-style latent guides must slice the complete prior
-            # sampled clip so the H3 temporal token phase is preserved.
-            previous_video, previous_audio = MiniMaxH3EasySegmentRefine._delivered_streams(previous_sample)
+            # Keep the delivered body for masked AV modes. Motion Context uses
+            # the separately cached, phase-aligned tail sliced directly from
+            # the sampled video latent.
+            previous_video, previous_audio = MiniMaxH3EasySegmentRefine._delivered_streams(
+                previous_sample,
+                motion_context=continuity_mode == CONTEXT_CONTINUITY_LATENT,
+            )
+            previous_motion_context_tail_latent = previous_sample.motion_context_tail_latent
             previous_full_latent = _segment_pack_latent(
                 previous_sample.video_latent,
                 previous_sample.audio_latent,
@@ -6032,6 +6186,12 @@ class MiniMaxH3EasySegmentStep:
                 keep = min(context_length, int(delivered.shape[0]))
                 tail_frames = delivered[-keep:].contiguous()
                 del previous_images, delivered, previous_full_latent
+            elif continuity_mode == CONTEXT_CONTINUITY_LATENT and previous_motion_context_tail_latent is None:
+                previous_motion_context_tail_latent = _segment_motion_context_tail_from_latent(
+                    previous_full_video,
+                    context_length,
+                )
+                del previous_full_latent
             else:
                 del previous_full_latent
 
@@ -6041,8 +6201,8 @@ class MiniMaxH3EasySegmentStep:
         if continuity_mode == CONTEXT_CONTINUITY_GUIDE:
             audio_context_reference = None
         guides = []
-        if previous_full_video is not None and continuity_mode == CONTEXT_CONTINUITY_LATENT:
-            guide_latent = previous_full_video
+        if previous_motion_context_tail_latent is not None and continuity_mode == CONTEXT_CONTINUITY_LATENT:
+            guide_latent = previous_motion_context_tail_latent
             if _segment_has_visual_reference(items):
                 guide_latent = _segment_apply_context_noise(
                     guide_latent,
@@ -6089,6 +6249,12 @@ class MiniMaxH3EasySegmentStep:
             video_vae=bundle.video_vae,
         )
         video_stream, audio_stream = _segment_latent_streams(sampled)
+        motion_context_tail_latent = None
+        if continuity_mode == CONTEXT_CONTINUITY_LATENT and index < len(shots):
+            motion_context_tail_latent = _segment_motion_context_tail_from_latent(
+                video_stream,
+                context_length,
+            )
         sample = MiniMaxH3SegmentSample(
             video_latent=video_stream.detach().to("cpu").contiguous(),
             audio_latent=audio_stream.detach().to("cpu").contiguous(),
@@ -6097,6 +6263,7 @@ class MiniMaxH3EasySegmentStep:
             output_frames=shot.get("output_frames"),
             prompt=prompt_text,
             media=tuple(items),
+            motion_context_tail_latent=motion_context_tail_latent,
         )
         return (MiniMaxH3SegmentStep(
             plan=plan,
@@ -6275,14 +6442,25 @@ class MiniMaxH3EasySegmentRefine:
         return torch.cat([stream, last.repeat(*repeats)], dim=time_dim).contiguous()
 
     @staticmethod
-    def _delivered_streams(sample: MiniMaxH3SegmentSample) -> tuple[torch.Tensor, torch.Tensor]:
+    def _delivered_streams(
+        sample: MiniMaxH3SegmentSample,
+        motion_context: bool = False,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         video = sample.video_latent
         audio = sample.audio_latent
-        video_prefix = h3.temporal_shape(sample.head_frames)[1] if sample.head_frames else 0
-        audio_prefix = h3.temporal_shape(sample.head_frames)[2] if sample.head_frames else 0
         output_frames = int(sample.output_frames or sample.delivery_frames)
-        video_length = h3.temporal_shape(output_frames)[1]
-        audio_length = h3.temporal_shape(output_frames)[2]
+        video_prefix, video_length = _segment_stream_window(
+            sample.head_frames,
+            output_frames,
+            1,
+            motion_context=motion_context,
+        )
+        audio_prefix, audio_length = _segment_stream_window(
+            sample.head_frames,
+            output_frames,
+            2,
+            motion_context=motion_context,
+        )
         video = video[:, :, video_prefix:video_prefix + video_length]
         audio = audio[..., audio_prefix:audio_prefix + audio_length]
         return (
@@ -6296,6 +6474,7 @@ class MiniMaxH3EasySegmentRefine:
         sample: MiniMaxH3SegmentSample,
         head_frames: int,
         delivery_frames: int,
+        motion_context: bool = False,
     ) -> torch.Tensor:
         """Keep the hidden temporal prefix while preparing a refine source.
 
@@ -6304,9 +6483,13 @@ class MiniMaxH3EasySegmentRefine:
         look like a new clip at that transform boundary.  Keep the exact
         prefix plus body here, then crop it again after the transform.
         """
-        video_prefix = h3.temporal_shape(head_frames)[1] if head_frames else 0
         output_frames = int(sample.output_frames or delivery_frames)
-        video_length = h3.temporal_shape(output_frames)[1]
+        video_prefix, video_length = _segment_stream_window(
+            head_frames,
+            output_frames,
+            1,
+            motion_context=motion_context,
+        )
         wanted = video_prefix + video_length
         return cls._fit_time_tokens(sample.video_latent, wanted, 2)
 
@@ -6316,10 +6499,15 @@ class MiniMaxH3EasySegmentRefine:
         video_latent: torch.Tensor,
         head_frames: int,
         delivery_frames: int,
+        motion_context: bool = False,
     ) -> torch.Tensor:
         """Remove the temporary refine prefix after a temporal transform."""
-        video_prefix = h3.temporal_shape(head_frames)[1] if head_frames else 0
-        video_length = h3.temporal_shape(delivery_frames)[1]
+        video_prefix, video_length = _segment_stream_window(
+            head_frames,
+            delivery_frames,
+            1,
+            motion_context=motion_context,
+        )
         video = cls._fit_time_tokens(video_latent, video_prefix + video_length, 2)
         return video[:, :, video_prefix:video_prefix + video_length].contiguous()
 
@@ -6343,6 +6531,7 @@ class MiniMaxH3EasySegmentRefine:
         latent_upscale_precision: str,
         head_frames: int,
         delivery_frames: int,
+        motion_context: bool = False,
         sampling_model=None,
     ) -> tuple[torch.Tensor, int, int]:
         base_width = int(plan["width"])
@@ -6356,7 +6545,12 @@ class MiniMaxH3EasySegmentRefine:
             if not isinstance(encoded, torch.Tensor) or encoded.ndim != 5:
                 raise RuntimeError("Segment refine pixel resize did not produce a video latent")
             return (
-                cls._crop_refine_video_body(encoded, head_frames, delivery_frames)
+                cls._crop_refine_video_body(
+                    encoded,
+                    head_frames,
+                    delivery_frames,
+                    motion_context=motion_context,
+                )
                 .detach()
                 .to("cpu")
                 .contiguous(),
@@ -6394,7 +6588,12 @@ class MiniMaxH3EasySegmentRefine:
         upscaled = result.get("samples") if isinstance(result, Mapping) else None
         if not isinstance(upscaled, torch.Tensor) or upscaled.ndim != 5:
             raise RuntimeError("H3 latent upscaler returned an invalid video latent")
-        upscaled = cls._crop_refine_video_body(upscaled, head_frames, delivery_frames)
+        upscaled = cls._crop_refine_video_body(
+            upscaled,
+            head_frames,
+            delivery_frames,
+            motion_context=motion_context,
+        )
         return upscaled.detach().to("cpu").contiguous(), int(upscaled.shape[-1]) * 16, int(upscaled.shape[-2]) * 16
 
     @staticmethod
@@ -6424,6 +6623,7 @@ class MiniMaxH3EasySegmentRefine:
         head_frames: int,
         video_body: torch.Tensor,
         audio_body: torch.Tensor,
+        motion_context: bool = False,
     ) -> dict[str, Any]:
         latent, _frame_count = h3._empty_av_latent(
             target_width, target_height, sample_length,
@@ -6431,10 +6631,18 @@ class MiniMaxH3EasySegmentRefine:
         video, audio = _segment_latent_streams(latent)
         video = video.detach().to("cpu").clone()
         audio = audio.detach().to("cpu").clone()
-        video_prefix = h3.temporal_shape(head_frames)[1] if head_frames else 0
-        audio_prefix = h3.temporal_shape(head_frames)[2] if head_frames else 0
-        video_length = h3.temporal_shape(delivery_frames)[1]
-        audio_length = h3.temporal_shape(delivery_frames)[2]
+        video_prefix, video_length = _segment_stream_window(
+            head_frames,
+            delivery_frames,
+            1,
+            motion_context=motion_context,
+        )
+        audio_prefix, audio_length = _segment_stream_window(
+            head_frames,
+            delivery_frames,
+            2,
+            motion_context=motion_context,
+        )
         video[:, :, video_prefix:video_prefix + video_length] = MiniMaxH3EasySegmentRefine._fit_time_tokens(
             video_body, video_length, 2,
         ).to(dtype=video.dtype)
@@ -6476,7 +6684,11 @@ class MiniMaxH3EasySegmentRefine:
             )
         if refine_mode != "latent_upscale":
             raise ValueError(f"Unsupported segment refine mode: {refine_mode}")
-        source_video, _source_audio = cls._delivered_streams(first_pass)
+        source_video, _source_audio = cls._delivered_streams(
+            first_pass,
+            motion_context=str(plan.get("continuity_mode") or CONTEXT_CONTINUITY_LATENT)
+            == CONTEXT_CONTINUITY_LATENT,
+        )
         scale = float(latent_upscale_scale)
         grid = 32
         latent_width = max(1, int(round(round(source_video.shape[-1] * 16 * scale / grid) * grid / 16)))
@@ -6697,6 +6909,7 @@ class MiniMaxH3EasySegmentRefine:
         continuity_mode = str(plan.get("continuity_mode") or CONTEXT_CONTINUITY_LATENT)
         if continuity_mode not in CONTEXT_CONTINUITY_MODES:
             continuity_mode = CONTEXT_CONTINUITY_LATENT
+        motion_context = continuity_mode == CONTEXT_CONTINUITY_LATENT
         context_length = _segment_context_frame_count_for_mode(
             plan.get("context_length", SEGMENT_DEFAULT_CONTEXT_FRAMES),
             continuity_mode,
@@ -6733,6 +6946,7 @@ class MiniMaxH3EasySegmentRefine:
         refined_samples = []
         previous_video = None
         previous_full_video = None
+        previous_motion_context_tail_latent = None
         previous_full_audio = None
         previous_full_head_frames = 0
         previous_full_delivery_frames = 0
@@ -6753,8 +6967,16 @@ class MiniMaxH3EasySegmentRefine:
             # crops it from the delivered segment after sampling.
             head_frames = context_length if position else 0
             sample_length = _segment_target_length(delivery_frames, head_frames)
-            _, source_audio_latent = cls._delivered_streams(first_pass)
-            source_video = cls._refine_source_video(first_pass, head_frames, delivery_frames)
+            _, source_audio_latent = cls._delivered_streams(
+                first_pass,
+                motion_context=motion_context,
+            )
+            source_video = cls._refine_source_video(
+                first_pass,
+                head_frames,
+                delivery_frames,
+                motion_context=motion_context,
+            )
             video_body, resolved_width, resolved_height = cls._prepare_video_body(
                 bundle,
                 source_video,
@@ -6768,7 +6990,8 @@ class MiniMaxH3EasySegmentRefine:
                 str(latent_upscale_precision),
                 head_frames,
                 output_frames,
-                model,
+                motion_context=motion_context,
+                sampling_model=model,
             )
 
             prompt_text = (
@@ -6808,6 +7031,7 @@ class MiniMaxH3EasySegmentRefine:
                 head_frames,
                 video_body,
                 source_audio_latent,
+                motion_context=motion_context,
             )
 
             source_audio_reference = _segment_source_audio_reference(
@@ -6835,8 +7059,8 @@ class MiniMaxH3EasySegmentRefine:
 
             shot_seed = segment_seed_values[position]
             guides = []
-            if previous_full_video is not None and continuity_mode == CONTEXT_CONTINUITY_LATENT:
-                guide_latent = previous_full_video
+            if previous_motion_context_tail_latent is not None and continuity_mode == CONTEXT_CONTINUITY_LATENT:
+                guide_latent = previous_motion_context_tail_latent
                 if _segment_has_visual_reference(items):
                     guide_latent = _segment_apply_context_noise(
                         guide_latent,
@@ -6919,12 +7143,20 @@ class MiniMaxH3EasySegmentRefine:
                 sampling_passes = 1
             completed_steps += sampling_passes * steps_per_segment
             sampled_video, _sampled_audio = _segment_latent_streams(sampled)
-            video_prefix = h3.temporal_shape(head_frames)[1] if head_frames else 0
-            video_length = h3.temporal_shape(output_frames)[1]
+            video_prefix, video_length = _segment_stream_window(
+                head_frames,
+                output_frames,
+                1,
+                motion_context=motion_context,
+            )
             delivered_video = sampled_video[:, :, video_prefix:video_prefix + video_length].detach().to("cpu").contiguous()
             input_video, input_audio = _segment_latent_streams(latent)
-            audio_prefix = h3.temporal_shape(head_frames)[2] if head_frames else 0
-            audio_length = h3.temporal_shape(output_frames)[2]
+            audio_prefix, audio_length = _segment_stream_window(
+                head_frames,
+                output_frames,
+                2,
+                motion_context=motion_context,
+            )
             refined_audio = input_audio.detach().to("cpu").clone()
             if isinstance(audio_reference, Mapping) and audio_prefix > 0:
                 reference_audio = audio_reference.get("audio_latent")
@@ -6946,6 +7178,13 @@ class MiniMaxH3EasySegmentRefine:
             else:
                 previous_tail_frames = None
 
+            motion_context_tail_latent = None
+            if continuity_mode == CONTEXT_CONTINUITY_LATENT and position + 1 < len(shots):
+                motion_context_tail_latent = _segment_motion_context_tail_from_latent(
+                    sampled_video,
+                    context_length,
+                )
+
             refined_samples.append(
                 MiniMaxH3SegmentSample(
                     video_latent=sampled_video.detach().to("cpu").contiguous(),
@@ -6955,10 +7194,12 @@ class MiniMaxH3EasySegmentRefine:
                     output_frames=shot.get("output_frames") or first_pass.output_frames,
                     prompt=first_pass.prompt if first_pass.prompt is not None else prompt_text,
                     media=first_pass.media if first_pass.media is not None else tuple(items),
+                    motion_context_tail_latent=motion_context_tail_latent,
                 )
             )
             previous_video = delivered_video
             previous_full_video = sampled_video.detach().to("cpu").contiguous()
+            previous_motion_context_tail_latent = motion_context_tail_latent
             previous_full_audio = refined_audio.detach().to("cpu").contiguous()
             previous_full_head_frames = head_frames
             previous_full_delivery_frames = delivery_frames
@@ -7005,6 +7246,7 @@ class MiniMaxH3EasySegmentDecode:
             raise ValueError("The segment result contains no delivered video frames")
 
         temp_root = folder_paths.get_temp_directory()
+        os.makedirs(temp_root, exist_ok=True)
         stream_dir = tempfile.mkdtemp(prefix="minimax_h3_segments_", dir=temp_root)
         raw_video_path = os.path.join(stream_dir, "video.mp4")
         raw_audio_path = os.path.join(stream_dir, "audio.f32le")

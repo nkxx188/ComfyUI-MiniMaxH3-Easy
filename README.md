@@ -154,11 +154,11 @@ Context Segments → Segment Sample → Segment Decode → first-pass video
 
 Regular first-pass workflow:
 
-- [`4.MiniMax_H3_Easy_Context_Segments.json`](workflow/4.MiniMax_H3_Easy_Context_Segments.json)
+- [`3.MiniMax_H3_Easy_Context_Segments.json`](workflow/3.MiniMax_H3_Easy_Context_Segments.json)
 
 ### Optional per-segment control
 
-If you only want one chain that generates every segment, use **Segment Sample**. To adjust seeds per segment, temporarily replace one segment's prompt, or optionally rerun only the affected part later, use [`7.MiniMax_H3_Easy_Context_Segments_Control.json`](workflow/7.MiniMax_H3_Easy_Context_Segments_Control.json). It connects the shared Context, Model, SAMPLER, and SIGMAS once through **MiniMax H3 Easy Sample Setup**, then chains multiple **Segment Step** nodes. The first run still generates the complete video; selective reruns are an extra capability.
+If you only want one chain that generates every segment, use **Segment Sample**. To adjust seeds per segment, temporarily replace one segment's prompt, or optionally rerun only the affected part later, use [`5.MiniMax_H3_Easy_Context_Segments_Control.json`](workflow/5.MiniMax_H3_Easy_Context_Segments_Control.json). It connects the shared Context, Model, SAMPLER, and SIGMAS once through **MiniMax H3 Easy Sample Setup**, then chains multiple **Segment Step** nodes. The first run still generates the complete video; selective reruns are an extra capability.
 
 The first Step receives Setup; later Steps only connect `Previous segment`, and the segment order is inferred from the chain. Each Step has its own seed, while `Prompt override` is optional. If it is not connected, the Step keeps using the segment prompt and `@` media from Context Segments. The example contains 3 Steps; add or remove Steps as needed.
 
@@ -192,11 +192,12 @@ Context Segments also supports Digital Human audio mode. Connect exactly one aud
 - **Pixel Resize**: decode, resize, and re-encode; no latent upscaler model is required.
 - **Latent Upscale**: use the built-in 3D latent upscaler instead of pixel resizing.
 - **Low VRAM Tile**: spatially tile the current segment to trade more sampling time for lower VRAM use.
+- Pixel Resize and Latent Upscale are now combined in one Context Segments workflow and placed in separate groups; the Latent Upscale group with the 3-step custom Sigma is enabled by default.
+- Pixel Resize no longer loads a separate second-stage model; it reuses the first-pass model directly.
 
-Example workflows:
+Example workflow (switch between the two groups as needed):
 
-- [`6.MiniMax_H3_Easy_Context_Segments_Pixel_Refine.json`](workflow/6.MiniMax_H3_Easy_Context_Segments_Pixel_Refine.json)
-- [`5.MiniMax_H3_Easy_Context_Segments_Latent_Refine.json`](workflow/5.MiniMax_H3_Easy_Context_Segments_Latent_Refine.json)
+- [`4.MiniMax_H3_Easy_Context_Segments_Refine.json`](workflow/4.MiniMax_H3_Easy_Context_Segments_Refine.json)
 
 Segment Decode decodes one segment at a time into a temporary video file and returns a complete ComfyUI `VIDEO` with audio. It does not keep the full RGB timeline in memory.
 
