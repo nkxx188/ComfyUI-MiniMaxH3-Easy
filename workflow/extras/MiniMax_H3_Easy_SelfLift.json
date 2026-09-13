@@ -644,8 +644,8 @@
         "minimax_h3_prompt_optimizer": {
           "enabled": true,
           "api_format": "openai",
-          "api_url": "https://zz.211b.site",
-          "model": "gpt-5.6-terra",
+          "api_url": "",
+          "model": "",
           "scene_guide": "none",
           "read_media": true
         }
