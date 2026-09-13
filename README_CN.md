@@ -154,11 +154,11 @@ Context Segments → Segment Sample → Segment Decode → 第一采视频
 
 普通第一采工作流：
 
-- [`4.MiniMax_H3_Easy_Context_Segments.json`](workflow/4.MiniMax_H3_Easy_Context_Segments.json)
+- [`3.MiniMax_H3_Easy_Context_Segments.json`](workflow/3.MiniMax_H3_Easy_Context_Segments.json)
 
 ### 逐段控制（可选）
 
-如果只想一条链完成所有分段，直接使用 **Segment Sample** 即可。需要逐段调整 Seed、临时替换某段提示词，或以后只重跑受影响的分段时，可使用 [`7.MiniMax_H3_Easy_Context_Segments_Control.json`](workflow/7.MiniMax_H3_Easy_Context_Segments_Control.json)。它用 **MiniMax H3 Easy Sample Setup** 接收一次公共的 Context、Model、SAMPLER 和 SIGMAS，再把多个 **Segment Step** 串联起来；第一次运行仍会完整生成，局部重跑只是额外能力。
+如果只想一条链完成所有分段，直接使用 **Segment Sample** 即可。需要逐段调整 Seed、临时替换某段提示词，或以后只重跑受影响的分段时，可使用 [`5.MiniMax_H3_Easy_Context_Segments_Control.json`](workflow/5.MiniMax_H3_Easy_Context_Segments_Control.json)。它用 **MiniMax H3 Easy Sample Setup** 接收一次公共的 Context、Model、SAMPLER 和 SIGMAS，再把多个 **Segment Step** 串联起来；第一次运行仍会完整生成，局部重跑只是额外能力。
 
 第一个 Step 接 Setup，后续 Step 只连接 `Previous segment`，分段顺序由连线自动确定。每个 Step 都有自己的 Seed，`Prompt override` 是可选输入；不连接时继续使用 Context Segments 中的分段提示词和 `@` 素材。示例工作流放了 3 个 Step，可按需要增加或减少。
 
@@ -197,7 +197,7 @@ Context Segments 也支持数字人音频模式：连接且仅连接一条音频
 
 对应示例（可在两个分组之间切换）：
 
-- [`5.MiniMax_H3_Easy_Context_Segments_Refine.json`](workflow/5.MiniMax_H3_Easy_Context_Segments_Refine.json)
+- [`4.MiniMax_H3_Easy_Context_Segments_Refine.json`](workflow/4.MiniMax_H3_Easy_Context_Segments_Refine.json)
 
 Segment Decode 会逐段解码并写入临时视频文件，最终输出带音频的完整 ComfyUI `VIDEO`，因此不需要在内存中保留整条 RGB 视频。
 
