@@ -5965,6 +5965,8 @@ class MiniMaxH3EasySegmentRender:
             if digital_human:
                 latent = _lock_audio_latent(latent, source_audio_reference["audio_latent"])
 
+            comfy.model_management.unload_all_models()
+            comfy.model_management.soft_empty_cache()
             sampled = cls._sample_one(
                 model, conditioning, latent, sampler, sigmas,
                 shot_seed, progress, position * steps_per_shot, total_steps,
