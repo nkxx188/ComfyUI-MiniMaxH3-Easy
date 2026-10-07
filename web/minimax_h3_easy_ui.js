@@ -3007,9 +3007,26 @@ function findMentionOption(options, reference, mode) {
         : null;
     if (mode === "index") return findByOrdinal();
     if (Number.isFinite(sourceId)) {
-        return options.find((item) => Number(item.sourceId) === sourceId
+        const bound = options.filter((item) => Number(item.sourceId) === sourceId
             && Number(item.sourceSlot) === sourceSlot
-            && item.type === type) || null;
+            && item.type === type);
+        // A media loader exposes several files through the same output slot.
+        // Bind its references to type-local positions in both display modes;
+        // swapping cards changes the filename and thumbnail, not the H3 tag.
+        if (bound.some((item) => item.filename)) {
+            if (Number.isFinite(ordinal) && ordinal > 0) {
+                return bound.find((item) => Number(item.ordinal) === ordinal) || null;
+            }
+            const filename = String(reference?.filename || "");
+            if (filename) return bound.find((item) => item.filename === filename) || null;
+            const fullLabel = String(reference?.fullLabel || "");
+            if (fullLabel) {
+                const named = bound.filter((item) => item.fullLabel === fullLabel);
+                return named.length === 1 ? named[0] : null;
+            }
+            return null;
+        }
+        return bound[0] || null;
     }
     // Official tags pasted before their media exists only carry a type and an
     // ordinal. In filename mode, use that ordinal once to claim the future
@@ -3107,12 +3124,15 @@ function refreshMentionPreviews() {
                 ordinal,
                 sourceId,
                 sourceSlot: Number(chip.dataset.sourceSlot) || 0,
+                filename: chip.dataset.filename || "",
+                fullLabel: chip.dataset.fullLabel || "",
             }, currentMode);
             updateMentionChip(chip, option || {
                 type: chip.dataset.mediaType || "image",
                 token: chip.dataset.token || "",
                 label: chip.dataset.label || chip.dataset.fullLabel || "",
                 fullLabel: chip.dataset.fullLabel || chip.dataset.label || "",
+                filename: chip.dataset.filename || "",
                 referenceMode: currentMode,
                 ordinal,
                 sourceId,
@@ -3148,6 +3168,7 @@ function updateMentionChip(chip, option) {
     chip.dataset.tag = nextTag;
     chip.dataset.label = nextLabel;
     chip.dataset.fullLabel = nextFullLabel;
+    if (option.filename != null) chip.dataset.filename = String(option.filename);
     chip.dataset.mediaType = option.type || chip.dataset.mediaType || "image";
     chip.dataset.referenceMode = option.referenceMode || chip.dataset.referenceMode || "index";
     chip.dataset.ordinal = Number(option.ordinal) || chip.dataset.ordinal || "";
@@ -3416,6 +3437,7 @@ function makeMentionChip(option) {
     chip.dataset.tag = option.tag || option.token || "";
     chip.dataset.label = option.label || "";
     chip.dataset.fullLabel = option.fullLabel || option.label || "";
+    chip.dataset.filename = option.filename || "";
     chip.dataset.mediaType = option.type || "image";
     chip.dataset.referenceMode = option.referenceMode || "index";
     chip.dataset.ordinal = Number(option.ordinal) || "";
@@ -3565,6 +3587,7 @@ function promptPartsFromText(node, value) {
             tag: option.tag || match.raw || option.token || "",
             label: option.label || "",
             fullLabel: option.fullLabel || option.label || "",
+            filename: option.filename || "",
             mediaType: option.type || "image",
             referenceMode: option.referenceMode || referenceMentionMode(node),
             ordinal: Number(option.ordinal) || null,
@@ -3655,6 +3678,7 @@ function serializeEditorDoc(editor) {
                 tag: item.dataset.tag || item.dataset.token || "",
                 label: item.dataset.label || "",
                 fullLabel: item.dataset.fullLabel || item.dataset.label || "",
+                filename: item.dataset.filename || "",
                 mediaType: item.dataset.mediaType || "image",
                 referenceMode: item.dataset.referenceMode || "index",
                 ordinal: Number(item.dataset.ordinal) || null,
@@ -3724,6 +3748,8 @@ function renderEditorFromNode(node, force = false) {
             ordinal: partOrdinal,
             sourceId: partSourceId,
             sourceSlot: Number(part.sourceSlot) || 0,
+            filename: part.filename || "",
+            fullLabel: part.fullLabel || "",
         }, currentMode);
         editor.append(makeMentionChip({
             type: part.mediaType || option?.type || "image",
@@ -3731,6 +3757,7 @@ function renderEditorFromNode(node, force = false) {
             tag: option?.tag || part.tag || part.token || "",
             label: option?.label || part.label || part.token || "",
             fullLabel: option?.fullLabel || part.fullLabel || part.label || part.token || "",
+            filename: option?.filename || part.filename || "",
             referenceMode: currentMode,
             ordinal: option?.ordinal ?? part.ordinal,
             sourceId: option?.sourceId ?? part.sourceId,
