@@ -7361,7 +7361,9 @@ class MiniMaxH3EasySegmentDecode:
                 "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
                 "-pix_fmt", "yuv420p", "-movflags", "+faststart", raw_video_path,
             ]
-            return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+            return subprocess.Popen(
+                args, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, shell=False
+            )
 
         try:
             for index, sample in enumerate(segments.samples, start=1):
@@ -7441,7 +7443,7 @@ class MiniMaxH3EasySegmentDecode:
                     "-c:a", "aac", "-t", f"{delivered_total / float(h3.FPS):.6f}",
                     "-movflags", "+faststart", final_video_path,
                 ]
-                mux = subprocess.run(mux_args, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                mux = subprocess.run(mux_args, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, shell=False)
                 if mux.returncode != 0:
                     detail = mux.stderr.decode("utf-8", "replace").strip()
                     raise RuntimeError(f"Streaming Context Segment audio mux failed: {detail}")
