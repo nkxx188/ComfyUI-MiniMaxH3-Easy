@@ -5965,7 +5965,18 @@ class MiniMaxH3EasySegmentRender:
             if digital_human:
                 latent = _lock_audio_latent(latent, source_audio_reference["audio_latent"])
 
-            comfy.model_management.unload_all_models()
+            # In multi-segment rendering, release the text encoder and VAE before
+            # DiT sampling so spatial-temporal attention has full VRAM headroom.
+            for component in (getattr(bundle, "clip", None), getattr(bundle, "video_vae", None)):
+                patcher = getattr(component, "patcher", component)
+                if patcher is not None:
+                    try:
+                        comfy.model_management.unload_model_and_clones(
+                            patcher,
+                            unload_additional_models=False,
+                        )
+                    except Exception:
+                        pass
             comfy.model_management.soft_empty_cache()
             sampled = cls._sample_one(
                 model, conditioning, latent, sampler, sigmas,
