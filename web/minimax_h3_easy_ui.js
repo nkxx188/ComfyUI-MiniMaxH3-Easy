@@ -7918,8 +7918,9 @@ function mediaLoaderResize(node) {
             domWidget.type = "hidden";
             fixedSize = node.computeSize?.();
         } finally {
-            domWidget.hidden = wasHidden;
+            // Restore the type first: newer frontends derive hidden state from it.
             domWidget.type = wasType;
+            domWidget.hidden = wasHidden;
         }
         if (Array.isArray(fixedSize) && typeof node.setSize === "function") {
             const width = Math.max(currentWidth, 320);
