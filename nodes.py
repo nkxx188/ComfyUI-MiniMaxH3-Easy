@@ -2181,6 +2181,11 @@ def _register_prompt_optimizer_route() -> bool:
             payload = await request.json()
             prompt = str(payload.get("prompt") or "")
             settings = _read_prompt_optimizer_config()
+            if payload.get("task") == "h3_image":
+                from .image_nodes import optimize_image_prompt
+
+                result = await asyncio.to_thread(optimize_image_prompt, payload, settings)
+                return web.json_response(result)
             api_key = str(settings.get("api_key") or "")
             api_url = str(settings.get("api_url") or "")
             model = str(settings.get("model") or "")
@@ -2648,7 +2653,7 @@ MEDIA_LOADER_GROUPS = (
     ("audio", None),
     ("video", None),
 )
-def _media_loader_normalize_state(value: Any) -> dict[str, list[dict[str, str]]]:
+def _media_loader_normalize_state(value: Any) -> dict[str, list[dict[str, Any]]]:
     """Parse the canvas-managed media list without accepting arbitrary paths."""
     result = {kind: [] for kind, _maximum in MEDIA_LOADER_GROUPS}
     if isinstance(value, str):
@@ -2677,7 +2682,10 @@ def _media_loader_normalize_state(value: Any) -> dict[str, list[dict[str, str]]]
             if normalized in seen:
                 continue
             seen.add(normalized)
-            result[kind].append({"filename": normalized})
+            entry = {"filename": normalized}
+            if isinstance(raw, Mapping) and raw.get("enabled") is False:
+                entry["enabled"] = False
+            result[kind].append(entry)
             if maximum is not None and len(result[kind]) >= maximum:
                 break
     return result
@@ -2750,7 +2758,7 @@ class MiniMaxH3EasyMediaLoader:
     FUNCTION = "load"
     RETURN_TYPES = (MEDIA_BUNDLE_TYPE,)
     RETURN_NAMES = ("media_bundle",)
-    DESCRIPTION = "Load ordered image, audio, and video references from ComfyUI input. Video components are decoded once and reused through ComfyUI's node cache."
+    DESCRIPTION = "Load enabled image, audio, and video references from ComfyUI input in their displayed order. Disabled media stays in the saved list without being loaded. Video components are reused through ComfyUI's node cache."
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -2766,6 +2774,8 @@ class MiniMaxH3EasyMediaLoader:
         signature = []
         for kind, _maximum in MEDIA_LOADER_GROUPS:
             for entry in state[kind]:
+                if entry.get("enabled") is False:
+                    continue
                 filename = entry["filename"]
                 try:
                     stat = os.stat(_media_loader_input_path(filename))
@@ -2779,6 +2789,8 @@ class MiniMaxH3EasyMediaLoader:
         state = _media_loader_normalize_state(media_state)
         for kind, _maximum in MEDIA_LOADER_GROUPS:
             for entry in state[kind]:
+                if entry.get("enabled") is False:
+                    continue
                 try:
                     _media_loader_input_path(entry["filename"])
                 except ValueError as exc:
@@ -2791,6 +2803,8 @@ class MiniMaxH3EasyMediaLoader:
         input_index = 0
         for media_type, _maximum in MEDIA_LOADER_GROUPS:
             for entry in state[media_type]:
+                if entry.get("enabled") is False:
+                    continue
                 filename = entry["filename"]
                 path = _media_loader_input_path(filename)
                 if media_type == "image":

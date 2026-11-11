@@ -1,0 +1,9 @@
+MiniMax-H3-Image is licensed under the MiniMax-H3-Image Community License Agreement, Copyright © 2026 MiniMax. All Rights Reserved.
+
+The unmodified t2i.txt and edit.txt task prompts are from:
+https://huggingface.co/MiniMaxAI/MiniMax-H3-Image-PE
+Revision: 35603d4b63949afa12cb098227fffefedf081afa
+Original paths: prompt/t2i/task_prompt.txt and prompt/edit/task_prompt.txt
+
+LICENSE is the upstream MiniMax-H3-Image Community License Agreement.
+The Easy integration adds its ComfyUI request context separately in image_nodes.py.

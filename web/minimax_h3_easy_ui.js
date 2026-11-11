@@ -2,6 +2,10 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 
 const NODE_CLASS = "MiniMaxH3Easy";
+const IMAGE_CLASS = "MiniMaxH3EasyImage";
+const IMAGE_LOADER_CLASS = "MiniMaxH3EasyImageLoader";
+const IMAGE_OUTPUT_CLASS = "MiniMaxH3EasyImageOutput";
+const IMAGE_MAX_REFERENCES = 16;
 const CONTEXT_SEGMENTS_CLASS = "MiniMaxH3EasyContextSegments";
 const SELECTED_VIDEO_CONTEXT_CLASS = "MiniMaxH3EasySelectedVideoContext";
 const LOADER_CLASS = "MiniMaxH3EasyLoader";
@@ -119,6 +123,12 @@ const CARET_SENTINEL = "\u200B";
 const AUDIO_ICON_SVG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='0.5' y='10' width='3' height='4' rx='1.5' fill='%2300e2bb'/%3E%3Crect x='5.5' y='7' width='3' height='10' rx='1.5' fill='%2300e2bb'/%3E%3Crect x='10.5' y='4' width='3' height='16' rx='1.5' fill='%2300e2bb'/%3E%3Crect x='15.5' y='7' width='3' height='10' rx='1.5' fill='%2300e2bb'/%3E%3Crect x='20.5' y='10' width='3' height='4' rx='1.5' fill='%2300e2bb'/%3E%3C/svg%3E";
 const PRIMARY_BROWSER_LANGUAGE = String(globalThis.navigator?.language || globalThis.navigator?.languages?.[0] || "");
 const ZH_BROWSER = /^(zh)(?:[-_]|$)/i.test(PRIMARY_BROWSER_LANGUAGE);
+const IMAGE_REFERENCE_SIZES = [
+    { value: "auto", zh: "\u5b98\u65b9\u7b56\u7565", en: "Official strategy" },
+    { value: "short_1k", zh: "\u77ed\u8fb9 1K", en: "1K short edge" },
+    { value: "short_1.5k", zh: "\u77ed\u8fb9 1.5K", en: "1.5K short edge" },
+    { value: "short_2k", zh: "\u77ed\u8fb9 2K", en: "2K short edge" },
+];
 const TEXT = {
     image: ZH_BROWSER ? "\u56fe\u7247" : "Image",
     video: ZH_BROWSER ? "\u89c6\u9891" : "Video",
@@ -175,6 +185,9 @@ const TEXT = {
     mediaLoaderDrop: ZH_BROWSER ? "\u91ca\u653e\u4ee5\u6dfb\u52a0\u5a92\u4f53" : "Drop to add media",
     mediaLoaderReplace: ZH_BROWSER ? "\u66ff\u6362" : "Replace",
     mediaLoaderRemove: ZH_BROWSER ? "\u5220\u9664" : "Remove",
+    mediaLoaderEnable: ZH_BROWSER ? "\u542f\u7528\u7d20\u6750" : "Enable media",
+    mediaLoaderDisable: ZH_BROWSER ? "\u505c\u7528\u7d20\u6750" : "Disable media",
+    mediaLoaderDisabled: ZH_BROWSER ? "\u5df2\u505c\u7528\uff0c\u4e0d\u53c2\u4e0e\u751f\u6210\u6216\u63d0\u793a\u8bcd\u4f18\u5316" : "Disabled; excluded from generation and prompt optimization",
     mediaLoaderPlay: ZH_BROWSER ? "\u64ad\u653e" : "Play",
     mediaLoaderPause: ZH_BROWSER ? "\u6682\u505c" : "Pause",
     mediaLoaderEmpty: ZH_BROWSER ? "\u6682\u65e0\u5a92\u4f53" : "No media",
@@ -518,8 +531,21 @@ function nodeMatchesClass(node, className, displayName, installedMarker) {
 
 function isTarget(node) {
     return nodeMatchesClass(node, NODE_CLASS, TEXT.mainTitle, "__h3EasyNodeInstalled")
+        || isImageNode(node)
         || nodeMatchesClass(node, CONTEXT_SEGMENTS_CLASS, TEXT.contextSegmentsTitle, "__h3ContextSegmentsNodeInstalled")
         || nodeMatchesClass(node, SELECTED_VIDEO_CONTEXT_CLASS, TEXT.selectedVideoContextTitle, "__h3SelectedVideoContextNodeInstalled");
+}
+
+function isImageNode(node) {
+    return nodeMatchesClass(node, IMAGE_CLASS, "MiniMax H3 Easy Image", "__h3EasyImageInstalled");
+}
+
+function isImageLoader(node) {
+    return nodeMatchesClass(node, IMAGE_LOADER_CLASS, "MiniMax H3 Easy Image Loader", "__h3EasyImageLoaderInstalled");
+}
+
+function isImageOutput(node) {
+    return nodeMatchesClass(node, IMAGE_OUTPUT_CLASS, "MiniMax H3 Easy Image Output", "__h3EasyImageOutputInstalled");
 }
 
 function isContextSegmentsNode(node) {
@@ -747,6 +773,11 @@ function trimMediaBridgeNodeDataInputs(nodeData) {
 
 function canonicalOption(name, value) {
     const raw = String(value ?? "");
+    if (name === "ref_image_size" && ["Official default", "\u5b98\u65b9\u9ed8\u8ba4", "Model default", "\u6a21\u578b\u9ed8\u8ba4"].includes(raw)) return "auto";
+    if (name === "ref_image_size") {
+        const imageSize = IMAGE_REFERENCE_SIZES.find((item) => [item.value, item.zh, item.en].includes(raw));
+        if (imageSize) return imageSize.value;
+    }
     const alias = OPTION_ALIASES[name]?.[raw];
     if (alias !== undefined) return alias;
     const definition = OPTION_DEFS[name];
@@ -789,6 +820,8 @@ function canonicalPromptGuideForLanguage(value, language) {
 
 function localizeComboWidget(widget, node = null) {
     const name = String(widget?.name || "");
+    // Image ratios need no translation; preserve the image backend's full list.
+    if (isImageNode(node) && name === "aspect_ratio") return;
     if (name === "prompt_optimizer_scene_guide") {
         const current = canonicalPromptGuide(widget?.value);
         widget.options ||= {};
@@ -800,6 +833,12 @@ function localizeComboWidget(widget, node = null) {
     let definition = name === "segment_mode"
         ? OPTION_DEFS.selected_video_segment_mode
         : OPTION_DEFS[name];
+    if (isImageNode(node) && name === "resolution") {
+        definition = { "1K": "1K", "1.5K": "1.5K", "2K": "2K", "3K": "3K", "4K": "4K", custom: OPTION_DEFS.resolution.custom };
+    }
+    if (isImageNode(node) && name === "ref_image_size") {
+        definition = Object.fromEntries(IMAGE_REFERENCE_SIZES.map((item) => [item.value, ZH_BROWSER ? item.zh : item.en]));
+    }
     if (name === "mode" && node) {
         definition = isContextSegmentsNode(node)
             ? { [MODE_SEGMENTS]: OPTION_DEFS.mode[MODE_SEGMENTS] }
@@ -838,6 +877,26 @@ function setLocalizedSlotLabel(slot, label) {
 
 function localizeNodeInstance(node) {
     if (!node) return;
+    if (isImageOutput(node)) {
+        node.title = ZH_BROWSER ? "MiniMax H3 Easy \u56fe\u7247\u8f93\u51fa" : "MiniMax H3 Easy Image Output";
+        for (const input of node.inputs || []) {
+            if (input.name === "h3_image_context") setLocalizedSlotLabel(input, "H3 Image Context");
+        }
+        const labels = { positive: TEXT.outputConditioning, negative: "Negative", latent: TEXT.outputLatent, vae: "Image VAE" };
+        for (const output of node.outputs || []) if (labels[output.name]) setLocalizedSlotLabel(output, labels[output.name]);
+        return;
+    }
+    if (isImageLoader(node)) {
+        node.title = ZH_BROWSER ? "MiniMax H3 Easy \u56fe\u7247\u6a21\u578b\u52a0\u8f7d\u5668" : "MiniMax H3 Easy Image Loader";
+        const labels = {
+            image_model: ZH_BROWSER ? "\u56fe\u7247\u4e3b\u6a21\u578b" : "Image model",
+            text_encoder: TEXT.textEncoder,
+            image_vae: ZH_BROWSER ? "\u56fe\u7247 VAE" : "Image VAE",
+        };
+        for (const widget of node.widgets || []) if (labels[widget.name]) widget.label = labels[widget.name];
+        for (const output of node.outputs || []) setLocalizedSlotLabel(output, ZH_BROWSER ? "H3 \u56fe\u7247\u6a21\u578b\u7ec4\u5408" : "H3 image bundle");
+        return;
+    }
     if (isMediaSplitter(node)) {
         node.title = TEXT.mediaSplitterTitle;
         const countLabels = {
@@ -1060,7 +1119,9 @@ function localizeNodeInstance(node) {
         return;
     }
     if (!isTarget(node)) return;
-    node.title = isContextSegmentsNode(node)
+    node.title = isImageNode(node)
+        ? (ZH_BROWSER ? "MiniMax H3 Easy \u56fe\u7247" : "MiniMax H3 Easy Image")
+        : isContextSegmentsNode(node)
         ? TEXT.contextSegmentsTitle
         : isSelectedVideoContextNode(node)
             ? TEXT.selectedVideoContextTitle
@@ -1072,10 +1133,13 @@ function localizeNodeInstance(node) {
     }
     for (const input of node.inputs || []) {
         if (input.name === "h3_bundle") setLocalizedSlotLabel(input, TEXT.bundle);
-        if (input.name === "media") setLocalizedSlotLabel(input, TEXT.inputMedia);
+        if (input.name === "h3_image_bundle") setLocalizedSlotLabel(input, ZH_BROWSER ? "H3 \u56fe\u7247\u6a21\u578b\u7ec4\u5408" : "H3 image bundle");
+        if (input.name === "media") setLocalizedSlotLabel(input, isImageNode(node) ? (ZH_BROWSER ? "\u53c2\u8003\u56fe\u7247" : "Reference images") : TEXT.inputMedia);
         if (input.name === "selected_video") setLocalizedSlotLabel(input, TEXT.selectedVideoInput);
     }
-    const outputLabels = { model: TEXT.outputModel, h3_context: TEXT.outputContext };
+    const outputLabels = isImageNode(node)
+        ? { model: TEXT.outputModel, h3_image_context: "H3 Image Context" }
+        : { model: TEXT.outputModel, h3_context: TEXT.outputContext };
     for (const output of node.outputs || []) {
         const key = String(output.name || "").toLowerCase();
         if (outputLabels[key]) setLocalizedSlotLabel(output, outputLabels[key]);
@@ -1083,6 +1147,18 @@ function localizeNodeInstance(node) {
 }
 
 function localizeNodeDefinition(nodeData) {
+    if (nodeData?.name === IMAGE_OUTPUT_CLASS) {
+        nodeData.display_name = ZH_BROWSER ? "MiniMax H3 Easy \u56fe\u7247\u8f93\u51fa" : "MiniMax H3 Easy Image Output";
+        nodeData.category = TEXT.category;
+        return;
+    }
+    if (nodeData?.name === IMAGE_CLASS || nodeData?.name === IMAGE_LOADER_CLASS) {
+        nodeData.display_name = nodeData.name === IMAGE_CLASS
+            ? (ZH_BROWSER ? "MiniMax H3 Easy \u56fe\u7247" : "MiniMax H3 Easy Image")
+            : (ZH_BROWSER ? "MiniMax H3 Easy \u56fe\u7247\u6a21\u578b\u52a0\u8f7d\u5668" : "MiniMax H3 Easy Image Loader");
+        nodeData.category = TEXT.category;
+        return;
+    }
     if (!nodeData || ![NODE_CLASS, CONTEXT_SEGMENTS_CLASS, SELECTED_VIDEO_CONTEXT_CLASS, LOADER_CLASS, ADAPTER_CLASS, MEDIA_LOADER_CLASS, MEDIA_BRIDGE_CLASS, MEDIA_SPLITTER_CLASS, OUTPUT_CLASS, EASY_SAMPLER_CLASS, SELFLIFT_STRATEGY_CLASS, SEGMENT_RENDER_CLASS, SEGMENT_SAMPLE_SETUP_CLASS, SEGMENT_STEP_CLASS, SEGMENT_COLLECT_CLASS, SEGMENT_REFINE_CLASS, SEGMENT_DECODE_CLASS].includes(nodeData.name)) return;
     nodeData.display_name = nodeData.name === LOADER_CLASS
         ? TEXT.loaderTitle
@@ -1378,13 +1454,13 @@ function updateMediaSplitterWidgets(node, options = {}) {
 }
 
 function mediaReferenceMode(node) {
-    return isReferenceMode(node) || isContextSegmentsNode(node) || isSelectedVideoContextNode(node);
+    return isImageNode(node) || isReferenceMode(node) || isContextSegmentsNode(node) || isSelectedVideoContextNode(node);
 }
 
 // Context Segments uses the same media-mention editor as reference mode, but
 // remains a separate execution mode and does not inherit reference-only UI.
 function canUseMediaMentions(node) {
-    return isReferenceMode(node) || isContextSegmentsNode(node) || isSelectedVideoContextNode(node);
+    return isImageNode(node) || isReferenceMode(node) || isContextSegmentsNode(node) || isSelectedVideoContextNode(node);
 }
 
 function isSegmentMode(node) {
@@ -1477,6 +1553,7 @@ function getMediaType(sourceType, sourceNode = null) {
 }
 
 function mediaLimits(node) {
+    if (isImageNode(node)) return { image: IMAGE_MAX_REFERENCES, video: 0, audio: 0, total: IMAGE_MAX_REFERENCES };
     if (isContextSegmentsNode(node)) {
         // The context node owns one media library for the full sequence. Each
         // prompt block selects its own H3-sized subset, so the library scales
@@ -1502,6 +1579,7 @@ function mediaLimits(node) {
 }
 
 function transportMediaLimit(node) {
+    if (isImageNode(node)) return IMAGE_MAX_REFERENCES;
     return isContextSegmentsNode(node) ? SEGMENT_MAX_MEDIA : MAX_MEDIA;
 }
 
@@ -2634,12 +2712,23 @@ function buildRuntimePrompt(node, runtimeLinks) {
     const fallback = String(promptWidget?.value || "");
     const doc = node?.properties?.[PROMPT_DOC_PROP];
     if (!Array.isArray(doc?.parts)) return fallback;
+    const loaderOptions = mediaLoaderReferenceOptions(node, true);
     return doc.parts.map((part) => {
         if (part?.type === "dialogue") return `<d>${String(part.text || "")}</d>`;
         if (part?.type !== "mention") return String(part?.text || "");
         const mediaType = String(part.mediaType || "image").toLowerCase();
+        if (loaderOptions) {
+            const option = findMentionOption(loaderOptions, part, referenceMentionMode(node));
+            if (option?.disabled) return "";
+            if (!option) return `${UNRESOLVED_REF_PREFIX}${mediaType}__`;
+            return isImageNode(node) ? option.tag : `${RUNTIME_REF_PREFIX}${option.mediaIndex}__`;
+        }
         const partSourceId = part.sourceId != null && Number.isFinite(Number(part.sourceId)) ? Number(part.sourceId) : null;
         const partOrdinal = Number(part.ordinal);
+        if (isImageNode(node) && getNativeMediaBridgeLink(node)) {
+            const option = findMentionOption(mentionOptions(node), part, referenceMentionMode(node));
+            return option?.tag || String(part.tag || part.token || "");
+        }
         let index = -1;
         if ((referenceMentionMode(node) === "index" || partSourceId == null) && Number.isFinite(partOrdinal) && partOrdinal > 0) {
             let ordinal = 0;
@@ -2747,6 +2836,20 @@ function patchGraphToPrompt() {
                 const originId = promptLink?.origin_id ?? promptLink?.originId;
                 const originSlot = promptLink?.origin_slot ?? promptLink?.originSlot ?? 0;
                 if (originId != null) promptNode.inputs.prompt = [String(originId), Number(originSlot) || 0];
+            }
+            if (isImageNode(node)) {
+                promptNode.inputs.resolution = canonicalOption("resolution", getWidgetValue(node, "resolution", "2K"));
+                promptNode.inputs.aspect_ratio = canonicalOption("aspect_ratio", getWidgetValue(node, "aspect_ratio", "1:1"));
+                preserveLinkedPromptInput(promptNode, node, "width", Number(getWidgetValue(node, "width", 2048)));
+                preserveLinkedPromptInput(promptNode, node, "height", Number(getWidgetValue(node, "height", 2048)));
+                promptNode.inputs.advanced = isAdvancedEnabled(node);
+                promptNode.inputs.ref_image_size = canonicalOption("ref_image_size", getWidgetValue(node, "ref_image_size", "auto"));
+                promptNode.inputs.reference_mention_mode = referenceMentionMode(node);
+                promptNode.inputs.prompt_optimizer_settings = false;
+                promptNode.inputs.prompt_optimizer_resources = JSON.stringify(promptOptimizerResources(node));
+                promptNode.inputs.prompt_optimizer_marker = JSON.stringify(node.properties?.[PROMPT_AUTO_MARKER_PROP] || {});
+                promptNode.inputs.prompt_optimizer_prompt_connected = hasPromptConnection;
+                continue;
             }
             promptNode.inputs.mode = canonicalOption("mode", getWidgetValue(node, "mode", MODE_IMAGE));
             if (!isSelectedVideoContextNode(node)) {
@@ -2894,12 +2997,12 @@ function sourceFilename(node, mediaType) {
 }
 
 function mediaLoaderState(node) {
-    if (!isMediaLoader(node)) return { images: [], audios: [], videos: [] };
+    if (!isMediaLoader(node)) return { images: [], audios: [], videos: [], disabled: { images: [], audios: [], videos: [] } };
     let value = getWidgetValue(node, "media_state", "");
     if (typeof value === "string") {
         try { value = JSON.parse(value || "{}"); } catch { value = {}; }
     }
-    const state = { images: [], audios: [], videos: [] };
+    const state = { images: [], audios: [], videos: [], disabled: {} };
     for (const group of MEDIA_LOADER_GROUPS) {
         const values = Array.isArray(value?.[group.key]) ? value[group.key] : [];
         const normalized = values.map((entry) => {
@@ -2908,6 +3011,9 @@ function mediaLoaderState(node) {
         }).filter((filename) => filename && !filename.split("/").includes(".."))
             .filter((filename, index, list) => list.indexOf(filename) === index);
         state[group.key] = normalized;
+        state.disabled[group.key] = values.filter((entry) => entry && typeof entry === "object" && entry.enabled === false)
+            .map((entry) => String(entry.filename || "").replaceAll("\\", "/").replace(/^\/+/, "").trim())
+            .filter((filename) => normalized.includes(filename));
     }
     return state;
 }
@@ -2918,32 +3024,42 @@ function mediaLoaderEntryUrl(filename, type) {
     return `/view?${params.toString()}`;
 }
 
-function mediaLoaderMentionOptions(source, targetNode = source) {
+function mediaLoaderMentionOptions(source, targetNode = source, includeDisabled = false) {
     source = isMediaLoader(source) ? source : null;
     if (!source) return [];
     const state = mediaLoaderState(source);
     const result = [];
     const counts = { image: 0, video: 0, audio: 0 };
+    let mediaIndex = 0;
     // Match the loader bundle's serialized order exactly. H3 still assigns
     // the official type-local Picture/Video/Audio tags downstream.
     for (const type of ["image", "audio", "video"]) {
+        if (isImageNode(targetNode) && type !== "image") continue;
         const key = `${type}s`;
-        for (const filename of state[key] || []) {
-            counts[type] += 1;
-            const ordinal = counts[type];
+        for (const [index, filename] of (state[key] || []).entries()) {
+            const disabled = state.disabled[key].includes(filename);
+            if (disabled && !includeDisabled) continue;
+            if (!disabled) { counts[type] += 1; mediaIndex += 1; }
+            const ordinal = disabled ? null : counts[type];
             const tag = promptMentionTag(type, ordinal);
             const mode = referenceMentionMode(targetNode);
             const fullLabel = filename.split(/[\\/]/).pop() || filename;
-            const label = mode === "index" ? `${LABELS[type] || type}${ordinal}` : truncateMentionLabel(fullLabel);
+            const label = mode === "index" && !disabled ? `${LABELS[type] || type}${ordinal}` : truncateMentionLabel(fullLabel);
             result.push({
                 type, tag, token: `@${mode === "index" ? label : fullLabel}`, label, fullLabel,
-                ordinal, referenceMode: mode, source: TEXT.mediaLoaderMenuTitle,
-                sourceId: Number(source.id), sourceSlot: 0, mediaIndex: result.length + 1,
+                ordinal, libraryOrdinal: index + 1, disabled, referenceMode: mode, source: TEXT.mediaLoaderMenuTitle,
+                sourceId: Number(source.id), sourceSlot: 0, mediaIndex: disabled ? null : mediaIndex,
                 previewUrl: mediaLoaderEntryUrl(filename, type), filename,
             });
         }
     }
     return result;
+}
+
+function mediaLoaderReferenceOptions(node, includeDisabled = false) {
+    const native = getNativeMediaBridgeLink(node);
+    const source = native ? app.graph?.getNodeById?.(Number(native.source_id)) : null;
+    return source && isMediaLoader(source) ? mediaLoaderMentionOptions(source, node, includeDisabled) : null;
 }
 
 function truncateMentionLabel(value, maxLength = 22) {
@@ -3003,8 +3119,21 @@ function findMentionOption(options, reference, mode) {
     const sourceId = rawSourceId == null || rawSourceId === "" ? Number.NaN : Number(rawSourceId);
     const sourceSlot = Number(reference?.sourceSlot) || 0;
     const findByOrdinal = () => Number.isFinite(ordinal) && ordinal > 0
-        ? options.find((item) => item.type === type && Number(item.ordinal) === ordinal)
+        ? options.find((item) => item.type === type && Number(item.ordinal) === ordinal && !item.disabled)
         : null;
+    if (Number(reference?.libraryOrdinal) > 0
+        || (Number.isFinite(sourceId) && isMediaLoader(app.graph?.getNodeById?.(sourceId)))) {
+        const bound = options.filter((item) => item.type === type && Number(item.libraryOrdinal) > 0);
+        // Keep the existing position-based swap behavior, but anchor to the
+        // full library position so disabling an earlier item cannot retarget @.
+        // Use the connected loader's options, not an obsolete loader id after
+        // reconnecting the media input (the old node may still be on canvas).
+        const libraryOrdinal = Number(reference?.libraryOrdinal) || ordinal;
+        if (Number.isFinite(libraryOrdinal) && libraryOrdinal > 0) {
+            return bound.find((item) => Number(item.libraryOrdinal) === libraryOrdinal) || null;
+        }
+        return bound.find((item) => item.filename === reference?.filename) || null;
+    }
     if (mode === "index") return findByOrdinal();
     if (Number.isFinite(sourceId)) {
         const bound = options.filter((item) => Number(item.sourceId) === sourceId
@@ -3115,13 +3244,15 @@ function refreshMentionPreviews() {
             continue;
         }
         const options = mentionOptions(node);
+        const chipOptions = mediaLoaderReferenceOptions(node, true) || options;
         const currentMode = referenceMentionMode(node);
         for (const chip of node.__h3Editor?.querySelectorAll?.(".h3-mention-chip") || []) {
             const sourceId = chip.dataset.sourceId ? Number(chip.dataset.sourceId) : null;
             const ordinal = Number(chip.dataset.ordinal) || null;
-            const option = findMentionOption(options, {
+            const option = findMentionOption(chipOptions, {
                 mediaType: chip.dataset.mediaType || "image",
                 ordinal,
+                libraryOrdinal: Number(chip.dataset.libraryOrdinal) || null,
                 sourceId,
                 sourceSlot: Number(chip.dataset.sourceSlot) || 0,
                 filename: chip.dataset.filename || "",
@@ -3135,6 +3266,7 @@ function refreshMentionPreviews() {
                 filename: chip.dataset.filename || "",
                 referenceMode: currentMode,
                 ordinal,
+                libraryOrdinal: Number(chip.dataset.libraryOrdinal) || null,
                 sourceId,
                 sourceSlot: Number(chip.dataset.sourceSlot) || 0,
                 previewUrl: "",
@@ -3158,12 +3290,13 @@ function refreshMentionPreviews() {
 function updateMentionChip(chip, option) {
     if (!chip || !option) return;
     const nextToken = option.token || option.tag || chip.dataset.token || "";
-    const nextTag = option.tag || chip.dataset.tag || nextToken;
+    const nextTag = option.disabled ? "" : option.tag || chip.dataset.tag || nextToken;
     const nextLabel = option.label || chip.dataset.label || nextToken;
     const nextFullLabel = option.fullLabel || nextLabel;
     const nextPreviewUrl = option.previewUrl || "";
     chip.classList.toggle("is-pending", Boolean(option.pending));
     chip.classList.toggle("is-unresolved", Boolean(option.unresolved) && !option.pending);
+    chip.classList.toggle("is-disabled", Boolean(option.disabled));
     chip.dataset.token = nextToken;
     chip.dataset.tag = nextTag;
     chip.dataset.label = nextLabel;
@@ -3171,13 +3304,14 @@ function updateMentionChip(chip, option) {
     if (option.filename != null) chip.dataset.filename = String(option.filename);
     chip.dataset.mediaType = option.type || chip.dataset.mediaType || "image";
     chip.dataset.referenceMode = option.referenceMode || chip.dataset.referenceMode || "index";
-    chip.dataset.ordinal = Number(option.ordinal) || chip.dataset.ordinal || "";
-    chip.dataset.mediaIndex = Number(option.mediaIndex) || chip.dataset.mediaIndex || "";
+    chip.dataset.ordinal = option.disabled ? "" : Number(option.ordinal) || chip.dataset.ordinal || "";
+    chip.dataset.libraryOrdinal = Number(option.libraryOrdinal) || chip.dataset.libraryOrdinal || "";
+    chip.dataset.mediaIndex = option.disabled ? "" : Number(option.mediaIndex) || chip.dataset.mediaIndex || "";
     chip.dataset.pendingReference = option.pending ? "true" : "";
     if (option.sourceId != null) chip.dataset.sourceId = String(option.sourceId);
     if (option.sourceSlot != null) chip.dataset.sourceSlot = String(Number(option.sourceSlot) || 0);
     chip.dataset.previewUrl = nextPreviewUrl;
-    chip.title = option.pending
+    chip.title = option.disabled ? `${TEXT.mediaLoaderDisabled}: ${nextFullLabel}` : option.pending
         ? (ZH_BROWSER ? "\u7b49\u5f85\u8fde\u63a5\u5bf9\u5e94\u5e8f\u53f7\u7684\u5a92\u4f53\u7d20\u6750" : "Waiting for media with the matching index")
         : option.unresolved
             ? (ZH_BROWSER ? "\u5df2\u65ad\u5f00\uff1a\u8bf7\u91cd\u65b0\u8fde\u63a5\u6216\u5220\u9664\u8be5\u5f15\u7528" : "Disconnected: reconnect or remove this reference")
@@ -3432,21 +3566,23 @@ function makeMentionThumb(option, menu = false) {
 function makeMentionChip(option) {
     const chip = document.createElement("span");
     chip.className = `h3-mention-chip${option.pending ? " is-pending" : option.unresolved ? " is-unresolved" : ""}`;
+    chip.classList.toggle("is-disabled", Boolean(option.disabled));
     chip.contentEditable = "false";
     chip.dataset.token = option.token || option.tag || "";
-    chip.dataset.tag = option.tag || option.token || "";
+    chip.dataset.tag = option.disabled ? "" : option.tag || option.token || "";
     chip.dataset.label = option.label || "";
     chip.dataset.fullLabel = option.fullLabel || option.label || "";
     chip.dataset.filename = option.filename || "";
     chip.dataset.mediaType = option.type || "image";
     chip.dataset.referenceMode = option.referenceMode || "index";
     chip.dataset.ordinal = Number(option.ordinal) || "";
+    chip.dataset.libraryOrdinal = Number(option.libraryOrdinal) || "";
     chip.dataset.mediaIndex = Number(option.mediaIndex) || "";
     chip.dataset.sourceId = option.sourceId != null ? String(option.sourceId) : "";
     chip.dataset.sourceSlot = String(option.sourceSlot || 0);
     chip.dataset.previewUrl = option.previewUrl || "";
     chip.dataset.pendingReference = option.pending ? "true" : "";
-    chip.title = option.pending
+    chip.title = option.disabled ? `${TEXT.mediaLoaderDisabled}: ${option.fullLabel || option.label || ""}` : option.pending
         ? (ZH_BROWSER ? "\u7b49\u5f85\u8fde\u63a5\u5bf9\u5e94\u5e8f\u53f7\u7684\u5a92\u4f53\u7d20\u6750" : "Waiting for media with the matching index")
         : option.unresolved
             ? (ZH_BROWSER ? "\u5df2\u65ad\u5f00\uff1a\u8bf7\u91cd\u65b0\u8fde\u63a5\u6216\u5220\u9664\u8be5\u5f15\u7528" : "Disconnected: reconnect or remove this reference")
@@ -3549,7 +3685,7 @@ function promptDocTextFromParts(parts) {
     return (Array.isArray(parts) ? parts : []).map((part) => promptTextFromPart(part)).join("");
 }
 
-function promptPartsFromText(node, value) {
+function promptPartsFromText(node, value, includeDisabled = false) {
     const text = String(value || "");
     const parts = [];
     const pushText = (chunk) => {
@@ -3560,9 +3696,9 @@ function promptPartsFromText(node, value) {
     };
     let plainStart = 0;
     let cursor = 0;
-    const candidates = pastedMentionCandidates(node);
+    const candidates = pastedMentionCandidates(node, includeDisabled);
     while (cursor < text.length) {
-        const dialogueMatch = text.slice(cursor).match(/^<d>([\s\S]*?)<\/d>/i);
+        const dialogueMatch = !isImageNode(node) && text.slice(cursor).match(/^<d>([\s\S]*?)<\/d>/i);
         const match = dialogueMatch ? {
             raw: dialogueMatch[0],
             kind: "dialogue",
@@ -3591,6 +3727,7 @@ function promptPartsFromText(node, value) {
             mediaType: option.type || "image",
             referenceMode: option.referenceMode || referenceMentionMode(node),
             ordinal: Number(option.ordinal) || null,
+            libraryOrdinal: Number(option.libraryOrdinal) || null,
             mediaIndex: Number(option.mediaIndex) || null,
             sourceId: option.sourceId != null ? Number(option.sourceId) : null,
             sourceSlot: Number(option.sourceSlot) || 0,
@@ -3638,7 +3775,7 @@ function serializeRawPromptDoc(node, editor) {
     return {
         version: 1,
         text,
-        parts: promptPartsFromText(node, text),
+        parts: promptPartsFromText(node, text, true),
     };
 }
 
@@ -3682,6 +3819,7 @@ function serializeEditorDoc(editor) {
                 mediaType: item.dataset.mediaType || "image",
                 referenceMode: item.dataset.referenceMode || "index",
                 ordinal: Number(item.dataset.ordinal) || null,
+                libraryOrdinal: Number(item.dataset.libraryOrdinal) || null,
                 mediaIndex: Number(item.dataset.mediaIndex) || null,
                 sourceId: item.dataset.sourceId ? Number(item.dataset.sourceId) : null,
                 sourceSlot: Number(item.dataset.sourceSlot) || 0,
@@ -3727,13 +3865,15 @@ function renderEditorFromNode(node, force = false) {
         return;
     }
     if (!Array.isArray(doc?.parts)) {
-        appendPromptTextWithDialogueBlocks(editor, String(widget.value || ""));
+        if (isImageNode(node)) appendTextWithBreaks(editor, String(widget.value || ""));
+        else appendPromptTextWithDialogueBlocks(editor, String(widget.value || ""));
         return;
     }
-    const live = mentionOptions(node);
+    const live = mediaLoaderReferenceOptions(node, true) || mentionOptions(node);
     for (const part of doc.parts) {
         if (part?.type === "dialogue") {
-            appendDialogueBlock(editor, String(part.text || ""));
+            if (isImageNode(node)) appendTextWithBreaks(editor, `<d>${String(part.text || "")}</d>`);
+            else appendDialogueBlock(editor, String(part.text || ""));
             continue;
         }
         if (part?.type !== "mention") {
@@ -3746,6 +3886,7 @@ function renderEditorFromNode(node, force = false) {
         const option = findMentionOption(live, {
             mediaType: part.mediaType || "image",
             ordinal: partOrdinal,
+            libraryOrdinal: part.libraryOrdinal,
             sourceId: partSourceId,
             sourceSlot: Number(part.sourceSlot) || 0,
             filename: part.filename || "",
@@ -3760,10 +3901,12 @@ function renderEditorFromNode(node, force = false) {
             filename: option?.filename || part.filename || "",
             referenceMode: currentMode,
             ordinal: option?.ordinal ?? part.ordinal,
+            libraryOrdinal: option?.libraryOrdinal ?? part.libraryOrdinal,
             sourceId: option?.sourceId ?? part.sourceId,
             sourceSlot: option?.sourceSlot ?? part.sourceSlot ?? 0,
             previewUrl: option?.previewUrl || "",
             unresolved: !option,
+            disabled: Boolean(option?.disabled),
             pending: !option && partSourceId == null && partOrdinal != null,
         }));
     }
@@ -4111,6 +4254,7 @@ function exitDialogueBlock(node, editor, block) {
 }
 
 function insertDialogueBlockAtSelection(node, editor) {
+    if (isImageNode(node)) return false;
     const selection = window.getSelection?.();
     if (!selection || !selection.rangeCount || !editor) return false;
     const range = selection.getRangeAt(0);
@@ -4719,6 +4863,14 @@ function syncSegmentSummary(node) {
 function promptTextForOptimizer(node) {
     const doc = node?.properties?.[PROMPT_DOC_PROP];
     if (Array.isArray(doc?.parts)) {
+        const loaderOptions = mediaLoaderReferenceOptions(node, true);
+        if (loaderOptions) {
+            return doc.parts.map((part) => {
+                if (part?.type !== "mention") return promptTextFromPart(part);
+                const option = findMentionOption(loaderOptions, part, referenceMentionMode(node));
+                return option?.disabled ? "" : option?.tag || promptTextFromPart(part);
+            }).join("");
+        }
         return promptDocTextFromParts(doc.parts);
     }
     return String(getWidget(node, "prompt")?.value || "");
@@ -4770,7 +4922,7 @@ function syncModeWidgets(node, { adjustHeight = true } = {}) {
         setConditionalWidgetVisible(node, getWidget(node, "fps"), advanced && !segmentContextNode, { adjustHeight }),
         setConditionalWidgetVisible(node, getWidget(node, "keyframe_role"), advanced && !isReferenceMode(node) && !segmentContextNode, { adjustHeight }),
         setConditionalWidgetVisible(node, getWidget(node, "ref_image_size"), advanced, { adjustHeight }),
-        setConditionalWidgetVisible(node, getWidget(node, "reference_mention_mode"), advanced && isReferenceMode(node), { adjustHeight }),
+        setConditionalWidgetVisible(node, getWidget(node, "reference_mention_mode"), advanced && (isImageNode(node) || isReferenceMode(node)), { adjustHeight }),
         setConditionalWidgetVisible(node, getWidget(node, "aspect_ratio"), !isCustomResolution(node), { adjustHeight }),
         setConditionalWidgetVisible(node, getWidget(node, "width"), isCustomResolution(node), { adjustHeight }),
         setConditionalWidgetVisible(node, getWidget(node, "height"), isCustomResolution(node), { adjustHeight }),
@@ -5135,6 +5287,7 @@ function makePromptOptimizerSwitch(initialValue) {
 }
 
 async function openPromptOptimizerSettings(node) {
+    const imageTask = isImageNode(node);
     if (promptOptimizerSettingsModal) {
         promptOptimizerSettingsModal.dialog?.querySelector?.("input, button")?.focus?.();
         return;
@@ -5239,7 +5392,7 @@ async function openPromptOptimizerSettings(node) {
     apiFormat.addEventListener("change", syncOllamaUnloadVisibility);
     syncOllamaUnloadVisibility();
     form.append(
-        makePromptOptimizerSettingsPair(TEXT.promptLanguage, promptLanguage, TEXT.promptGuide, promptGuide),
+        ...(imageTask ? [] : [makePromptOptimizerSettingsPair(TEXT.promptLanguage, promptLanguage, TEXT.promptGuide, promptGuide)]),
         makePromptOptimizerSettingsRow(TEXT.apiFormat, apiFormat),
         makePromptOptimizerSettingsRow(TEXT.apiUrl, apiUrl),
         makePromptOptimizerSettingsRow(TEXT.apiKey, apiKey),
@@ -5288,14 +5441,14 @@ async function openPromptOptimizerSettings(node) {
         error.hidden = true;
         try {
             const selectedLanguage = promptGuideLanguage(promptLanguage.value);
-            selectedGuides[selectedLanguage] = canonicalPromptGuideForLanguage(promptGuide.value, selectedLanguage);
+            if (!imageTask) selectedGuides[selectedLanguage] = canonicalPromptGuideForLanguage(promptGuide.value, selectedLanguage);
             await savePromptOptimizerSettings({
                 api_format: apiFormat.value,
                 api_url: apiUrl.value,
                 api_key: apiKey.value,
                 model: model.value,
-                language: promptLanguage.value,
-                prompt_guide_by_language: selectedGuides,
+                language: imageTask ? promptOptimizerSettingsCache.language : promptLanguage.value,
+                prompt_guide_by_language: imageTask ? promptOptimizerSettingsCache.prompt_guide_by_language : selectedGuides,
                 read_media: readMedia.checked,
                 optimize_on_run: optimizeOnRun.checked,
                 unload_ollama_after_optimize: ollamaUnload.checked,
@@ -5388,6 +5541,8 @@ async function requestPromptOptimization(payload, signal) {
     const response = await api.fetchApi("/minimax_h3_easy/prompt_optimize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // The backend owns optimizer timeouts; ComfyUI's 60s default is too short.
+        timeoutMs: null,
         signal,
         body: JSON.stringify(payload),
     });
@@ -5717,7 +5872,17 @@ async function optimizePromptFromEditor(node) {
             resources,
             optimizer_mode: optimizerMode,
         };
+        if (isImageNode(node)) {
+            commonPayload.task = "h3_image";
+            commonPayload.resolution = canonicalOption("resolution", getWidgetValue(node, "resolution", "2K"));
+            commonPayload.aspect_ratio = canonicalOption("aspect_ratio", getWidgetValue(node, "aspect_ratio", "1:1"));
+            for (const dimension of ["width", "height"]) {
+                const linked = linkedInputValue(node, dimension);
+                commonPayload[dimension] = Number(linked.found ? linked.value : getWidgetValue(node, dimension, 2048));
+            }
+        }
         let optimizedPrompt = "";
+        let optimizationMarker = null;
         const sourceSegments = segmentMode ? splitContextPromptSegments(sourcePrompt) : [];
         if (segmentMode && optimizerMode === "per_segment" && sourceSegments.length >= 2) {
             optimizedPrompt = await optimizeContextSegmentsIndividually({
@@ -5732,11 +5897,13 @@ async function optimizePromptFromEditor(node) {
         } else {
             const data = await requestPromptOptimization(commonPayload, abortController.signal);
             optimizedPrompt = String(data.prompt || "");
+            optimizationMarker = data.marker || null;
         }
         if (node.__h3OptimizerRequestId !== requestId) return;
         node.__h3OptimizerSourcePrompt = sourcePrompt;
         node.__h3OptimizerLastResult = optimizedPrompt;
         setPromptFromOptimizedText(node, node.__h3OptimizerLastResult);
+        if (optimizationMarker) node.properties[PROMPT_AUTO_MARKER_PROP] = optimizationMarker;
         setPromptOptimizerStatus(node, "success");
     } catch (error) {
         if (abortController.signal.aborted || node.__h3OptimizerRequestId !== requestId || error?.name === "AbortError") return;
@@ -6166,7 +6333,7 @@ function insertPlainText(editor, text) {
     selection.addRange(range);
 }
 
-function pastedMentionCandidates(node) {
+function pastedMentionCandidates(node, includeDisabled = false) {
     if (!canUseMediaMentions(node)) return [];
     const labels = {
         image: ["\u56fe\u7247", "Image", "image", "Picture", "picture"],
@@ -6175,13 +6342,18 @@ function pastedMentionCandidates(node) {
     };
     const candidates = [];
     const seen = new Set();
-    for (const option of mentionOptions(node)) {
+    // Raw text renders a disabled reference as @filename. Keep it parseable
+    // while editing without adding disabled files to the normal @ picker.
+    const options = includeDisabled ? mediaLoaderReferenceOptions(node, true) || mentionOptions(node) : mentionOptions(node);
+    for (const option of options) {
         const aliases = new Set();
         if (option.fullLabel) aliases.add(`@${option.fullLabel}`);
         if (option.token) aliases.add(option.token);
-        for (const prefix of labels[option.type] || []) {
-            aliases.add(`@${prefix}${option.ordinal}`);
-            aliases.add(`@${prefix} ${option.ordinal}`);
+        if (!option.disabled) {
+            for (const prefix of labels[option.type] || []) {
+                aliases.add(`@${prefix}${option.ordinal}`);
+                aliases.add(`@${prefix} ${option.ordinal}`);
+            }
         }
         for (const raw of aliases) {
             const value = String(raw || "");
@@ -6831,6 +7003,7 @@ function bindPromptOptimizerWidgetCallbacks(node) {
 }
 
 function repairConfiguredWidgetValues(node, info) {
+    if (isImageNode(node)) return;
     const raw = Array.isArray(info?.widgets_values) ? [...info.widgets_values] : [];
     if (!raw.length) return;
 
@@ -7137,7 +7310,7 @@ function repairConfiguredWidgetValues(node, info) {
 }
 
 function installNode(nodeType, nodeData) {
-    if (![NODE_CLASS, CONTEXT_SEGMENTS_CLASS, SELECTED_VIDEO_CONTEXT_CLASS].includes(nodeData?.name)) return;
+    if (![NODE_CLASS, IMAGE_CLASS, CONTEXT_SEGMENTS_CLASS, SELECTED_VIDEO_CONTEXT_CLASS].includes(nodeData?.name)) return;
     // Strip the virtual-wire transport fields from every frontend definition
     // before a node instance can be constructed. Execution still receives
     // them through the prompt patch and the Python INPUT_TYPES declaration.
@@ -7146,7 +7319,9 @@ function installNode(nodeType, nodeData) {
     if (nodeType?.prototype?.constructor?.nodeData && nodeType.prototype.constructor.nodeData !== nodeData) {
         pruneTransportInputs(nodeType.prototype.constructor.nodeData);
     }
-    const installedMarker = nodeData?.name === CONTEXT_SEGMENTS_CLASS
+    const installedMarker = nodeData?.name === IMAGE_CLASS
+        ? "__h3EasyImageInstalled"
+        : nodeData?.name === CONTEXT_SEGMENTS_CLASS
         ? "__h3ContextSegmentsNodeInstalled"
         : nodeData?.name === SELECTED_VIDEO_CONTEXT_CLASS
             ? "__h3SelectedVideoContextNodeInstalled"
@@ -7341,9 +7516,12 @@ function installNode(nodeType, nodeData) {
             syncPromptExternalConnectionState(this);
             globalThis.requestAnimationFrame?.(() => syncPromptExternalConnectionState(this));
         }
-        if (connected && !this.__h3VirtualWireClearing && /^media(?:_\d+)?$/i.test(String(input?.name || ""))) {
-            enforceMediaInputExclusivity(this);
-            scheduleNativeMediaConnectionConversion(this, inputIndex, linkInfo);
+        if (!this.__h3VirtualWireClearing && /^media(?:_\d+)?$/i.test(String(input?.name || ""))) {
+            if (connected) {
+                enforceMediaInputExclusivity(this);
+                scheduleNativeMediaConnectionConversion(this, inputIndex, linkInfo);
+            }
+            requestMentionPreviewRefresh();
         }
         return result;
     };
@@ -7400,9 +7578,10 @@ function installNode(nodeType, nodeData) {
 }
 
 function installLoaderNode(nodeType, nodeData) {
-    if (nodeData?.name !== LOADER_CLASS) return;
-    if (nodeType.prototype.__h3EasyLoaderInstalled) return;
-    nodeType.prototype.__h3EasyLoaderInstalled = true;
+    if (![LOADER_CLASS, IMAGE_LOADER_CLASS].includes(nodeData?.name)) return;
+    const installedMarker = nodeData.name === IMAGE_LOADER_CLASS ? "__h3EasyImageLoaderInstalled" : "__h3EasyLoaderInstalled";
+    if (nodeType.prototype[installedMarker]) return;
+    nodeType.prototype[installedMarker] = true;
     const originalCreated = nodeType.prototype.onNodeCreated;
     nodeType.prototype.onNodeCreated = function onNodeCreatedH3Loader() {
         const result = originalCreated?.apply(this, arguments);
@@ -7436,9 +7615,10 @@ function installAdapterNode(nodeType, nodeData) {
 }
 
 function installOutputNode(nodeType, nodeData) {
-    if (nodeData?.name !== OUTPUT_CLASS) return;
-    if (nodeType.prototype.__h3EasyOutputInstalled) return;
-    nodeType.prototype.__h3EasyOutputInstalled = true;
+    if (![OUTPUT_CLASS, IMAGE_OUTPUT_CLASS].includes(nodeData?.name)) return;
+    const installedMarker = nodeData.name === IMAGE_OUTPUT_CLASS ? "__h3EasyImageOutputInstalled" : "__h3EasyOutputInstalled";
+    if (nodeType.prototype[installedMarker]) return;
+    nodeType.prototype[installedMarker] = true;
     const originalCreated = nodeType.prototype.onNodeCreated;
     nodeType.prototype.onNodeCreated = function onNodeCreatedH3Output() {
         const result = originalCreated?.apply(this, arguments);
@@ -7607,22 +7787,32 @@ function mediaLoaderReadState(node) {
         images: [...state.images],
         audios: [...state.audios],
         videos: [...state.videos],
+        disabled: Object.fromEntries(MEDIA_LOADER_GROUPS.map((group) => [group.key, [...state.disabled[group.key]]])),
     };
 }
 
 function mediaLoaderWriteState(node, state) {
     const unique = (values) => [...new Set((Array.isArray(values) ? values : []).map((value) => String(value || "").trim()).filter(Boolean))];
-    const value = JSON.stringify({
-        images: unique(state.images).map((filename) => ({ filename })),
-        audios: unique(state.audios).map((filename) => ({ filename })),
-        videos: unique(state.videos).map((filename) => ({ filename })),
-    });
+    const value = JSON.stringify(Object.fromEntries(MEDIA_LOADER_GROUPS.map((group) => [
+        group.key, unique(state[group.key]).map((filename) => state.disabled?.[group.key]?.includes(filename)
+            ? { filename, enabled: false } : { filename }),
+    ])));
     const widget = getWidget(node, "media_state");
     if (!widget) return;
     widget.value = value;
     if (widget._state) widget._state.value = value;
     node.properties ||= {};
     node.properties.media_loader_state = value;
+    for (const target of app.graph?._nodes || []) {
+        if (!isTarget(target)) continue;
+        const native = getNativeMediaBridgeLink(target);
+        if (Number(native?.source_id) !== Number(node.id)) continue;
+        // A remembered pre-optimization string has no reference identities;
+        // regenerate from the current document after the library changes.
+        target.__h3OptimizerSourcePrompt = null;
+        target.__h3OptimizerLastResult = null;
+        clearAutomaticPromptMarker(target);
+    }
     node.setDirtyCanvas?.(true, true);
     app.graph?.setDirtyCanvas?.(true, true);
     app.graph?.change?.();
@@ -7846,6 +8036,7 @@ async function mediaLoaderUploadFilesNow(node, fileList) {
     const state = mediaLoaderReadState(node);
     const pending = new Map(MEDIA_LOADER_GROUPS.map((group) => [group.type, state[group.key].length]));
     const errors = [];
+    const uploaded = [];
     let unsupported = 0;
     let skippedFull = 0;
     let changed = false;
@@ -7868,6 +8059,7 @@ async function mediaLoaderUploadFilesNow(node, fileList) {
             const filename = await mediaLoaderUploadOne(file);
             if (!state[group.key].includes(filename)) {
                 state[group.key].push(filename);
+                uploaded.push({ key: group.key, filename });
                 pending.set(type, (pending.get(type) || 0) + 1);
                 changed = true;
             }
@@ -7876,7 +8068,13 @@ async function mediaLoaderUploadFilesNow(node, fileList) {
         }
     }
     if (changed) {
-        mediaLoaderWriteState(node, state);
+        // Keep any enable/disable, swap or delete made while uploads awaited
+        // the server; merge new files into the latest library state only.
+        const latest = mediaLoaderReadState(node);
+        for (const { key, filename } of uploaded) {
+            if (!latest[key].includes(filename)) latest[key].push(filename);
+        }
+        mediaLoaderWriteState(node, latest);
         mediaLoaderRender(node);
     }
     const notices = [];
@@ -7972,6 +8170,9 @@ function mediaLoaderPasteTargetsEditor(event) {
 
 function mediaLoaderOwnsPasteFocus(node, event) {
     const panel = node?.__h3MediaLoaderPanel;
+    // Nodes 2.0 focuses the outer node element when its header is selected.
+    // That element owns this panel, just as the canvas does in classic mode.
+    const nodeElement = panel?.closest?.(".lg-node");
     const canvas = app.canvas?.canvas;
     const owns = (target) => Boolean(
         !target
@@ -7979,7 +8180,7 @@ function mediaLoaderOwnsPasteFocus(node, event) {
         || target === document.body
         || target === document.documentElement
         || target === canvas
-        || (target instanceof Node && panel?.contains?.(target))
+        || (target instanceof Node && (panel?.contains?.(target) || nodeElement?.contains?.(target)))
     );
     return owns(event?.target) && owns(document.activeElement);
 }
@@ -8035,12 +8236,19 @@ function installMediaLoaderFileDrop(node, panel) {
     });
 }
 
-function mediaLoaderUpdateCard(card, group, filename, index) {
+function mediaLoaderUpdateCard(card, group, filename, index, enabled, activeIndex) {
     card.dataset.index = String(index);
     card.dataset.filename = filename;
     card.dataset.mediaType = group.type;
     card.title = mediaLoaderCardTitle(card, filename);
-    card.querySelector(".h3-media-loader-tag").textContent = String(index + 1);
+    card.classList.toggle("is-disabled", !enabled);
+    const tag = card.querySelector(".h3-media-loader-tag");
+    tag.hidden = !enabled;
+    tag.textContent = enabled ? String(activeIndex) : "";
+    const toggle = card.querySelector(".h3-media-loader-toggle");
+    toggle.title = enabled ? TEXT.mediaLoaderDisable : TEXT.mediaLoaderEnable;
+    toggle.setAttribute("aria-label", toggle.title);
+    toggle.setAttribute("aria-pressed", String(enabled));
     const label = card.querySelector(".h3-media-loader-label");
     label.textContent = filename.split(/[\\/]/).pop() || filename;
     label.title = filename;
@@ -8142,10 +8350,29 @@ function mediaLoaderCreateCard(node, group, filename) {
         const next = mediaLoaderReadState(node);
         next[group.key].splice(index, 1);
         mediaLoaderWriteState(node, next);
-        mediaLoaderSyncGroup(node, group, next);
-        mediaLoaderResize(node);
+        mediaLoaderRender(node);
     });
     card.append(tag, label, remove);
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "h3-media-loader-toggle";
+    toggle.draggable = false;
+    toggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g class="h3-media-eye-on"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></g><g class="h3-media-eye-off"><path d="m3 3 18 18M10.6 5.1A13 13 0 0 1 12 5c6.5 0 10 7 10 7a19 19 0 0 1-3.1 4.1M6.1 6.1A23 23 0 0 0 2 12s3.5 7 10 7a12 12 0 0 0 5.9-1.9M9.9 9.9a3 3 0 0 0 4.2 4.2"/></g></svg>';
+    toggle.addEventListener("pointerdown", (event) => { event.preventDefault(); event.stopPropagation(); });
+    toggle.addEventListener("mousedown", (event) => event.stopPropagation());
+    toggle.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const next = mediaLoaderReadState(node);
+        const filename = card.dataset.filename;
+        const disabled = next.disabled[group.key];
+        const index = disabled.indexOf(filename);
+        if (index < 0) disabled.push(filename);
+        else disabled.splice(index, 1);
+        mediaLoaderWriteState(node, next);
+        mediaLoaderRender(node);
+    });
+    card.append(toggle);
 
     card.addEventListener("dragstart", (event) => {
         mediaLoaderInternalDrag = { node, groupType: group.type, card };
@@ -8219,9 +8446,12 @@ function mediaLoaderSyncGroup(node, group, state = mediaLoaderReadState(node)) {
         list.append(empty);
         return;
     }
+    let activeIndex = 0;
     entries.forEach((filename, index) => {
+        const enabled = !state.disabled[group.key].includes(filename);
+        if (enabled) activeIndex += 1;
         const card = cards.get(filename) || mediaLoaderCreateCard(node, group, filename);
-        mediaLoaderUpdateCard(card, group, filename, index);
+        mediaLoaderUpdateCard(card, group, filename, index, enabled, activeIndex);
         // Appending an existing card only moves it. Its image/video element stays
         // alive, so reordering another group cannot reload or flash previews.
         list.append(card);
@@ -8233,11 +8463,11 @@ function mediaLoaderRender(node) {
     if (!panel) return;
     const state = mediaLoaderReadState(node);
     const total = MEDIA_LOADER_GROUPS.reduce((sum, group) => sum + (state[group.key]?.length || 0), 0);
-    const capacities = MEDIA_LOADER_GROUPS.map((group) => Number(group.max));
-    const finiteCapacity = capacities.every((capacity) => Number.isFinite(capacity));
-    if (node.__h3MediaLoaderCount) node.__h3MediaLoaderCount.textContent = finiteCapacity
-        ? String(total) + "/" + String(capacities.reduce((sum, capacity) => sum + capacity, 0))
-        : String(total);
+    const enabled = MEDIA_LOADER_GROUPS.reduce((sum, group) => sum + state[group.key].filter((filename) => !state.disabled[group.key].includes(filename)).length, 0);
+    if (node.__h3MediaLoaderCount) {
+        node.__h3MediaLoaderCount.textContent = `${enabled}/${total}`;
+        node.__h3MediaLoaderCount.title = ZH_BROWSER ? "\u542f\u7528\u6570\u91cf / \u7d20\u6750\u603b\u6570" : "Enabled / total media";
+    }
     for (const group of MEDIA_LOADER_GROUPS) mediaLoaderSyncGroup(node, group, state);
     mediaLoaderResize(node);
 }
@@ -8342,6 +8572,9 @@ function installMediaLoaderStyles() {
       .h3-media-loader-card:active { cursor:grabbing; }
       .h3-media-loader-card.is-dragging { opacity:.4; transform:scale(.96); }
       .h3-media-loader-card.is-drop-target { border-color:#7ea6cb; box-shadow:0 0 0 1px rgba(126,166,203,.45); }
+      .h3-media-loader-card.is-disabled .h3-media-loader-thumb { opacity:.45; filter:grayscale(.7); }
+      .h3-media-loader-card.is-disabled .h3-media-loader-label { left:4px; opacity:.6; }
+      .h3-media-loader-card.is-disabled .h3-media-loader-tag { display:none; }
       .h3-media-loader-thumb { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; overflow:hidden; border-radius:4px; background:#101010; }
       .h3-media-loader-thumb.is-audio { background:#10201d; }
       .h3-media-loader-thumb.is-audio::before { content:""; position:absolute; inset:7px; border:1px solid rgba(70,206,182,.18); border-radius:3px; pointer-events:none; }
@@ -8365,6 +8598,13 @@ function installMediaLoaderStyles() {
       .h3-media-loader-remove { position:absolute; top:-7px; right:-7px; z-index:3; width:17px; height:17px; padding:0; border:2px solid #222; border-radius:50%; background:#3b434a; color:#f1f1f1; cursor:pointer; display:flex; align-items:center; justify-content:center; font-family:Arial,sans-serif; font-size:15px; font-weight:400; line-height:1; opacity:0; visibility:hidden; transform:scale(.82); transition:opacity .15s ease, visibility .15s ease, transform .15s ease, background .15s ease; }
       .h3-media-loader-card:hover .h3-media-loader-remove, .h3-media-loader-card:focus-within .h3-media-loader-remove { opacity:1; visibility:visible; transform:scale(1); }
       .h3-media-loader-remove:hover { background:#8b4242; color:#fff; }
+      .h3-media-loader-toggle { position:absolute; top:-7px; left:-7px; z-index:3; width:17px; height:17px; padding:0; border:2px solid #222; border-radius:50%; background:#3b434a; color:#f1f1f1; cursor:pointer; display:flex; align-items:center; justify-content:center; opacity:0; visibility:hidden; transform:scale(.82); transition:opacity .15s ease, visibility .15s ease, transform .15s ease, background .15s ease; }
+      .h3-media-loader-toggle svg { width:10px; height:10px; pointer-events:none; }
+      .h3-media-loader-toggle .h3-media-eye-off, .h3-media-loader-card.is-disabled .h3-media-eye-on { display:none; }
+      .h3-media-loader-card.is-disabled .h3-media-eye-off { display:inline; }
+      .h3-media-loader-card:hover .h3-media-loader-toggle, .h3-media-loader-card:focus-within .h3-media-loader-toggle { opacity:1; visibility:visible; transform:scale(1); }
+      .h3-media-loader-toggle:hover { background:#59636b; color:#fff; }
+      .h3-media-loader-toggle:focus-visible { outline:1px solid #9aa6ae; outline-offset:1px; }
     `;
 }
 
@@ -8685,6 +8925,7 @@ function install() {
         font-weight: 400; line-height: inherit; letter-spacing: 0; user-select: text; cursor: text;
       }
       .h3-mention-chip.is-unresolved { color: #ff9b9b; text-decoration: underline wavy rgba(255,110,110,.86); text-decoration-thickness: 1px; }
+      .h3-mention-chip.is-disabled { opacity:.5; text-decoration:line-through; }
       .h3-mention-chip-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: baseline; }
       .h3-dialogue-block {
         display: inline; margin: 0 1px; padding: 2px 4px; vertical-align: 1px; border: 0; border-radius: 4px;
