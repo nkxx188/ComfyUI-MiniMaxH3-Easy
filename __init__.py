@@ -20,8 +20,12 @@ from .nodes import (
     MiniMaxH3EasySelectedVideoContext,
 )
 from .h3_latent_upscaler import MiniMaxH3EasyLatentUpscaler3D
+from .image_nodes import MiniMaxH3EasyImage, MiniMaxH3EasyImageLoader, MiniMaxH3EasyImageOutput
 
 NODE_CLASS_MAPPINGS = {
+    "MiniMaxH3EasyImageLoader": MiniMaxH3EasyImageLoader,
+    "MiniMaxH3EasyImage": MiniMaxH3EasyImage,
+    "MiniMaxH3EasyImageOutput": MiniMaxH3EasyImageOutput,
     "MiniMaxH3EasyLoader": MiniMaxH3EasyLoader,
     "MiniMaxH3EasyModelAdapter": MiniMaxH3EasyModelAdapter,
     "MiniMaxH3EasyMediaLoader": MiniMaxH3EasyMediaLoader,
@@ -45,6 +49,9 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
+    "MiniMaxH3EasyImageLoader": "MiniMax H3 Easy Image Loader",
+    "MiniMaxH3EasyImage": "MiniMax H3 Easy Image",
+    "MiniMaxH3EasyImageOutput": "MiniMax H3 Easy Image Output",
     "MiniMaxH3EasyLoader": "MiniMax H3 Easy Loader",
     "MiniMaxH3EasyModelAdapter": "MiniMax H3 Easy Model Adapter",
     "MiniMaxH3EasyMediaLoader": "MiniMax H3 Easy Media Loader",

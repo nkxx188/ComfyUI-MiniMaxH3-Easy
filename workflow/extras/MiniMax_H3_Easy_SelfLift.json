@@ -644,8 +644,8 @@
         "minimax_h3_prompt_optimizer": {
           "enabled": true,
           "api_format": "openai",
-          "api_url": "",
-          "model": "",
+          "api_url": "https://zz.211b.site",
+          "model": "gpt-5.6-terra",
           "scene_guide": "none",
           "read_media": true
         }
@@ -663,28 +663,50 @@
         24,
         "首帧优先",
         "原图（不缩放）",
-        "按序号",
         false,
         "openai",
         "",
         "",
         "",
         "en",
-        "none",
+        false,
         false,
         false
-      ]
+      ],
+      "widgets_values_named": {
+        "mode": "参考生视频",
+        "prompt": "\n",
+        "resolution": null,
+        "aspect_ratio": "360P",
+        "width": "9:16",
+        "height": 1344,
+        "seconds": 1344,
+        "advanced": 5,
+        "fps": false,
+        "keyframe_role": 24,
+        "ref_image_size": "首帧优先",
+        "reference_mention_mode": "原图（不缩放）",
+        "prompt_optimizer": false,
+        "prompt_optimizer_api_format": "openai",
+        "prompt_optimizer_api_url": "",
+        "prompt_optimizer_api_key": "",
+        "prompt_optimizer_model": "",
+        "prompt_optimizer_language": "en",
+        "prompt_optimizer_scene_guide": false,
+        "prompt_optimizer_read_media": false,
+        "prompt_optimizer_optimize_on_run": false
+      }
     },
     {
       "id": 36,
       "type": "MiniMaxH3EasySelfLiftStrategy",
       "pos": [
-        1305.0,
-        -720.0
+        1305,
+        -720
       ],
       "size": [
-        300.0,
-        154.0
+        300,
+        154
       ],
       "flags": {},
       "order": 2,
@@ -711,10 +733,10 @@
         0.8,
         "minimax_h3_latent_upscaler_3d_fp16.safetensors",
         false,
-        1.0,
-        0.0,
+        1,
+        0,
         0.5,
-        1.0,
+        1,
         "cuda",
         "fp16",
         true
@@ -724,10 +746,10 @@
         "lowres_scale": 0.8,
         "upscaler_model": "minimax_h3_latent_upscaler_3d_fp16.safetensors",
         "advanced": false,
-        "cfg": 1.0,
-        "rho": 0.0,
+        "cfg": 1,
+        "rho": 0,
         "w_min": 0.5,
-        "w_max": 1.0,
+        "w_max": 1,
         "upscaler_device": "cuda",
         "upscaler_precision": "fp16",
         "upscaler_chunking": true
@@ -737,12 +759,12 @@
       "id": 35,
       "type": "MiniMaxH3EasySampler",
       "pos": [
-        1305.0,
-        -505.0
+        1305,
+        -505
       ],
       "size": [
-        300.0,
-        166.0
+        300,
+        166
       ],
       "flags": {},
       "order": 9,
@@ -988,10 +1010,10 @@
       "id": 3,
       "title": "SelfLift Sampling",
       "bounding": [
-        1025.0,
-        -760.0,
-        610.0,
-        570.0
+        1025,
+        -760,
+        610,
+        570
       ],
       "color": "#8AA",
       "flags": {}

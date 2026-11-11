@@ -2185,15 +2185,6 @@
           "link": null
         },
         {
-          "localized_name": "prompt_optimizer_settings",
-          "name": "prompt_optimizer_settings",
-          "type": "BOOLEAN",
-          "widget": {
-            "name": "prompt_optimizer_settings"
-          },
-          "link": null
-        },
-        {
           "localized_name": "prompt_optimizer_scene_guide",
           "name": "prompt_optimizer_scene_guide",
           "type": "COMBO",
@@ -2262,17 +2253,39 @@
         24,
         "首帧优先",
         "1.5K 面积（约2.25MP）",
-        "按序号",
         false,
         "openai",
         "",
         "",
         "",
         "en",
-        "none",
+        false,
         false,
         false
-      ]
+      ],
+      "widgets_values_named": {
+        "mode": "图生或首尾帧",
+        "prompt": "\n",
+        "resolution": null,
+        "aspect_ratio": "360P",
+        "width": "2:3",
+        "height": 1344,
+        "seconds": 768,
+        "advanced": 4,
+        "fps": true,
+        "keyframe_role": 24,
+        "ref_image_size": "首帧优先",
+        "reference_mention_mode": "1.5K 面积（约2.25MP）",
+        "prompt_optimizer": false,
+        "prompt_optimizer_api_format": "openai",
+        "prompt_optimizer_api_url": "",
+        "prompt_optimizer_api_key": "",
+        "prompt_optimizer_model": "",
+        "prompt_optimizer_language": "en",
+        "prompt_optimizer_scene_guide": false,
+        "prompt_optimizer_read_media": false,
+        "prompt_optimizer_optimize_on_run": false
+      }
     },
     {
       "id": 40,

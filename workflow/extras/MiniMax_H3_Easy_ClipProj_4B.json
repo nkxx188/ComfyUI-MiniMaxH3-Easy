@@ -693,7 +693,6 @@
       "widgets_values": [
         "参考生视频",
         "subject_definitions:\n<Subject 1> 是 <Picture 1> 中的女孩，具有浅蓝色齐刘海短发、白色猫耳连帽外套、领口粉色蝴蝶结、胸前金色小铃铛、棕色大眼睛和粉色脸颊，头顶带有白色小圆脸装饰（配粉色蝴蝶结和绿色叶片）。\n<Subject 2> 是 <Picture 2> 中的女孩，具有深蓝色渐变波浪长发、蓝色眼睛、头戴白色荷叶边发带配蓝色蝴蝶结、头部两侧有蓝色鲸鱼鳍状装饰、身穿深蓝色女仆装（白色蕾丝领口和袖口）、系白色围裙（印有鲸鱼图案）、裙摆为多层蓝白花边、身后有蓝色鲸鱼尾巴。\n\nsummary:\n[reference generation] 目标视频是一段游轮度假 vlog，<Subject 1> 和 <Subject 2> 在游轮甲板上度假：两人站在栏杆旁向镜头挥手、手拉手沿甲板漫步、靠在船头栏杆看海，最后一起向镜头挥手结束。\n\nretention_analysis:\n<Subject 1>（出现在 [Shot 1]、[Shot 2]、[Shot 3]、[Shot 4]）：fully_preserved - 浅蓝色齐刘海短发、白色猫耳连帽外套、粉色蝴蝶结和金色铃铛完整保留。\n<Subject 2>（出现在 [Shot 1]、[Shot 2]、[Shot 3]、[Shot 4]）：fully_preserved - 深蓝色渐变波浪长发、白色荷叶边发带、蓝色鲸鱼鳍装饰、深蓝色鲸鱼主题女仆装和鲸鱼围裙完整保留。\n\ndetailed_description:\n目标视频采用明亮清新的 Q 版动漫风格，手持旅行 vlog 镜头略带自然晃动，全片在游轮甲板上进行，阳光充足。\n[Shot 1] 中景建立 <Subject 1> 和 <Subject 2>，两人站在游轮白色栏杆旁，背景是蔚蓝海面、白色船体和晴朗天空。午后阳光从右上方照射。<Subject 1> 保持 <Picture 1> 中的浅蓝色短发、白色猫耳连帽外套、粉色蝴蝶结和金色铃铛，头顶白色小圆脸装饰随她动作轻轻晃动。<Subject 2> 保持 <Picture 2> 中的深蓝色波浪长发、白色荷叶边发带和鲸鱼主题深蓝色女仆装。两人面向镜头开心挥手，海风吹动她们的头发和裙摆。\n[Shot 2] At 00:03.000, 镜头横移跟拍，<Subject 2> 拉着 <Subject 1> 的手沿甲板从右向左快步走，<Subject 2> 抬起左手指向远处海面并回头看向 <Subject 1>，两人都面带笑容，裙摆和发丝随风摆动，白色栏杆在背景中后退。\n[Shot 3] At 00:07.000, 镜头切到两人并排靠在船头栏杆上，身体侧对镜头面向大海。<Subject 1> 双手搭在栏杆上，转头看向 <Subject 2> 露出笑容；<Subject 2> 也转过头与她对视，阳光在两人脸上形成明亮光斑，海面在背景中伸展，天空飘着白云。\n[Shot 4] At 00:11.000, 镜头切到两人正面近景并缓慢推近，<Subject 1> 和 <Subject 2> 一起面向镜头灿烂微笑挥手，<Subject 2> 微微偏头，<Subject 1> 眨了一下眼睛，两人在挥手动作中结束视频。\n\noverall_soundscape:\n游轮甲板上的海风声、海浪声、远处海鸥叫声、游轮汽笛声、脚步踏在木甲板上的声音，以及两个女孩轻快的笑声贯穿整段视频。\n\nnon_diegetic_music:\n轻快明亮的旅行 vlog 风格背景音乐，以木吉他、尤克里里和轻快鼓点为主，节奏轻松欢快，音量适中，在视频结尾处自然淡出。",
-        null,
         "540P",
         "1:1",
         1344,
@@ -710,7 +709,7 @@
         "",
         "",
         "en",
-        "none",
+        "通用",
         false,
         false
       ],
@@ -727,13 +726,13 @@
         "keyframe_role": "首帧优先",
         "ref_image_size": "1K 面积（约1MP）",
         "reference_mention_mode": "按序号",
-        "prompt_optimizer_scene_guide": "none",
         "prompt_optimizer": false,
         "prompt_optimizer_api_format": "openai",
         "prompt_optimizer_api_url": "",
         "prompt_optimizer_api_key": "",
         "prompt_optimizer_model": "",
         "prompt_optimizer_language": "en",
+        "prompt_optimizer_scene_guide": "通用",
         "prompt_optimizer_read_media": false,
         "prompt_optimizer_optimize_on_run": false
       }

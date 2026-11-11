@@ -8,6 +8,12 @@ A practical MiniMax H3 node suite for ComfyUI. It reduces the setup needed for t
   <img src="images/media-loader-en.png" alt="MiniMax H3 Easy Media Loader and main node" width="960">
 </p>
 
+**New: MiniMax H3 Image support**, with text-to-image and reference-image editing in one workflow.
+
+<p align="center">
+  <img src="images/h3-image-workflow.png" alt="MiniMax H3 Easy Image workflow and generated image" width="960">
+</p>
+
 ## Why use it?
 
 - **One main node for common generation modes**: text, image, first/last frame, full reference, and digital human.
@@ -16,6 +22,7 @@ A practical MiniMax H3 node suite for ComfyUI. It reduces the setup needed for t
 - **Generate longer videos as connected segments**: every segment keeps its own prompt and references while receiving visual or AV context from the previous segment.
 - **Built-in segment refinement**: Pixel Resize, 3D Latent Upscale, and a Low VRAM Tile option.
 - **Still fully composable**: samplers, LoRAs, attention patches, decoders, and save nodes remain ordinary ComfyUI connections.
+- **H3 Image generation and editing**: a dedicated image loader and Easy Image node reuse the Media Loader, multi-link input, and visual references, with optimizer API settings filled in directly in each node.
 
 ## Installation
 
@@ -63,6 +70,8 @@ Easy Loader → MiniMax H3 Easy → Easy Output → sample / decode / save
 
 The main node's `Model` output can continue through LoRAs, model patches, or a sampler. Connect `H3 Context` to **MiniMax H3 Easy Output**.
 
+For images, import [`workflow/6.MiniMax_H3_Easy_Image.json`](workflow/6.MiniMax_H3_Easy_Image.json) with **ComfyUI 0.45.0 or newer**. Select the H3 Image model and dedicated image VAE; the H3 video text encoder can be reused. Leave the Media Loader empty for text-to-image, or add reference pictures for editing. Configure the optimizer API directly in the image node's Advanced options, just as in the video nodes.
+
 ## Generation modes
 
 | Goal | Mode and input |
@@ -101,6 +110,8 @@ Digital Human mode locks the single Media audio item into the generated result a
 Media Loader accepts images, videos, and audio dragged directly from the system file manager. You can also select only the Media Loader node and press `Ctrl+V` to paste supported media from the clipboard. Dragged or pasted files are placed into the appropriate media category automatically.
 
 Audio cards include a compact play/pause control for quick checking. Video cards remain thumbnail previews.
+
+Hover over any media card to use the eye button at its upper left. Disabled media stays in the saved library and can still be swapped by dragging, but is not loaded or sent to prompt optimization. Its number badge is hidden; enabled items are renumbered within each media type. Existing structured `@` references to disabled items remain dimmed in the editor and are omitted from generation and optimization requests. Re-enable a card to use it again without uploading it.
 
 Media Loader can hold a large shared library; the consuming Easy or Context Segments node applies the actual media limits. **Of the four methods, only Media Loader caches decoded video references.** After a video is decoded once, later generations can reuse it through ComfyUI's node cache, reducing the loading and decoding time when the same reference video is used repeatedly. Replacing or modifying the file invalidates the cache automatically. Direct Media-port links, Media Bridge, and Media Splitter do not provide this decoded-video cache. It saves video preparation time, not the model's sampling time.
 
@@ -284,5 +295,7 @@ The context-continuity design was inspired by [NikoDemon80/ComfyUI-H3-Motion-Con
 ## License and attribution
 
 This project is released under the [MIT License](LICENSE).
+
+The bundled H3 Image prompt rules are covered separately by the [MiniMax-H3-Image license](prompt_guides/h3_image/LICENSE).
 
 If your project reuses or adapts a substantial amount of this project's code or major implementations, please credit the original author and mention `ComfyUI-MiniMaxH3-Easy`. Please do not present the reused portions as entirely independent original work. Minor references, ordinary use, or simply depending on this node do not carry this attribution request.

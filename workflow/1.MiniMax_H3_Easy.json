@@ -787,11 +787,10 @@
         "minimax_h3_prompt_optimizer": {
           "enabled": true,
           "api_format": "openai",
-          "api_url": "",
-          "model": "",
+          "api_url": "https://zz.211b.site",
+          "model": "gpt-5.6-terra",
           "scene_guide": "none",
-          "read_media": true,
-          "optimize_on_run": false
+          "read_media": true
         }
       },
       "widgets_values": [
@@ -807,17 +806,39 @@
         24,
         "首帧优先",
         "原图（不缩放）",
-        "按序号",
-        true,
+        false,
         "openai",
         "",
         "",
         "",
         "en",
-        "none",
-        true,
+        false,
+        false,
         false
-      ]
+      ],
+      "widgets_values_named": {
+        "mode": "参考生视频",
+        "prompt": "\n",
+        "resolution": null,
+        "aspect_ratio": "360P",
+        "width": "9:16",
+        "height": 1344,
+        "seconds": 1344,
+        "advanced": 5,
+        "fps": false,
+        "keyframe_role": 24,
+        "ref_image_size": "首帧优先",
+        "reference_mention_mode": "原图（不缩放）",
+        "prompt_optimizer": false,
+        "prompt_optimizer_api_format": "openai",
+        "prompt_optimizer_api_url": "",
+        "prompt_optimizer_api_key": "",
+        "prompt_optimizer_model": "",
+        "prompt_optimizer_language": "en",
+        "prompt_optimizer_scene_guide": false,
+        "prompt_optimizer_read_media": false,
+        "prompt_optimizer_optimize_on_run": false
+      }
     }
   ],
   "links": [

@@ -303,7 +303,7 @@ CONTEXT_PROMPT_OPTIMIZER_MODES = (
 )
 # Bump whenever the optimizer contract changes so an older auto-optimized
 # result cannot silently bypass the new continuity rules.
-PROMPT_OPTIMIZER_MARKER_VERSION = 9
+PROMPT_OPTIMIZER_MARKER_VERSION = 10
 
 
 def _reference_aligned_size(image_w: int, image_h: int, scale: float) -> tuple[int, int]:
@@ -1268,6 +1268,8 @@ def _optimizer_single_segment_rules(
             "只优化用户消息中当前这一段。前面的原始段落仅用于理解人物、场景、道具和动作连续性，不能重写、总结或输出。"
             "最终只返回当前段的一条自然、完整、可独立执行的 MiniMax H3 提示词，不要输出编号、标题、解释、Markdown 围栏或分段标签。"
             "不要提到上一段、下一段、延续、拼接或提示词规划。保留当前段已有的媒体标签；只有当前段确实依赖已连接的媒体时才添加对应标签。\n"
+            "媒体引用只在当前段内生效，不能继承前段的引用。由已连接图片或视频素材定义的人物，只要在当前段出场，就必须在当前段明确写出对应的 @ 引用或 <Picture N>/<Video N> 标签，"
+            "即使前段已经引用过也必须重复。人物名字、<Subject N>、代词或外观描述不能代替素材引用。每段对同一素材明确引用一次即可，不必每句话重复；当前段未使用的素材不要强行加入。\n"
             f"当前是第 {int(segment_index) + 1} 段，共 {int(segment_count)} 段，时长约 {float(seconds):g} 秒。"
         )
     return (
@@ -1539,7 +1541,10 @@ def _optimizer_segment_rules(
             "如果使用时间码，每一段都必须从 0.00 秒起算，而不是沿用整条序列的累计时间。\n"
             "5. 音频连续性要灵活：持续的音乐或环境声可以保持同一身份，但允许根据剧情加入局部声音、停顿、静音或变化，不要机械重复没有新增信息的完整声音段落。\n"
             "6. 媒体引用由用户原始提示词和实际连接的媒体决定。保留显式的 @ 引用以及 <Picture N>、<Video N>、<Audio N> 标签，不要重编号、调换顺序或凭空创造标签。"
-            "如果一个媒体在某段负责人物、外观、场景、风格、动作、镜头、声音或连续性，就在该段明确引用；真正没有使用的媒体不要强行加入。媒体无法读取时，不要编造其内容。\n"
+            "媒体引用只在当前段内生效，不能继承前段的引用。由已连接图片或视频素材定义的人物，只要在某段出场，就必须在该段明确写出对应的 @ 引用或 <Picture N>/<Video N> 标签；"
+            "同一人物连续出场或再次出场时，每个出场分段都必须重复对应引用。人物名字、<Subject N>、代词或外观描述不能代替素材引用。"
+            "每段对同一素材明确引用一次即可，不必每句话重复。本节避免重复的要求只针对冗余描述，不适用于当前段必需的素材引用。"
+            "其他用于场景、风格、动作、镜头、声音或连续性的媒体，也必须在每个实际使用它的分段明确引用；真正没有使用的媒体不要强行加入。媒体无法读取时，不要编造其内容。\n"
             "7. 对白必须放在 <d>...</d> 中并保留原语言。"
         )
     if has_storyboard:
@@ -2075,17 +2080,28 @@ def _register_prompt_optimizer_route() -> bool:
             api_url = str(payload.get("api_url") or "")
             model = str(payload.get("model") or "")
             api_format = str(payload.get("api_format") or "openai").lower()
+            if api_format not in {"openai", "responses", "gemini"}:
+                return web.json_response({"ok": False, "error": "Unsupported API format"}, status=400)
+            if payload.get("task") == "h3_image":
+                from .image_nodes import optimize_image_prompt
+
+                settings = {
+                    "api_url": api_url, "api_key": api_key, "model": model,
+                    "api_format": api_format,
+                    "read_media": _prompt_optimizer_flag(payload.get("read_media")),
+                }
+                result = await asyncio.to_thread(optimize_image_prompt, payload, settings)
+                return web.json_response(result)
             mode = str(payload.get("mode") or MODE_IMAGE)
             audio_mode = str(payload.get("audio_mode") or CONTEXT_AUDIO_GENERATED)
+            context_segmented = mode == MODE_SEGMENTS or bool(payload.get("context_segmented"))
             optimizer_mode = MODE_DIGITAL_HUMAN if mode == MODE_SEGMENTS and audio_mode == CONTEXT_AUDIO_DIGITAL_HUMAN else mode
             scene_guide = str(payload.get("scene_guide") or "none")
             seconds = min(MAX_SECONDS, max(MIN_SECONDS, float(payload.get("seconds") or 5.0)))
-            if api_format not in {"openai", "responses", "gemini"}:
-                return web.json_response({"ok": False, "error": "Unsupported API format"}, status=400)
             if not prompt.strip() or not _prompt_optimizer_settings_complete(api_url, api_key, model, api_format):
                 return web.json_response({"ok": False, "error": "Prompt optimization settings are incomplete"}, status=400)
             raw_counts = payload.get("media_counts") if isinstance(payload.get("media_counts"), dict) else {}
-            resource_limit = SEGMENT_MAX_MEDIA if mode == MODE_SEGMENTS else MAX_MEDIA
+            resource_limit = SEGMENT_MAX_MEDIA if context_segmented else MAX_MEDIA
             counts = {kind: max(0, min(resource_limit, int(raw_counts.get(kind, 0) or 0))) for kind in ("image", "video", "audio")}
             resources = payload.get("resources") if isinstance(payload.get("resources"), list) else []
             resources = [item for item in resources[:resource_limit] if isinstance(item, Mapping)]
@@ -2095,9 +2111,9 @@ def _register_prompt_optimizer_route() -> bool:
             previous_prompts = payload.get("previous_prompts") if isinstance(payload.get("previous_prompts"), list) else []
             previous_prompts = [str(item) for item in previous_prompts]
             segment_seconds_raw = str(payload.get("segment_seconds") or "")
-            expected_segments = _segment_expected_count(segment_seconds_raw) if mode == MODE_SEGMENTS else 0
+            expected_segments = _segment_expected_count(segment_seconds_raw) if context_segmented else 0
             if (
-                mode == MODE_SEGMENTS
+                context_segmented
                 and optimizer_scope == CONTEXT_PROMPT_OPTIMIZER_PER_SEGMENT
                 and segment_count >= 2
                 and segment_index < segment_count
@@ -2127,7 +2143,7 @@ def _register_prompt_optimizer_route() -> bool:
                 return web.json_response({"ok": True, "prompt": result, "segment_index": segment_index})
 
             read_media = _prompt_optimizer_flag(payload.get("read_media"))
-            if mode == MODE_SEGMENTS and not _optimizer_media_read_allowed(resources):
+            if context_segmented and not _optimizer_media_read_allowed(resources):
                 read_media = False
             media_parts = _optimizer_media_parts(resources, api_format, resource_limit) if read_media else []
             language = _normalize_optimizer_language(payload.get("language"))
@@ -2160,7 +2176,7 @@ def _register_prompt_optimizer_route() -> bool:
                 media_parts,
                 max_output_tokens=(
                     CONTEXT_PROMPT_OPTIMIZER_MAX_OUTPUT_TOKENS
-                    if mode == MODE_SEGMENTS
+                    if context_segmented
                     else PROMPT_OPTIMIZER_MAX_OUTPUT_TOKENS
                 ),
             )
@@ -2535,7 +2551,7 @@ MEDIA_LOADER_GROUPS = (
     ("audio", None),
     ("video", None),
 )
-def _media_loader_normalize_state(value: Any) -> dict[str, list[dict[str, str]]]:
+def _media_loader_normalize_state(value: Any) -> dict[str, list[dict[str, Any]]]:
     """Parse the canvas-managed media list without accepting arbitrary paths."""
     result = {kind: [] for kind, _maximum in MEDIA_LOADER_GROUPS}
     if isinstance(value, str):
@@ -2564,7 +2580,10 @@ def _media_loader_normalize_state(value: Any) -> dict[str, list[dict[str, str]]]
             if normalized in seen:
                 continue
             seen.add(normalized)
-            result[kind].append({"filename": normalized})
+            entry = {"filename": normalized}
+            if isinstance(raw, Mapping) and raw.get("enabled") is False:
+                entry["enabled"] = False
+            result[kind].append(entry)
             if maximum is not None and len(result[kind]) >= maximum:
                 break
     return result
@@ -2637,7 +2656,7 @@ class MiniMaxH3EasyMediaLoader:
     FUNCTION = "load"
     RETURN_TYPES = (MEDIA_BUNDLE_TYPE,)
     RETURN_NAMES = ("media_bundle",)
-    DESCRIPTION = "Load ordered image, audio, and video references from ComfyUI input. Video components are decoded once and reused through ComfyUI's node cache."
+    DESCRIPTION = "Load enabled image, audio, and video references from ComfyUI input in their displayed order. Disabled media stays in the saved list without being loaded. Video components are reused through ComfyUI's node cache."
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -2653,6 +2672,8 @@ class MiniMaxH3EasyMediaLoader:
         signature = []
         for kind, _maximum in MEDIA_LOADER_GROUPS:
             for entry in state[kind]:
+                if entry.get("enabled") is False:
+                    continue
                 filename = entry["filename"]
                 try:
                     stat = os.stat(_media_loader_input_path(filename))
@@ -2666,6 +2687,8 @@ class MiniMaxH3EasyMediaLoader:
         state = _media_loader_normalize_state(media_state)
         for kind, _maximum in MEDIA_LOADER_GROUPS:
             for entry in state[kind]:
+                if entry.get("enabled") is False:
+                    continue
                 try:
                     _media_loader_input_path(entry["filename"])
                 except ValueError as exc:
@@ -2678,6 +2701,8 @@ class MiniMaxH3EasyMediaLoader:
         input_index = 0
         for media_type, _maximum in MEDIA_LOADER_GROUPS:
             for entry in state[media_type]:
+                if entry.get("enabled") is False:
+                    continue
                 filename = entry["filename"]
                 path = _media_loader_input_path(filename)
                 if media_type == "image":
@@ -4666,8 +4691,8 @@ def _reference_conditioning(
         ref_blocks.append({"kind": "audio", "ref_audio_t": audio_t, "audio_latent": audio_latent})
         tag_by_input[item.input_index] = f"<Audio {audio_ordinal}>"
 
-    if not ref_items or all(item.get("type") == "audio" for item in ref_items):
-        raise ValueError("Reference mode needs at least one image or video")
+    if not ref_items:
+        raise ValueError("Reference mode needs at least one media resource")
 
     resolved_prompt = _resolve_reference_prompt(
         prompt,
@@ -4694,8 +4719,8 @@ def _validate_reference_media(items: list[_MediaInput], scope: str = "Reference 
         counts[item.media_type] += 1
     if counts["image"] > MAX_IMAGES or counts["video"] > MAX_VIDEOS or counts["audio"] > MAX_AUDIOS:
         raise ValueError(f"{scope} media limits are 9 images, 3 videos and 3 audio clips")
-    if counts["image"] == 0 and counts["video"] == 0:
-        raise ValueError(f"{scope} needs an image or video in addition to audio")
+    if not items:
+        raise ValueError(f"{scope} needs at least one media resource")
 
 
 def _extract_digital_human_audio(items: list[_MediaInput], scope: str) -> tuple[list[_MediaInput], Mapping[str, Any]]:
@@ -4968,6 +4993,7 @@ class MiniMaxH3EasySelectedVideoContext(MiniMaxH3Easy):
             "prompt_optimizer_api_url",
             "prompt_optimizer_api_key",
             "prompt_optimizer_model",
+            "prompt_optimizer_language",
             "prompt_optimizer_scene_guide",
             "prompt_optimizer_read_media",
             "prompt_optimizer_optimize_on_run",
@@ -5223,6 +5249,7 @@ class MiniMaxH3EasyContextSegments:
             "reference_mention_mode", "prompt_optimizer",
             "prompt_optimizer_api_format", "prompt_optimizer_api_url",
             "prompt_optimizer_api_key", "prompt_optimizer_model",
+            "prompt_optimizer_language",
             "prompt_optimizer_scene_guide", "prompt_optimizer_read_media",
             "prompt_optimizer_optimize_on_run", "context_prompt_optimizer_mode",
             "context_prompt_optimizer_concurrency",

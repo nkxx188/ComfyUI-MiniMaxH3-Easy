@@ -8,6 +8,12 @@
   <img src="images/media-loader-zh.png" alt="MiniMax H3 Easy 媒体加载器与主节点" width="960">
 </p>
 
+**现已适配 MiniMax H3 Image**，一条工作流即可完成文生图和参考图编辑。
+
+<p align="center">
+  <img src="images/h3-image-workflow.png" alt="MiniMax H3 Easy 图片工作流与生成效果" width="960">
+</p>
+
 ## 主要优势
 
 - **一个入口覆盖常用模式**：文生、图生、首尾帧、参考生视频和数字人共用同一个 Easy 主节点。
@@ -16,6 +22,7 @@
 - **长视频分段生成**：每段可使用独立提示词和参考素材，同时把上一段的画面或音视频上下文传给下一段。
 - **内置分段二采**：支持 Pixel Resize、3D Latent Upscale，以及显存不足时的 Low VRAM Tile。
 - **保持 ComfyUI 的可组合性**：采样器、LoRA、注意力优化、解码和保存仍可自由连接。
+- **H3 图片生成与编辑**：独立的图片模型加载器和 Easy 图片节点，复用媒体加载器、多线输入与可视化引用；提示词优化 API 在各节点内直接填写。
 
 ## 安装
 
@@ -63,6 +70,8 @@ Easy Loader → MiniMax H3 Easy → Easy Output → 采样 / 解码 / 保存
 
 主节点输出的 `Model` 可继续连接 LoRA、模型补丁或采样器；`H3 Context` 连接 **MiniMax H3 Easy Output**。
 
+图片任务使用 [`workflow/6.MiniMax_H3_Easy_Image.json`](workflow/6.MiniMax_H3_Easy_Image.json)，需要 **ComfyUI 0.45.0 或更新版本**。选择 H3 Image 主模型和图片专用 VAE，文本编码器可复用视频 H3 的。媒体加载器留空就是文生图，添加参考图后就是编辑任务；提示词优化 API 与视频节点一样，在图片节点的高级选项中直接填写。
+
 ## 生成模式
 
 | 目标 | 模式与输入 |
@@ -101,6 +110,8 @@ Easy Loader → MiniMax H3 Easy → Easy Output → 采样 / 解码 / 保存
 Media Loader 支持从资源管理器直接拖入图片、视频和音频，也可以在单独选中该节点后使用 `Ctrl+V` 粘贴剪贴板中的媒体。拖入或粘贴的素材会自动归入对应分类。
 
 音频卡片提供低调的播放/暂停按钮，方便快速检查；视频卡片仍以缩略图预览为主。
+
+鼠标悬浮在素材卡片上时，点击左上角眼睛即可启用或停用。停用素材仍保留在工作流中，也可以正常拖动交换，但不会加载或发送给提示词优化。停用项不显示编号，启用项在各自类型内连续重排；已有的结构化 `@` 引用会在编辑器中标暗，生成和优化请求中则省略。重新启用即可使用，无需再次上传。
 
 Media Loader 本身可以保存较大的素材库，实际数量限制由使用它的 Easy 或 Context Segments 节点检查。**四种方式中，只有 Media Loader 会缓存视频参考的解码结果**：同一个视频首次解码后，后续生成可通过 ComfyUI 的节点缓存直接复用，从而减少重复使用视频参考时的加载和解码时间。更换文件或文件内容变化后缓存会自动失效。直接连接 Media 口、Media Bridge 和 Media Splitter 不提供这项视频解码缓存；它节省的是生成前的视频处理时间，不会缩短模型本身的采样时间。
 
@@ -284,5 +295,7 @@ API 设置随各自节点保存在工作流中，复制工作流时不需要重�
 ## License 与署名
 
 本项目使用 [MIT License](LICENSE)。
+
+内置 H3 Image 提示词规则单独遵循 [MiniMax-H3-Image 许可证](prompt_guides/h3_image/LICENSE)。
 
 如果项目中复用或改编了本项目较多代码或重要实现，请在项目说明中注明 `ComfyUI-MiniMaxH3-Easy` 及原作者，并请勿将复用的部分声明为完全独立原创。少量参考、普通调用或仅使用本节点不受此署名说明约束。

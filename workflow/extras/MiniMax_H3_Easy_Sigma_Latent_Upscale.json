@@ -1595,7 +1595,6 @@
       "widgets_values": [
         "图生或首尾帧",
         "subject_definitions:\n<Subject 1> is the blue-haired anime maid character shown in <Picture 1>, with long blue twin-tail hair, large blue eyes, blue ribbon bows, a dark navy maid dress, white lace trim, puffed sleeves, gold decorative accents, and dark shoes. The reference defines her character appearance and costume, which are preserved as she performs the central fight choreography.\n\nsummary:\n[reference generation] The target video is a six-second Hollywood-style action fight sequence featuring <Subject 1> as the central protagonist. Her blue-haired maid appearance, navy-and-white costume, blue ribbons, and anime character identity from <Picture 1> remain consistent throughout a fast, polished hand-to-hand combat scene against multiple masked attackers in a dim industrial environment.\n\nretention_analysis:\n<Subject 1> (appears in [Shot 1], [Shot 2], [Shot 3]): fully_preserved - her blue twin-tail hair, blue eyes, blue ribbons, navy maid dress, white lace trim, gold accents, and anime character identity are retained throughout the fight.\n<Picture 1> (character appearance reference): fully_preserved - the visible character design and costume from the image are transferred consistently to <Subject 1> without adding conflicting identifying features.\n\ndetailed_description:\nThe target video uses a high-energy Hollywood action-film style with dramatic practical lighting, sharp choreography, dynamic handheld camera movement, controlled motion blur, and a polished anime-meets-cinematic visual treatment. Preserve <Subject 1>'s recognizable blue-haired maid design in every shot while staging the combat with clear physical impacts and readable movement.\n\n[Shot 1] The scene opens in a dark industrial warehouse with wet concrete flooring, scattered metal crates, drifting dust, and narrow shafts of cold light cutting through haze. <Subject 1> stands in a low defensive stance at the center of the frame, her long blue twin-tail hair and blue ribbon bows moving in the air, her navy maid dress and white lace trim clearly visible. Two masked attackers rush toward her from opposite sides. The camera pushes rapidly forward from a low-angle medium-wide shot as she pivots between them, catches the first attacker's wrist, and redirects the attacker into the second, creating a sharp synchronized collision.\n\n[Shot 2] At 00:02.000, the shot cuts to a tight tracking shot circling <Subject 1>. She ducks beneath a swinging strike, her skirt and twin tails trailing with the motion, then delivers a fast spinning kick to the attacker's torso. The impact sends the attacker backward into a metal container with a loud metallic crash. Sparks scatter near the floor while <Subject 1> lands lightly, slides one foot across the wet concrete, and immediately turns toward a third attacker entering from the background. Keep her blue eyes focused and determined, with her original costume details intact.\n\n[Shot 3] At 00:04.500, the camera snaps into a dramatic slow-motion close-up as <Subject 1> leaps forward through the haze, blocks a weapon-bearing arm, twists the attacker off balance, and throws the attacker past the camera. Return to full speed for the final beat: she lands in a three-quarter stance, one hand extended defensively, blue hair and ribbons settling around her shoulders as the remaining attackers lie scattered in the background. End at 00:06.000 on a low-angle heroic composition with a bright rim light outlining her silhouette.\n\noverall_soundscape:\nA cavernous warehouse ambience with distant machinery hum, rainwater dripping, hurried footsteps on wet concrete, fabric movement, sharp body impacts, metallic crashes, scattered sparks, and brief air-rushes from the fast strikes.\n\nnon_diegetic_music:\nA tense Hollywood action score with deep electronic pulses, aggressive low strings, heavy percussion hits synchronized to the impacts, and a rising orchestral accent that resolves on the final heroic pose.",
-        null,
         "416P",
         "16:9",
         960,
@@ -1612,7 +1611,7 @@
         "",
         "",
         "en",
-        "none",
+        "通用",
         false,
         false
       ],
@@ -1629,13 +1628,13 @@
         "keyframe_role": "首帧优先",
         "ref_image_size": "1K 面积（约1MP）",
         "reference_mention_mode": "按序号",
-        "prompt_optimizer_scene_guide": "none",
         "prompt_optimizer": false,
         "prompt_optimizer_api_format": "openai",
         "prompt_optimizer_api_url": "",
         "prompt_optimizer_api_key": "",
         "prompt_optimizer_model": "",
         "prompt_optimizer_language": "en",
+        "prompt_optimizer_scene_guide": "通用",
         "prompt_optimizer_read_media": false,
         "prompt_optimizer_optimize_on_run": false
       }

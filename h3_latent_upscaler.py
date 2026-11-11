@@ -20,6 +20,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import folder_paths
+from comfy.nested_tensor import NestedTensor
 from comfy_api.latest import io
 
 
@@ -338,6 +339,45 @@ class UpscaleConfig(TypedDict, total=False):
     megapixels: float
 
 
+def _extract_video_samples(samples: Any) -> tuple[torch.Tensor, list[torch.Tensor] | None, int]:
+    """Split a H3 latent value into (video tensor, other streams, video index).
+
+    The V3 API passes batched latents as NestedTensor values: either a single
+    batched tensor or the multi-stream H3 pair (video [B, 24, T, H/16, W/16],
+    audio [B, 32, 2, T40]). Only the video stream is upsampled; the other
+    streams are returned untouched for pass-through.
+    """
+    if isinstance(samples, torch.Tensor):
+        return samples, None, 0
+    tensors = list(samples.tensors)
+    if len(tensors) == 1:
+        return tensors[0], None, 0
+    video_idx = 0
+    for i, t in enumerate(tensors):
+        if t.ndim == 5:
+            video_idx = i
+            break
+    else:
+        for i, t in enumerate(tensors):
+            if t.ndim >= 3 and t.shape[0] == 24:
+                video_idx = i
+                break
+    other_streams = [t for i, t in enumerate(tensors) if i != video_idx]
+    return tensors[video_idx], other_streams, video_idx
+
+
+def _rebuild_samples(samples_value: Any, video_idx: int, video: torch.Tensor,
+                     other_streams: list[torch.Tensor] | None) -> Any:
+    """Re-wrap the upscaled video tensor in its original container."""
+    if not isinstance(samples_value, NestedTensor):
+        return video
+    if other_streams is None:
+        return NestedTensor([video])
+    tensors = list(samples_value.tensors)
+    tensors[video_idx] = video
+    return NestedTensor(tensors)
+
+
 class MiniMaxH3EasyLatentUpscaler3D(io.ComfyNode):
     """Built-in neural 3D upscaler for MiniMax H3 video latents."""
 
@@ -386,11 +426,14 @@ class MiniMaxH3EasyLatentUpscaler3D(io.ComfyNode):
         device: str,
         precision: str,
     ) -> io.NodeOutput:
-        if not isinstance(latent, dict) or not isinstance(latent.get("samples"), torch.Tensor):
+        if not isinstance(latent, dict):
+            raise ValueError("MiniMax H3 Easy 3D Latent Upscale requires a LATENT input")
+        samples_value = latent.get("samples")
+        if not isinstance(samples_value, (torch.Tensor, NestedTensor)):
             raise ValueError("MiniMax H3 Easy 3D Latent Upscale requires a LATENT input")
         if str(model_name).startswith("("):
             raise ValueError("Place a MiniMax H3 latent upscaler checkpoint in models/latent_upscale_models")
-        source = latent["samples"]
+        source, other_streams, video_idx = _extract_video_samples(samples_value)
         if source.ndim not in (4, 5):
             raise ValueError(f"Expected a 4D or 5D latent, got shape {tuple(source.shape)}")
         selected_mode = str(mode.get("mode") or UpscaleMode.SCALE_BY)
@@ -453,7 +496,9 @@ class MiniMaxH3EasyLatentUpscaler3D(io.ComfyNode):
         if was_image:
             upscaled = upscaled.squeeze(2)
         result = dict(latent)
-        result["samples"] = upscaled.to(device="cpu", dtype=source_dtype)
+        result["samples"] = _rebuild_samples(
+            samples_value, video_idx, upscaled.to(device="cpu", dtype=source_dtype), other_streams
+        )
         return io.NodeOutput(result)
 
 

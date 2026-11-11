@@ -822,7 +822,6 @@
         "上下文分段",
         "默认",
         "For the target video, at 0.00 seconds into the target video, <Picture 1> is fully referenced.\n\nintegrated_multimodal_description: Pixel art style. The farmer from <Picture 1>, wearing his straw hat and blue plaid shirt, stands in a sunny orchard. The camera pans slowly as he reaches up and plucks a ripe red apple from a tree branch.\n\noverall_soundscape: Soft rustling of leaves and distant birds chirping.\n\nnon_diegetic_music: Light, cheerful acoustic guitar melody.\n\n---\n\nintegrated_multimodal_description: Pixel art style. The farmer from <Picture 1> holds the plucked red apple in his gloved hand. The camera slowly pushes in as he smiles and wipes the apple against his blue plaid shirt.\n\noverall_soundscape: Soft fabric rustling against the apple.\n\nnon_diegetic_music: Gentle acoustic guitar notes continuing.\n\n---\n\nintegrated_multimodal_description: Pixel art style. The farmer from <Picture 1> lifts the red apple and takes a crisp bite. The camera holds a static close-up as he chews with a satisfied expression.\n\noverall_soundscape: A loud, crisp crunch of biting into an apple.\n\nnon_diegetic_music: A warm acoustic guitar chord fading out.",
-        null,
         "480P",
         "16:9",
         1344,
@@ -842,10 +841,10 @@
         "",
         "",
         "en",
-        "none",
+        "仅通用方案",
         false,
         false,
-        "whole_sequence",
+        "整体优化",
         3
       ],
       "widgets_values_named": {
@@ -865,17 +864,17 @@
         "keyframe_role": "首帧优先",
         "ref_image_size": "1K 面积（约1MP）",
         "reference_mention_mode": "按序号",
-        "prompt_optimizer_scene_guide": "none",
-        "context_prompt_optimizer_mode": "whole_sequence",
-        "context_prompt_optimizer_concurrency": 3,
         "prompt_optimizer": false,
         "prompt_optimizer_api_format": "openai",
         "prompt_optimizer_api_url": "",
         "prompt_optimizer_api_key": "",
         "prompt_optimizer_model": "",
         "prompt_optimizer_language": "en",
+        "prompt_optimizer_scene_guide": "仅通用方案",
         "prompt_optimizer_read_media": false,
-        "prompt_optimizer_optimize_on_run": false
+        "prompt_optimizer_optimize_on_run": false,
+        "context_prompt_optimizer_mode": "整体优化",
+        "context_prompt_optimizer_concurrency": 3
       }
     }
   ],
