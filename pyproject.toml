@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-minimaxh3-easy"
 description = "Streamlined MiniMax H3 video generation and H3 Image generation/editing workflows for ComfyUI."
-version = "1.4.0"
+version = "1.4.1"
 license = { file = "LICENSE" }
 dependencies = ["requests", "psutil"]
 
