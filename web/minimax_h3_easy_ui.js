@@ -2712,15 +2712,14 @@ function buildRuntimePrompt(node, runtimeLinks) {
     const fallback = String(promptWidget?.value || "");
     const doc = node?.properties?.[PROMPT_DOC_PROP];
     if (!Array.isArray(doc?.parts)) return fallback;
-    const loaderOptions = mediaLoaderReferenceOptions(node, true);
+    const loaderOptions = mediaLoaderReferenceOptions(node);
     return doc.parts.map((part) => {
         if (part?.type === "dialogue") return `<d>${String(part.text || "")}</d>`;
         if (part?.type !== "mention") return String(part?.text || "");
         const mediaType = String(part.mediaType || "image").toLowerCase();
         if (loaderOptions) {
             const option = findMentionOption(loaderOptions, part, referenceMentionMode(node));
-            if (option?.disabled) return "";
-            if (!option) return `${UNRESOLVED_REF_PREFIX}${mediaType}__`;
+            if (!option) return "";
             return isImageNode(node) ? option.tag : `${RUNTIME_REF_PREFIX}${option.mediaIndex}__`;
         }
         const partSourceId = part.sourceId != null && Number.isFinite(Number(part.sourceId)) ? Number(part.sourceId) : null;
@@ -3123,16 +3122,12 @@ function findMentionOption(options, reference, mode) {
         : null;
     if (Number(reference?.libraryOrdinal) > 0
         || (Number.isFinite(sourceId) && isMediaLoader(app.graph?.getNodeById?.(sourceId)))) {
-        const bound = options.filter((item) => item.type === type && Number(item.libraryOrdinal) > 0);
-        // Keep the existing position-based swap behavior, but anchor to the
-        // full library position so disabling an earlier item cannot retarget @.
-        // Use the connected loader's options, not an obsolete loader id after
-        // reconnecting the media input (the old node may still be on canvas).
-        const libraryOrdinal = Number(reference?.libraryOrdinal) || ordinal;
-        if (Number.isFinite(libraryOrdinal) && libraryOrdinal > 0) {
-            return bound.find((item) => Number(item.libraryOrdinal) === libraryOrdinal) || null;
-        }
-        return bound.find((item) => item.filename === reference?.filename) || null;
+        // Both display modes refer to the current enabled Nth item. A saved
+        // full-library position is only a fallback for older disabled chips
+        // whose ordinal was cleared; it must not override an active ordinal.
+        const activeOrdinal = ordinal || Number(reference?.libraryOrdinal);
+        return options.find((item) => item.type === type && !item.disabled
+            && Number(item.ordinal) === activeOrdinal) || null;
     }
     if (mode === "index") return findByOrdinal();
     if (Number.isFinite(sourceId)) {
@@ -3162,6 +3157,20 @@ function findMentionOption(options, reference, mode) {
     // source; after resolution updateMentionChip stores sourceId/sourceSlot and
     // the reference becomes source-bound like any other filename-mode chip.
     return findByOrdinal();
+}
+
+function pendingMediaLoaderMention(reference, mode) {
+    const type = String(reference?.mediaType || reference?.type || "image").toLowerCase();
+    const ordinal = Number(reference?.ordinal) || Number(reference?.libraryOrdinal) || null;
+    const tag = promptMentionTag(type, ordinal);
+    const label = ordinal ? `${LABELS[type] || type}${ordinal}` : String(reference?.label || "");
+    return {
+        type, ordinal, tag, token: tag, label, fullLabel: label,
+        filename: "", previewUrl: "", mediaIndex: null,
+        libraryOrdinal: Number(reference?.libraryOrdinal) || null,
+        sourceId: reference?.sourceId ?? null, sourceSlot: Number(reference?.sourceSlot) || 0,
+        referenceMode: mode, unresolved: true, pending: Boolean(ordinal),
+    };
 }
 
 function isLikelyVideoUrl(url) {
@@ -3244,12 +3253,13 @@ function refreshMentionPreviews() {
             continue;
         }
         const options = mentionOptions(node);
-        const chipOptions = mediaLoaderReferenceOptions(node, true) || options;
+        const loaderOptions = mediaLoaderReferenceOptions(node);
+        const chipOptions = loaderOptions || options;
         const currentMode = referenceMentionMode(node);
         for (const chip of node.__h3Editor?.querySelectorAll?.(".h3-mention-chip") || []) {
             const sourceId = chip.dataset.sourceId ? Number(chip.dataset.sourceId) : null;
             const ordinal = Number(chip.dataset.ordinal) || null;
-            const option = findMentionOption(chipOptions, {
+            const reference = {
                 mediaType: chip.dataset.mediaType || "image",
                 ordinal,
                 libraryOrdinal: Number(chip.dataset.libraryOrdinal) || null,
@@ -3257,8 +3267,11 @@ function refreshMentionPreviews() {
                 sourceSlot: Number(chip.dataset.sourceSlot) || 0,
                 filename: chip.dataset.filename || "",
                 fullLabel: chip.dataset.fullLabel || "",
-            }, currentMode);
-            updateMentionChip(chip, option || {
+            };
+            const option = findMentionOption(chipOptions, reference, currentMode);
+            const pendingLoader = !option && (loaderOptions || reference.libraryOrdinal)
+                ? pendingMediaLoaderMention(reference, currentMode) : null;
+            updateMentionChip(chip, option || pendingLoader || {
                 type: chip.dataset.mediaType || "image",
                 token: chip.dataset.token || "",
                 label: chip.dataset.label || chip.dataset.fullLabel || "",
@@ -3306,7 +3319,7 @@ function updateMentionChip(chip, option) {
     chip.dataset.referenceMode = option.referenceMode || chip.dataset.referenceMode || "index";
     chip.dataset.ordinal = option.disabled ? "" : Number(option.ordinal) || chip.dataset.ordinal || "";
     chip.dataset.libraryOrdinal = Number(option.libraryOrdinal) || chip.dataset.libraryOrdinal || "";
-    chip.dataset.mediaIndex = option.disabled ? "" : Number(option.mediaIndex) || chip.dataset.mediaIndex || "";
+    chip.dataset.mediaIndex = option.disabled || option.unresolved ? "" : Number(option.mediaIndex) || chip.dataset.mediaIndex || "";
     chip.dataset.pendingReference = option.pending ? "true" : "";
     if (option.sourceId != null) chip.dataset.sourceId = String(option.sourceId);
     if (option.sourceSlot != null) chip.dataset.sourceSlot = String(Number(option.sourceSlot) || 0);
@@ -3678,6 +3691,9 @@ function promptMentionTag(type, ordinal) {
 function promptTextFromPart(part) {
     if (part?.type === "dialogue") return "<d>" + String(part.text || "") + "</d>";
     if (part?.type !== "mention") return String(part?.text || "");
+    if (Number(part.libraryOrdinal) > 0) {
+        return promptMentionTag(part.mediaType, Number(part.ordinal) || Number(part.libraryOrdinal)) || "";
+    }
     return String(part.tag || part.token || promptMentionTag(part.mediaType, part.ordinal) || "");
 }
 
@@ -3869,7 +3885,8 @@ function renderEditorFromNode(node, force = false) {
         else appendPromptTextWithDialogueBlocks(editor, String(widget.value || ""));
         return;
     }
-    const live = mediaLoaderReferenceOptions(node, true) || mentionOptions(node);
+    const loaderOptions = mediaLoaderReferenceOptions(node);
+    const live = loaderOptions || mentionOptions(node);
     for (const part of doc.parts) {
         if (part?.type === "dialogue") {
             if (isImageNode(node)) appendTextWithBreaks(editor, `<d>${String(part.text || "")}</d>`);
@@ -3883,7 +3900,7 @@ function renderEditorFromNode(node, force = false) {
         const currentMode = referenceMentionMode(node);
         const partSourceId = part.sourceId != null && Number.isFinite(Number(part.sourceId)) ? Number(part.sourceId) : null;
         const partOrdinal = Number(part.ordinal) || null;
-        const option = findMentionOption(live, {
+        const reference = {
             mediaType: part.mediaType || "image",
             ordinal: partOrdinal,
             libraryOrdinal: part.libraryOrdinal,
@@ -3891,23 +3908,26 @@ function renderEditorFromNode(node, force = false) {
             sourceSlot: Number(part.sourceSlot) || 0,
             filename: part.filename || "",
             fullLabel: part.fullLabel || "",
-        }, currentMode);
+        };
+        const option = findMentionOption(live, reference, currentMode)
+            || ((loaderOptions || Number(part.libraryOrdinal) > 0)
+                ? pendingMediaLoaderMention(reference, currentMode) : null);
         editor.append(makeMentionChip({
             type: part.mediaType || option?.type || "image",
             token: option?.token || part.token || option?.tag || "",
             tag: option?.tag || part.tag || part.token || "",
             label: option?.label || part.label || part.token || "",
             fullLabel: option?.fullLabel || part.fullLabel || part.label || part.token || "",
-            filename: option?.filename || part.filename || "",
+            filename: option?.filename ?? part.filename ?? "",
             referenceMode: currentMode,
             ordinal: option?.ordinal ?? part.ordinal,
             libraryOrdinal: option?.libraryOrdinal ?? part.libraryOrdinal,
             sourceId: option?.sourceId ?? part.sourceId,
             sourceSlot: option?.sourceSlot ?? part.sourceSlot ?? 0,
             previewUrl: option?.previewUrl || "",
-            unresolved: !option,
+            unresolved: !option || Boolean(option.unresolved),
             disabled: Boolean(option?.disabled),
-            pending: !option && partSourceId == null && partOrdinal != null,
+            pending: Boolean(option?.pending) || (!option && partSourceId == null && partOrdinal != null),
         }));
     }
 }
@@ -4863,12 +4883,12 @@ function syncSegmentSummary(node) {
 function promptTextForOptimizer(node) {
     const doc = node?.properties?.[PROMPT_DOC_PROP];
     if (Array.isArray(doc?.parts)) {
-        const loaderOptions = mediaLoaderReferenceOptions(node, true);
+        const loaderOptions = mediaLoaderReferenceOptions(node);
         if (loaderOptions) {
             return doc.parts.map((part) => {
                 if (part?.type !== "mention") return promptTextFromPart(part);
                 const option = findMentionOption(loaderOptions, part, referenceMentionMode(node));
-                return option?.disabled ? "" : option?.tag || promptTextFromPart(part);
+                return option?.tag || "";
             }).join("");
         }
         return promptDocTextFromParts(doc.parts);
@@ -7532,7 +7552,8 @@ function installNode(nodeType, nodeData) {
         const result = originalSerialize?.apply(this, arguments);
         if (info && this.properties?.[PROMPT_DOC_PROP]) {
             info.properties ||= {};
-            info.properties[PROMPT_DOC_PROP] = this.properties[PROMPT_DOC_PROP];
+            // Saved workflow data must not contain reactive Vue proxies.
+            info.properties[PROMPT_DOC_PROP] = JSON.parse(JSON.stringify(this.properties[PROMPT_DOC_PROP]));
         }
         if (info && this.properties?.[PROMPT_VIEW_PROP]) {
             info.properties ||= {};
@@ -7540,7 +7561,7 @@ function installNode(nodeType, nodeData) {
         }
         if (info && this.properties?.[PROMPT_AUTO_MARKER_PROP]) {
             info.properties ||= {};
-            info.properties[PROMPT_AUTO_MARKER_PROP] = this.properties[PROMPT_AUTO_MARKER_PROP];
+            info.properties[PROMPT_AUTO_MARKER_PROP] = JSON.parse(JSON.stringify(this.properties[PROMPT_AUTO_MARKER_PROP]));
         }
         return result;
     };
